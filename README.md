@@ -1,1 +1,1 @@
-Rust Rust Rust
+Spam, Spam, Spam, Rust and Spam
