@@ -1,1 +1,2 @@
-Spam, Spam, Spam, Rust and Spam
+I wanna write the very best,
+that no one ever wrote!
