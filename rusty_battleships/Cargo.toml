@@ -1,0 +1,4 @@
+[package]
+name = "rusty_battleships"
+version = "0.0.1"
+authors = ["Moritz Baumann <moritz.baumann@student.kit.edu>", "David Rieger <david.rieger@student.kit.edu>"]
