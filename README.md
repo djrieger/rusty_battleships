@@ -1,2 +1,4 @@
-I wanna write the very best,
-that no one ever wrote!
+Rusty Battleships
+=================
+
+Client/Server implementation of Battleship (Rust, group 6)
