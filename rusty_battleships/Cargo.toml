@@ -4,4 +4,5 @@ version = "0.0.1"
 authors = ["Moritz Baumann <moritz.baumann@student.kit.edu>", "David Rieger <david.rieger@student.kit.edu>"]
 
 [dependencies]
+#qmlrs = { git = "git://github.com/cyndis/qmlrs.git" }
 #rustty = "0.1.9"
