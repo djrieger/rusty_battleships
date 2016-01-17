@@ -1,16 +1,7 @@
-
-
 use std::env;
-use std::process as process;
-use std::net::TcpListener;
 use std::net::TcpStream;
 use std::io::Write;
-use std::io::Read;
-use std::io::BufReader;
-use std::str;
 use std::option::Option::None;
-use std::str::FromStr;
-use std::string::String;
 
 /* vlient <IP> <PORT>
  * In CLIENT mode, ip and port of the server is required.
@@ -33,8 +24,7 @@ fn main() {
 	sender.set_write_timeout(None);
 	let message = "123".to_string();
 	//	let message = b"123"; //Directly into bytes!
-	let mut message_bytes:Vec<u8> = message.into_bytes();
+	let message_bytes:Vec<u8> = message.into_bytes();
 	sender.write(&message_bytes);
 
 }
-

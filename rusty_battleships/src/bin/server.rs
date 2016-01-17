@@ -1,16 +1,11 @@
 
 
 use std::env;
-use std::process as process;
 use std::net::TcpListener;
-use std::net::TcpStream;
-use std::io::Write;
 use std::io::Read;
 use std::io::BufReader;
 use std::str;
 use std::option::Option::None;
-use std::str::FromStr;
-use std::string::String;
 
 /* tcpfun <PORT/IP:PORT>
  * In SERVER mode, the target port for the TCP socket is required.
@@ -19,7 +14,7 @@ use std::string::String;
 fn main() {
     let args: Vec<_> = env::args().collect(); // args[0] is the name of the program.
     let mut port:u16 = 5000;
-    let mut ip = "127.0.0.1";
+    let ip = "127.0.0.1";
 
     if args.len() == 2 {
     	port = args[1].parse::<u16>().unwrap();
@@ -42,6 +37,3 @@ fn main() {
 		}
 	}
 }
-
-
-
