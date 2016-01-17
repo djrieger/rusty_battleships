@@ -4,3 +4,4 @@ version = "0.0.1"
 authors = ["Moritz Baumann <moritz.baumann@student.kit.edu>", "David Rieger <david.rieger@student.kit.edu>"]
 
 [dependencies]
+#rustty = "0.1.9"
