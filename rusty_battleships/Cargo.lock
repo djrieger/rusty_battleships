@@ -18,7 +18,7 @@ source = "git+https://github.com/alexcrichton/pkg-config-rs#6ef53c5053bd287b3708
 [[package]]
 name = "qmlrs"
 version = "0.0.1"
-source = "git+git://github.com/Landkeks/qmlrs.git#a253f36801667b336fa7cc9bc24c39ce9f08abb0"
+source = "git+git://github.com/Landkeks/qmlrs.git#8498bb5cae6c9aca5bf420c2d0f182d4b612d66a"
 dependencies = [
  "libc 0.2.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "pkg-config 0.3.6 (git+https://github.com/alexcrichton/pkg-config-rs)",
