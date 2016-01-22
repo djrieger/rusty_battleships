@@ -14,6 +14,10 @@ Build requirements
    * OS X: XCode command line tools (include clang)
    * Windows: Visual Studio 2015, including C++ support
  * Qt 5.5 (Linux, OS X) / 5.6 beta, 64-bit, VS 2015 (Windows)
+   * When using the online installer only the following Qt modules have to be selected: 
+     - Quick Controls
+     - Quick
+     - Script
 
 Environment setup on Windows
 ----------------------------
