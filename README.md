@@ -24,3 +24,10 @@ automatically. However, Qt 5.5 does not support Visual Studio 2015, so we have
 to use the beta to build on Windows at the moment.
 
 (On Linux/Mac, any stable 5.x version should be fine.)
+
+Environment setup on OS X
+----------------------------
+
+CMAKE_PREFIX_PATH=$QTDIR
+PKG_CONFIG_PATH=$QTDIR/lib/pkgconfig
+DYLD_FRAMEWORK_PATH=$QTDIR/lib
