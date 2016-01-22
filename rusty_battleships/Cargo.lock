@@ -7,7 +7,7 @@ dependencies = [
 
 [[package]]
 name = "libc"
-version = "0.2.4"
+version = "0.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
@@ -18,9 +18,9 @@ source = "git+https://github.com/alexcrichton/pkg-config-rs#6ef53c5053bd287b3708
 [[package]]
 name = "qmlrs"
 version = "0.0.1"
-source = "git+git://github.com/Landkeks/qmlrs.git#c0cb8cc850a0530a0843fc19fb049cce4fe44bd1"
+source = "git+git://github.com/Landkeks/qmlrs.git#d594829d3c555957aa56631ea7f8e9487996b8d1"
 dependencies = [
- "libc 0.2.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "libc 0.2.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "pkg-config 0.3.6 (git+https://github.com/alexcrichton/pkg-config-rs)",
 ]
 
