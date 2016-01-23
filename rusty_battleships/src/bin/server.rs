@@ -29,6 +29,15 @@ fn extract_number(reader: &mut BufReader<TcpStream>) -> u8 {
     return message_buffer[0];
 }
 
+fn extract_bool(mut reader: &mut BufReader<TcpStream>) -> bool {
+    let intval = extract_number(&mut reader);
+    match intval {
+        1 => return true,
+        0 => return false,
+        _ => panic!("invalid bool")
+    }
+}
+
 fn extract_placement(mut reader: &mut BufReader<TcpStream>) -> [Message::ShipPlacement; 5] {
     let mut placement:[Message::ShipPlacement; 5] = [Message::ShipPlacement { x: 0, y: 0, direction: Message::Direction::North }; 5];
     for i in 0..4 {
@@ -74,7 +83,7 @@ fn main() {
         let mut buff_reader = BufReader::new(tcpstream);
         let result = buff_reader.read_exact(&mut message_buffer);
         let opcode = message_buffer[0];
-            let mut request: Option<Message::Request> = None;
+        let mut request: Option<Message::Request> = None;
         let mut response: Option<Message::Response> = None;
         let mut update:   Option<Message::Update> = None;
         match opcode {
@@ -133,10 +142,58 @@ fn main() {
             }),
             199 => response = Some(Message::Response::InvalidRequest),
 
+
+            200 => update = Some(Message::Update::PlayerJoined {
+                nickname: extract_string(&mut buff_reader)
+            }),
+            201 => update = Some(Message::Update::PlayerLeft {
+                nickname: extract_string(&mut buff_reader)
+            }),
+            202 => update = Some(Message::Update::PlayerReady {
+                nickname: extract_string(&mut buff_reader)
+            }),
+            203 => update = Some(Message::Update::PlayerNotReady {
+                nickname: extract_string(&mut buff_reader)
+            }),
+            204 => update = Some(Message::Update::GameStart {
+                nickname: extract_string(&mut buff_reader)
+            }),
+            210 => update = Some(Message::Update::YourTurn),
+            211 => update = Some(Message::Update::EnemyTurn),
+            212 => update = Some(Message::Update::EnemyVisible {
+                x: extract_number(&mut buff_reader),
+                y: extract_number(&mut buff_reader)
+            }),
+            213 => update = Some(Message::Update::EnemyInvisible {
+                x: extract_number(&mut buff_reader),
+                y: extract_number(&mut buff_reader)
+            }),
+            214 => update = Some(Message::Update::EnemyHit {
+                x: extract_number(&mut buff_reader),
+                y: extract_number(&mut buff_reader)
+            }),
+            215 => update = Some(Message::Update::EnemyMiss {
+                x: extract_number(&mut buff_reader),
+                y: extract_number(&mut buff_reader)
+            }),
+            216 => update = Some(Message::Update::GameOver {
+                victorious: extract_bool(&mut buff_reader),
+                reason: Message::get_reason(extract_number(&mut buff_reader)),
+            }),
+            217 => update = Some(Message::Update::AfkWarning {
+                strikes: extract_number(&mut buff_reader)
+            }),
+            218 => update = Some(Message::Update::EnemyAfk{
+                strikes: extract_number(&mut buff_reader)
+            }),
+
+            255 => update = Some(Message::Update::ServerGoingDown),
+
             _   => response = None
         }
         println!("Request: {:?} ", request);
         println!("Response: {:?} ", response);
+        println!("Update: {:?} ", update);
         // match msg.unwrap() {
         //     Message::Request::GetFeatures => println!("FEATIU"),
         //     Message::Request::ChallengePlayer { username: nickname } => println!("{}", nickname),
