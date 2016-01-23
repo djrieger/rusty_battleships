@@ -103,7 +103,7 @@ pub enum Update {
     AfkWarning {
         strikes:u8,
     },
-    EnemyAfkWarning {
+    EnemyAfk {
         strikes:u8,
     },
     ServerGoingDown,
