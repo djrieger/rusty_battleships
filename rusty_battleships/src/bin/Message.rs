@@ -117,13 +117,13 @@ pub enum Direction {
     West,
 }
 
-pub fn get_direction(direction_indicator: u8) -> Direction {
-    return match direction_indicator {
+pub fn get_direction(direction_index: u8) -> Direction {
+    return match direction_index {
         0 => Direction::North,
         1 => Direction::East,
         2 => Direction::South,
         3 => Direction::West,
-        _ => panic!()
+        _ => panic!("Invalid direction index")
     }
 }
 
@@ -140,4 +140,14 @@ pub enum Reason {
     Disconnected,
     Surrendered,
     Afk
+}
+
+pub fn get_reason(reason_index: u8) -> Reason {
+    return match reason_index {
+        0 => Reason::Obliterated,
+        1 => Reason::Disconnected,
+        2 => Reason::Surrendered,
+        3 => Reason::Afk,
+        _ => panic!("Invalid index for reason")
+    }
 }
