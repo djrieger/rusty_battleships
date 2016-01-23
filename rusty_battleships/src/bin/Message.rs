@@ -28,6 +28,7 @@ pub enum Request {
     },
 }
 
+#[derive(Debug)]
 pub enum Response {
     Ok,
     Features {
@@ -60,6 +61,7 @@ pub enum Response {
     InvalidRequest,
 }
 
+#[derive(Debug)]
 pub enum Update {
     PlayerJoined {
         nickname:String,
@@ -132,6 +134,7 @@ pub struct ShipPlacement {
     pub direction:Direction
 }
 
+#[derive(Debug)]
 pub enum Reason {
     Obliterated,
     Disconnected,

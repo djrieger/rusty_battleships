@@ -41,6 +41,18 @@ fn extract_placement(mut reader: &mut BufReader<TcpStream>) -> [Message::ShipPla
     return placement;
 }
 
+fn extract_features(mut reader: &mut BufReader<TcpStream>) -> Message::Response {
+    let numfeatures = extract_number(&mut reader);
+    let mut features = Vec::new();
+    for i in 0..numfeatures - 1 {
+        features.push(extract_string(&mut reader));
+    }
+    return Message::Response::Features {
+        numfeatures: numfeatures,
+        features: features
+    };
+}
+
 fn main() {
     let args: Vec<_> = env::args().collect(); // args[0] is the name of the program.
     let mut port:u16 = 5000;
@@ -62,37 +74,69 @@ fn main() {
         let mut buff_reader = BufReader::new(tcpstream);
         let result = buff_reader.read_exact(&mut message_buffer);
         let opcode = message_buffer[0];
-        let msg;
+            let mut request: Option<Message::Request> = None;
+        let mut response: Option<Message::Response> = None;
+        let mut update:   Option<Message::Update> = None;
         match opcode {
-            000 => msg = Some(Message::Request::GetFeatures),
-            001 => msg = Some(Message::Request::Login {
+            000 => request = Some(Message::Request::GetFeatures),
+            001 => request = Some(Message::Request::Login {
                 username: extract_string(&mut buff_reader)
             }),
-            002 => msg = Some(Message::Request::Ready),
-            003 => msg = Some(Message::Request::NotReady),
-            004 => msg = Some(Message::Request::ChallengePlayer {
+            002 => request = Some(Message::Request::Ready),
+            003 => request = Some(Message::Request::NotReady),
+            004 => request = Some(Message::Request::ChallengePlayer {
                 username: extract_string(&mut buff_reader)
             }),
-            010 => msg = Some(Message::Request::PlaceShips {
+            010 => request = Some(Message::Request::PlaceShips {
                 placement: extract_placement(&mut buff_reader)
             }),
-            11 => msg = Some(Message::Request::Shoot {
+            11 => request = Some(Message::Request::Shoot {
                 x: extract_number(&mut buff_reader),
                 y: extract_number(&mut buff_reader)
             }),
-            012 => msg = Some(Message::Request::MoveAndShoot {
+            012 => request = Some(Message::Request::MoveAndShoot {
                 id: extract_number(&mut buff_reader),
                 direction: Message::get_direction(extract_number(&mut buff_reader)),
                 x: extract_number(&mut buff_reader),
                 y: extract_number(&mut buff_reader)
             }),
-            013 => msg = Some(Message::Request::Surrender),
-            014 => msg = Some(Message::Request::ReportError {
+            013 => request = Some(Message::Request::Surrender),
+            099 => request = Some(Message::Request::ReportError {
                 errormessage: extract_string(&mut buff_reader) 
             }), 
-            _   => msg = None
+
+
+            100 => response = Some(Message::Response::Ok),
+            101 => response = Some(extract_features(&mut buff_reader)), 
+            102 => response = Some(Message::Response::NameTaken {
+                nickname: extract_string(&mut buff_reader)
+            }),
+            103 => response = Some(Message::Response::NoSuchPlayer {
+                nickname: extract_string(&mut buff_reader)
+            }),
+            104 => response = Some(Message::Response::NotWaiting {
+                nickname: extract_string(&mut buff_reader)
+            }),
+            105 => response = Some(Message::Response::GameAlreadyStarted),
+            110 => response = Some(Message::Response::IllegalPlacement),
+            111 => response = Some(Message::Response::Hit {
+                x: extract_number(&mut buff_reader),
+                y: extract_number(&mut buff_reader)
+            }),
+            112 => response = Some(Message::Response::Miss {
+                x: extract_number(&mut buff_reader),
+                y: extract_number(&mut buff_reader)
+            }),
+            113 => response = Some(Message::Response::Destroyed {
+                x: extract_number(&mut buff_reader),
+                y: extract_number(&mut buff_reader)
+            }),
+            199 => response = Some(Message::Response::InvalidRequest),
+
+            _   => response = None
         }
-        println!("Received {:?} message", msg);
+        println!("Request: {:?} ", request);
+        println!("Response: {:?} ", response);
         // match msg.unwrap() {
         //     Message::Request::GetFeatures => println!("FEATIU"),
         //     Message::Request::ChallengePlayer { username: nickname } => println!("{}", nickname),
