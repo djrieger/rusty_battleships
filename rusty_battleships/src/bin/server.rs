@@ -10,6 +10,9 @@ use std::sync::mpsc;
 use std::thread::sleep;
 use std::time::Duration;
 
+use std::net::TcpStream;
+
+mod Message;
 /* tcpfun <PORT/IP:PORT>
  * In SERVER mode, the target port for the TCP socket is required.
  */
@@ -33,16 +36,14 @@ fn main() {
 		let address = listener.local_addr().unwrap();
 		println!("Started listening on port {} at address {}.", port, address);
 		for stream in listener.incoming() {
-			let message = stream.unwrap();
-			message.set_read_timeout(None);
-			let mut message_buffer:[u8;3] = [0;3];
-			let mut buff_reader = BufReader::new(message);
-			let result = buff_reader.read_exact(&mut message_buffer);
-			match result {
-				Result::Ok(_) => println!("Received message: {}", str::from_utf8(&	message_buffer).unwrap()),
-				Result::Err(str) => println!("ERROR!")
-			}
-		}
+	        let tcpstream = stream.unwrap();
+	        tcpstream.set_read_timeout(None);
+	        let mut buff_reader = BufReader::new(tcpstream);
+	        let (request, response, update) = Message::deserialize_message(&mut buff_reader);
+	        if let Some(x) = request { println!("Request: {:?}", x); }
+	        if let Some(x) = response { println!("Response: {:?}", x); }
+	        if let Some(x) = update { println!("Update: {:?}", x); }
+	    }
 	} else { //Just for Testing purposes. Will be prettyfied.
 		let message = "RANDOMSTUFF";
 		let (transmitter, receiver) = mpsc::sync_channel(0);
