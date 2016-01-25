@@ -12,7 +12,12 @@ use std::time::Duration;
 
 use std::net::TcpStream;
 
-mod message;
+extern crate rusty_battleships;
+
+use rusty_battleships::message::{
+    deserialize_message
+};
+
 /* tcpfun <PORT/IP:PORT>
  * In SERVER mode, the target port for the TCP socket is required.
  */
@@ -30,8 +35,8 @@ fn main() {
     	do_thread_testing = true;
     }
     println!("Operating as server on port {}.", port);
-	
-	if !do_t::hread_testing { //Just for Testing purposes. Will be prettyfied.
+
+	if !do_thread_testing { //Just for Testing purposes. Will be prettyfied.
 		let listener = TcpListener::bind((ip, port)).unwrap();
 		let address = listener.local_addr().unwrap();
 		println!("Started listening on port {} at address {}.", port, address);
@@ -39,7 +44,7 @@ fn main() {
 	        let tcpstream = stream.unwrap();
 	        tcpstream.set_read_timeout(None);
 	        let mut buff_reader = BufReader::new(tcpstream);
-	        let (request, response, update) = Message::deserialize_message(&mut buff_reader);
+	        let (request, response, update) = deserialize_message(&mut buff_reader);
 	        if let Some(x) = request { println!("Request: {:?}", x); }
 	        if let Some(x) = response { println!("Response: {:?}", x); }
 	        if let Some(x) = update { println!("Update: {:?}", x); }
