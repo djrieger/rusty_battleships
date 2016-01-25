@@ -12,7 +12,7 @@ use std::time::Duration;
 
 use std::net::TcpStream;
 
-mod Message;
+mod message;
 /* tcpfun <PORT/IP:PORT>
  * In SERVER mode, the target port for the TCP socket is required.
  */
@@ -31,7 +31,7 @@ fn main() {
     }
     println!("Operating as server on port {}.", port);
 	
-	if !do_thread_testing { //Just for Testing purposes. Will be prettyfied.
+	if !do_t::hread_testing { //Just for Testing purposes. Will be prettyfied.
 		let listener = TcpListener::bind((ip, port)).unwrap();
 		let address = listener.local_addr().unwrap();
 		println!("Started listening on port {} at address {}.", port, address);
