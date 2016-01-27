@@ -44,10 +44,8 @@ fn main() {
 	        let tcpstream = stream.unwrap();
 	        tcpstream.set_read_timeout(None);
 	        let mut buff_reader = BufReader::new(tcpstream);
-	        let (request, response, update) = deserialize_message(&mut buff_reader);
-	        if let Some(x) = request { println!("Request: {:?}", x); }
-	        if let Some(x) = response { println!("Response: {:?}", x); }
-	        if let Some(x) = update { println!("Update: {:?}", x); }
+	        let msg = deserialize_message(&mut buff_reader);
+	        if let Some(x) = msg { println!("{:?}", x); }
 	    }
 	} else { //Just for Testing purposes. Will be prettyfied.
 		let message = "RANDOMSTUFF";
