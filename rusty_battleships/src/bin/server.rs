@@ -15,6 +15,7 @@ use std::net::TcpStream;
 extern crate rusty_battleships;
 
 use rusty_battleships::message::{
+    serialize_message,
     deserialize_message
 };
 
@@ -29,38 +30,41 @@ fn main() {
     let mut do_thread_testing = false; //Just for Testing purposes. Will be prettyfied.
 
     if args.len() == 2 {
-    	port = args[1].parse::<u16>().unwrap();
+        port = args[1].parse::<u16>().unwrap();
     } else if args.len() == 3 && args[2] == "threadtest" { //Just for Testing purposes. Will be prettyfied.
-    	port = args[1].parse::<u16>().unwrap();
-    	do_thread_testing = true;
+        port = args[1].parse::<u16>().unwrap();
+        do_thread_testing = true;
     }
     println!("Operating as server on port {}.", port);
 
-	if !do_thread_testing { //Just for Testing purposes. Will be prettyfied.
-		let listener = TcpListener::bind((ip, port)).unwrap();
-		let address = listener.local_addr().unwrap();
-		println!("Started listening on port {} at address {}.", port, address);
-		for stream in listener.incoming() {
-	        let tcpstream = stream.unwrap();
-	        tcpstream.set_read_timeout(None);
-	        let mut buff_reader = BufReader::new(tcpstream);
-	        let msg = deserialize_message(&mut buff_reader);
-	        if let Some(x) = msg { println!("{:?}", x); }
-	    }
-	} else { //Just for Testing purposes. Will be prettyfied.
-		let message = "RANDOMSTUFF";
-		let (transmitter, receiver) = mpsc::sync_channel(0);
+    if !do_thread_testing { //Just for Testing purposes. Will be prettyfied.
+        let listener = TcpListener::bind((ip, port)).unwrap();
+        let address = listener.local_addr().unwrap();
+        println!("Started listening on port {} at address {}.", port, address);
+        for stream in listener.incoming() {
+            let tcpstream = stream.unwrap();
+            tcpstream.set_read_timeout(None);
+            let mut buff_reader = BufReader::new(tcpstream);
+            let msg = deserialize_message(&mut buff_reader);
+            if let Some(x) = msg {
+                println!("{:?}", x); 
+                println!("{}", String::from_utf8(serialize_message(x)).unwrap());
+            }
+        }
+    } else { //Just for Testing purposes. Will be prettyfied.
+        let message = "RANDOMSTUFF";
+        let (transmitter, receiver) = mpsc::sync_channel(0);
 
-		let function = move || {
-			println!("Child sending {} to parent.",  message);
-			sleep(Duration::new(5, 0));
-			transmitter.send(message).unwrap();
-			println!("Child will now terminate.");
-			};
-		let child = thread::spawn(function);
+        let function = move || {
+            println!("Child sending {} to parent.",  message);
+            sleep(Duration::new(5, 0));
+            transmitter.send(message).unwrap();
+            println!("Child will now terminate.");
+        };
+        let child = thread::spawn(function);
 
-		let received_message = receiver.recv().unwrap();
-		println!("Parent thread received {}.", received_message);
-		println!("Parent will now terminate.");
-	}
+        let received_message = receiver.recv().unwrap();
+        println!("Parent thread received {}.", received_message);
+        println!("Parent will now terminate.");
+    }
 }

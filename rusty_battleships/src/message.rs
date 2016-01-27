@@ -2,10 +2,19 @@ use std::io::Read;
 use std::io::BufReader;
 use std::str;
 use std::option::Option::None;
+use std::collections::HashMap;
+use std::fmt;
+use std::io::Write;
 
 use std::net::TcpStream;
 
-#[derive(Debug)]
+// fn build_messagemap() -> Hashmap<Message, u8> {
+//     let mut msgmap = HashMap::new();
+//     msgmap.insert(Message::GetFeaturesRequest, 0);
+//     return msgmap;
+// }
+
+#[derive(Debug, Hash, Eq, PartialEq)]
 pub enum Message {
     // Requests
     GetFeaturesRequest,
@@ -113,12 +122,12 @@ pub enum Message {
     ServerGoingDownUpdate,
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
 pub enum Direction {
-    North,
-    East,
-    South,
-    West,
+    North = 0,
+    East = 1,
+    South = 2,
+    West = 3,
 }
 
 pub fn get_direction(direction_index: u8) -> Direction {
@@ -131,14 +140,14 @@ pub fn get_direction(direction_index: u8) -> Direction {
     }
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
 pub struct ShipPlacement {
     pub x:u8,
     pub y:u8,
     pub direction:Direction
 }
 
-#[derive(Debug)]
+#[derive(Debug, Hash, Eq, PartialEq)]
 pub enum Reason {
     Obliterated,
     Disconnected,
@@ -313,4 +322,152 @@ pub fn deserialize_message(mut reader: &mut BufReader<TcpStream>) -> Option<Mess
         _   => {}
     }
     return msg;
+}
+
+// fn encode_string<'a>(str: &'a String) -> &'a mut Vec<u8> {
+//     if str.len() > 255 {
+//         panic!("String length exceeds 255");
+//     }
+//     return str.into_bytes();
+// }
+//
+
+fn append_string(mut buf: &mut Vec<u8>, string: String) {
+    buf.push(string.len() as u8);
+    write!(&mut buf, "{}", string);
+}
+
+pub fn serialize_message(msg: Message) -> Vec<u8> {
+    let mut msgbuf /*: Vec<u8>*/ = Vec::new();
+    match msg {
+        Message::GetFeaturesRequest => msgbuf.push(000), 
+        Message::LoginRequest { username } => {
+            msgbuf.push(001);
+            append_string(&mut msgbuf, username);
+        },
+        Message::ReadyRequest => msgbuf.push(002),
+        Message::NotReadyRequest => msgbuf.push(003),
+        Message::ChallengePlayerRequest { username } => {
+            msgbuf.push(004);
+            append_string(&mut msgbuf, username);
+        },
+        // Message::PlaceShipsRequest => msgbuf.push(010) {
+        //     placement: extract_placement(&mut reader)
+        // }),
+        Message::ShootRequest { x, y } =>{
+            msgbuf.push(11);
+            msgbuf.push(x);
+            msgbuf.push(y);
+        },
+        Message::MoveAndShootRequest { id, direction, x, y } => {
+            msgbuf.push(012);
+            msgbuf.push(id);
+            msgbuf.push(direction as u8);
+            msgbuf.push(x);
+            msgbuf.push(y);
+        },
+        Message::SurrenderRequest => msgbuf.push(013),
+        Message::ReportErrorRequest { errormessage } => {
+            msgbuf.push(099); 
+            append_string(&mut msgbuf, errormessage);
+        }, 
+
+
+        // Message::OkResponse => msgbuf.push(100),
+        //  extract => msgbuf.push(101)_features(&mut reader)), 
+
+        Message::NameTakenResponse { nickname } => {
+            msgbuf.push(102);
+            append_string(&mut msgbuf, nickname);
+        },
+        Message::NoSuchPlayerResponse { nickname } => {
+            msgbuf.push(103);
+            append_string(&mut msgbuf, nickname);
+        },
+        Message::NotWaitingResponse { nickname } => {
+            msgbuf.push(104);
+            append_string(&mut msgbuf, nickname);
+        },
+        Message::GameAlreadyStartedResponse => msgbuf.push(105),
+        Message::IllegalPlacementResponse => msgbuf.push(110),
+        Message::HitResponse { x, y } => {
+            msgbuf.push(111); 
+            msgbuf.push(x);
+            msgbuf.push(y);
+        },
+        Message::MissResponse { x, y } => {
+            msgbuf.push(112); 
+            msgbuf.push(x);
+            msgbuf.push(y);
+        },
+        Message::DestroyedResponse { x, y } => {
+            msgbuf.push(113); 
+            msgbuf.push(x);
+            msgbuf.push(y);
+        },
+        Message::InvalidRequestResponse => msgbuf.push(199),
+
+
+        Message::PlayerJoinedUpdate { nickname } => {
+            msgbuf.push(200); 
+            append_string(&mut msgbuf, nickname);
+        },
+        Message::PlayerLeftUpdate { nickname } => {
+            msgbuf.push(201); 
+            append_string(&mut msgbuf, nickname);
+        },
+        Message::PlayerReadyUpdate { nickname } => {
+            msgbuf.push(202); 
+            append_string(&mut msgbuf, nickname);
+        },
+        Message::PlayerNotReadyUpdate { nickname } => {
+            msgbuf.push(203); 
+            append_string(&mut msgbuf, nickname);
+        },
+        Message::GameStartUpdate { nickname } => {
+            msgbuf.push(204); 
+            append_string(&mut msgbuf, nickname);
+        },
+
+        Message::YourTurnUpdate => msgbuf.push(210),
+        Message::EnemyTurnUpdate => msgbuf.push(211),
+        Message::EnemyVisibleUpdate { x, y} => {
+            msgbuf.push(212);
+            msgbuf.push(x);
+            msgbuf.push(y);
+        },
+        Message::EnemyInvisibleUpdate { x, y} => {
+            msgbuf.push(213);
+            msgbuf.push(x);
+            msgbuf.push(y);
+        },
+        Message::EnemyHitUpdate { x, y} => {
+            msgbuf.push(214);
+            msgbuf.push(x);
+            msgbuf.push(y);
+        },
+        Message::EnemyMissUpdate { x, y} => {
+            msgbuf.push(215);
+            msgbuf.push(x);
+            msgbuf.push(y);
+        },
+
+        // Message::GameOverUpdate => msgbuf.push(216) {
+        //     victorious: extract_bool(&mut reader),
+        //     reason: get_reason(extract_number(&mut reader)),
+        // }),
+        Message::AfkWarningUpdate { strikes } => {
+            msgbuf.push(217);
+            msgbuf.push(strikes);
+        },
+        Message::EnemyAfkUpdate { strikes } => {
+            msgbuf.push(218);
+            msgbuf.push(strikes);
+        },
+
+        Message::ServerGoingDownUpdate => msgbuf.push(255),
+
+        _ => {},
+    }
+    return msgbuf;
 }
