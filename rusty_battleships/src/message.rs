@@ -8,12 +8,6 @@ use std::io::Write;
 
 use std::net::TcpStream;
 
-// fn build_messagemap() -> Hashmap<Message, u8> {
-//     let mut msgmap = HashMap::new();
-//     msgmap.insert(Message::GetFeaturesRequest, 0);
-//     return msgmap;
-// }
-
 #[derive(Debug, Hash, Eq, PartialEq)]
 pub enum Message {
     // Requests
@@ -149,10 +143,10 @@ pub struct ShipPlacement {
 
 #[derive(Debug, Hash, Eq, PartialEq)]
 pub enum Reason {
-    Obliterated,
-    Disconnected,
-    Surrendered,
-    Afk
+    Obliterated = 0,
+    Disconnected = 1,
+    Surrendered = 2,
+    Afk = 3,
 }
 
 pub fn get_reason(reason_index: u8) -> Reason {
@@ -324,21 +318,16 @@ pub fn deserialize_message(mut reader: &mut BufReader<TcpStream>) -> Option<Mess
     return msg;
 }
 
-// fn encode_string<'a>(str: &'a String) -> &'a mut Vec<u8> {
-//     if str.len() > 255 {
-//         panic!("String length exceeds 255");
-//     }
-//     return str.into_bytes();
-// }
-//
-
 fn append_string(mut buf: &mut Vec<u8>, string: String) {
+    if string.len() > 255 {
+        panic!("String exceeds maximum allowed length.");
+    }
     buf.push(string.len() as u8);
     write!(&mut buf, "{}", string);
 }
 
 pub fn serialize_message(msg: Message) -> Vec<u8> {
-    let mut msgbuf /*: Vec<u8>*/ = Vec::new();
+    let mut msgbuf = Vec::new();
     match msg {
         Message::GetFeaturesRequest => msgbuf.push(000), 
         Message::LoginRequest { username } => {
@@ -351,9 +340,14 @@ pub fn serialize_message(msg: Message) -> Vec<u8> {
             msgbuf.push(004);
             append_string(&mut msgbuf, username);
         },
-        // Message::PlaceShipsRequest => msgbuf.push(010) {
-        //     placement: extract_placement(&mut reader)
-        // }),
+        Message::PlaceShipsRequest { placement } => {
+            msgbuf.push(010);
+            for shipPlacement in &placement {
+                msgbuf.push(shipPlacement.x);
+                msgbuf.push(shipPlacement.y);
+                msgbuf.push(shipPlacement.direction as u8);
+            }
+        },
         Message::ShootRequest { x, y } =>{
             msgbuf.push(11);
             msgbuf.push(x);
@@ -373,8 +367,13 @@ pub fn serialize_message(msg: Message) -> Vec<u8> {
         }, 
 
 
-        // Message::OkResponse => msgbuf.push(100),
-        //  extract => msgbuf.push(101)_features(&mut reader)), 
+        Message::OkResponse => msgbuf.push(100),
+        Message::FeaturesResponse { numfeatures, features } => {
+            msgbuf.push(101);
+            for feature in features {
+                append_string(&mut msgbuf, feature);
+            }
+        },
 
         Message::NameTakenResponse { nickname } => {
             msgbuf.push(102);
@@ -452,10 +451,11 @@ pub fn serialize_message(msg: Message) -> Vec<u8> {
             msgbuf.push(y);
         },
 
-        // Message::GameOverUpdate => msgbuf.push(216) {
-        //     victorious: extract_bool(&mut reader),
-        //     reason: get_reason(extract_number(&mut reader)),
-        // }),
+        Message::GameOverUpdate { victorious, reason } => {
+            msgbuf.push(216);
+            msgbuf.push(victorious as u8);
+            msgbuf.push(reason as u8);
+        },
         Message::AfkWarningUpdate { strikes } => {
             msgbuf.push(217);
             msgbuf.push(strikes);
@@ -466,8 +466,6 @@ pub fn serialize_message(msg: Message) -> Vec<u8> {
         },
 
         Message::ServerGoingDownUpdate => msgbuf.push(255),
-
-        _ => {},
     }
     return msgbuf;
 }
