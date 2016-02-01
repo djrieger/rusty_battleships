@@ -26,9 +26,9 @@ use rusty_battleships::message::{
  */
 
 fn handle_get_features_request(tx : mpsc::SyncSender<Message>, rx : mpsc::Receiver<Message>) -> Message {
-    Message::FeaturesResponse { 
-        numfeatures: 1, 
-        features: vec!["Awesomeness".to_string()] 
+    Message::FeaturesResponse {
+        numfeatures: 1,
+        features: vec!["Awesomeness".to_string()]
     }
 }
 
@@ -44,16 +44,16 @@ fn handle_client(mut stream : TcpStream, tx : mpsc::SyncSender<Message>, rx : mp
     let mut response_msg;
     match msg {
         Some(Message::GetFeaturesRequest) => response_msg = handle_get_features_request(tx, rx),
-        Some(_) => response_msg = Message::ReportError { 
-            errormessage: "Cannot handle opcode".to_string() 
+        Some(_) => response_msg = Message::ReportErrorRequest {
+            errormessage: "Cannot handle opcode".to_string()
         },
-        None => response_msg = Message::ReportError { 
-            errormessage: "Malformed message".to_string() 
+        None => response_msg = Message::ReportErrorRequest { 
+            errormessage: "Malformed message".to_string()
         }
     }
     let serialized_msg = serialize_message(response_msg);
     buff_writer.write(&serialized_msg[..]);
-    // println!("{:?}", x); 
+    // println!("{:?}", x);
     // stream.write(
     // println!("{}", String::from_utf8(serialize_message(x)).unwrap());
     // } else {
@@ -100,12 +100,12 @@ fn main() {
             let mut buff_reader = BufReader::new(tcpstream);
             let msg = deserialize_message(&mut buff_reader);
             if let Some(x) = msg {
-                println!("{:?}", x); 
+                println!("{:?}", x);
                 println!("{}", String::from_utf8(serialize_message(x)).unwrap());
             }
             */
         }
-    } 
+    }
     /*else { //Just for Testing purposes. Will be prettyfied.
         let message = "RANDOMSTUFF";
         let (transmitter, receiver) = mpsc::sync_channel(0);

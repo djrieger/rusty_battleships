@@ -2,8 +2,6 @@ use std::io::Read;
 use std::io::BufReader;
 use std::str;
 use std::option::Option::None;
-use std::collections::HashMap;
-use std::fmt;
 use std::io::Write;
 
 use std::net::TcpStream;
@@ -34,7 +32,7 @@ pub enum Message {
         y:u8,
     },
     SurrenderRequest,
-    ReportError{
+    ReportErrorRequest {
         errormessage:String,
     },
 
@@ -44,13 +42,13 @@ pub enum Message {
         numfeatures:u8,
         features:Vec<String>,
     },
-    NameTakenResponse{
+    NameTakenResponse {
         nickname:String,
     },
-    NoSuchPlayerResponse{
+    NoSuchPlayerResponse {
         nickname:String,
     },
-    NotWaitingResponse{
+    NotWaitingResponse {
         nickname:String,
     },
     GameAlreadyStartedResponse,
@@ -113,8 +111,107 @@ pub enum Message {
     EnemyAfkUpdate {
         strikes:u8,
     },
-    ServerGoingDownUpdate,
+    ServerGoingDownUpdate {
+        errormessage:String,
+    },
 }
+
+#[derive(Debug, Hash, Eq, PartialEq)]
+enum MessageEnvironment {
+    Lobby,
+    Game,
+    All,
+}
+
+#[derive(Debug, Hash, Eq, PartialEq)]
+enum MessageType {
+    Request,
+    Response,
+    Update,
+}
+
+fn message_type(msg: Message) -> (MessageEnvironment, MessageType) {
+    match msg {
+        Message::GetFeaturesRequest |
+        Message::LoginRequest{..} |
+        Message::ReadyRequest |
+        Message::NotReadyRequest |
+        Message::ChallengePlayerRequest {..} => (MessageEnvironment::Lobby, MessageType::Request),
+
+        Message::PlaceShipsRequest {..} |
+        Message::ShootRequest {..} |
+        Message::MoveAndShootRequest {..} |
+        Message::SurrenderRequest => (MessageEnvironment::Game, MessageType::Request),
+
+        Message::ReportErrorRequest{..} => (MessageEnvironment::All, MessageType::Request),
+
+
+        Message::FeaturesResponse{..} |
+        Message::NameTakenResponse{..} |
+        Message::NoSuchPlayerResponse{..} |
+        Message::NotWaitingResponse{..} |
+        Message::GameAlreadyStartedResponse => (MessageEnvironment::Lobby, MessageType::Response),
+
+        Message::IllegalPlacementResponse |
+        Message::HitResponse {..} |
+        Message::MissResponse {..} |
+        Message::DestroyedResponse {..} => (MessageEnvironment::Game, MessageType::Response),
+
+        Message::OkResponse |
+        Message::InvalidRequestResponse => (MessageEnvironment::All, MessageType::Response),
+
+
+        Message::PlayerJoinedUpdate{..} |
+        Message::PlayerLeftUpdate{..} |
+        Message::PlayerReadyUpdate{..} |
+        Message::PlayerNotReadyUpdate{..} |
+        Message::GameStartUpdate{..} => (MessageEnvironment::Lobby, MessageType::Update),
+
+        Message::YourTurnUpdate |
+        Message::EnemyTurnUpdate |
+        Message::EnemyVisibleUpdate{..} |
+        Message::EnemyInvisibleUpdate{..} |
+        Message::EnemyHitUpdate{..} |
+        Message::EnemyMissUpdate{..} |
+        Message::GameOverUpdate{..} |
+        Message::AfkWarningUpdate{..} |
+        Message::EnemyAfkUpdate{..} => (MessageEnvironment::Game, MessageType::Update),
+
+        Message::ServerGoingDownUpdate{..} => (MessageEnvironment::All, MessageType::Update),
+    }
+}
+
+pub fn is_fatal_error(msg: Message) -> bool {
+    match msg {
+        Message::ReportErrorRequest{..} |
+        Message::InvalidRequestResponse |
+        Message::ServerGoingDownUpdate{..} => true,
+        _ => false
+    }
+}
+
+pub fn is_request(msg: Message) -> bool {
+    message_type(msg).1 == MessageType::Request
+}
+
+pub fn is_response(msg: Message) -> bool {
+    message_type(msg).1 == MessageType::Response
+}
+
+pub fn is_update(msg: Message) -> bool {
+    message_type(msg).1 == MessageType::Update
+}
+
+pub fn is_game(msg: Message) -> bool {
+    let env = message_type(msg).0;
+    env == MessageEnvironment::Game || env == MessageEnvironment::All
+}
+
+pub fn is_lobby(msg: Message) -> bool {
+    let env = message_type(msg).0;
+    env == MessageEnvironment::Lobby || env == MessageEnvironment::All
+}
+
 
 #[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
 pub enum Direction {
@@ -234,13 +331,13 @@ pub fn deserialize_message(mut reader: &mut BufReader<TcpStream>) -> Option<Mess
             y: extract_number(&mut reader)
         }),
         013 => msg = Some(Message::SurrenderRequest),
-        099 => msg = Some(Message::ReportError{
-            errormessage: extract_string(&mut reader) 
-        }), 
+        099 => msg = Some(Message::ReportErrorRequest {
+            errormessage: extract_string(&mut reader)
+        }),
 
 
         100 => msg = Some(Message::OkResponse),
-        101 => msg = Some(extract_features(&mut reader)), 
+        101 => msg = Some(extract_features(&mut reader)),
         102 => msg = Some(Message::NameTakenResponse {
             nickname: extract_string(&mut reader)
         }),
@@ -311,7 +408,9 @@ pub fn deserialize_message(mut reader: &mut BufReader<TcpStream>) -> Option<Mess
             strikes: extract_number(&mut reader)
         }),
 
-        255 => msg = Some(Message::ServerGoingDownUpdate),
+        255 => msg = Some(Message::ServerGoingDownUpdate{
+            errormessage: extract_string(&mut reader)
+        }),
 
         _   => {}
     }
@@ -329,7 +428,7 @@ fn append_string(mut buf: &mut Vec<u8>, string: String) {
 pub fn serialize_message(msg: Message) -> Vec<u8> {
     let mut msgbuf = Vec::new();
     match msg {
-        Message::GetFeaturesRequest => msgbuf.push(000), 
+        Message::GetFeaturesRequest => msgbuf.push(000),
         Message::LoginRequest { username } => {
             msgbuf.push(001);
             append_string(&mut msgbuf, username);
@@ -361,10 +460,10 @@ pub fn serialize_message(msg: Message) -> Vec<u8> {
             msgbuf.push(y);
         },
         Message::SurrenderRequest => msgbuf.push(013),
-        Message::ReportError{ errormessage } => {
-            msgbuf.push(099); 
+        Message::ReportErrorRequest { errormessage } => {
+            msgbuf.push(099);
             append_string(&mut msgbuf, errormessage);
-        }, 
+        },
 
 
         Message::OkResponse => msgbuf.push(100),
@@ -391,17 +490,17 @@ pub fn serialize_message(msg: Message) -> Vec<u8> {
         Message::GameAlreadyStartedResponse => msgbuf.push(105),
         Message::IllegalPlacementResponse => msgbuf.push(110),
         Message::HitResponse { x, y } => {
-            msgbuf.push(111); 
+            msgbuf.push(111);
             msgbuf.push(x);
             msgbuf.push(y);
         },
         Message::MissResponse { x, y } => {
-            msgbuf.push(112); 
+            msgbuf.push(112);
             msgbuf.push(x);
             msgbuf.push(y);
         },
         Message::DestroyedResponse { x, y } => {
-            msgbuf.push(113); 
+            msgbuf.push(113);
             msgbuf.push(x);
             msgbuf.push(y);
         },
@@ -409,23 +508,23 @@ pub fn serialize_message(msg: Message) -> Vec<u8> {
 
 
         Message::PlayerJoinedUpdate { nickname } => {
-            msgbuf.push(200); 
+            msgbuf.push(200);
             append_string(&mut msgbuf, nickname);
         },
         Message::PlayerLeftUpdate { nickname } => {
-            msgbuf.push(201); 
+            msgbuf.push(201);
             append_string(&mut msgbuf, nickname);
         },
         Message::PlayerReadyUpdate { nickname } => {
-            msgbuf.push(202); 
+            msgbuf.push(202);
             append_string(&mut msgbuf, nickname);
         },
         Message::PlayerNotReadyUpdate { nickname } => {
-            msgbuf.push(203); 
+            msgbuf.push(203);
             append_string(&mut msgbuf, nickname);
         },
         Message::GameStartUpdate { nickname } => {
-            msgbuf.push(204); 
+            msgbuf.push(204);
             append_string(&mut msgbuf, nickname);
         },
 
@@ -466,7 +565,10 @@ pub fn serialize_message(msg: Message) -> Vec<u8> {
             msgbuf.push(strikes);
         },
 
-        Message::ServerGoingDownUpdate => msgbuf.push(255),
+        Message::ServerGoingDownUpdate { errormessage } => {
+            msgbuf.push(255);
+            append_string(&mut msgbuf, errormessage);
+        },
     }
     return msgbuf;
 }
