@@ -32,6 +32,15 @@ fn handle_get_features_request(tx : mpsc::SyncSender<Message>, rx : mpsc::Receiv
     }
 }
 
+fn handle_login_request(msg: Message::LoginRequest, tx : mpsc::SyncSender<Message>, rx : mpsc::Receiver<Message>) -> Message {
+    tx.send(msg);
+    return rx.recv().unwrap();
+    // match rx.recv() {
+    //     Ok(msg) => return msg,
+    //     Err(RecvError) => { panic!("asd") }
+    // }
+}
+
 fn handle_client(mut stream : TcpStream, tx : mpsc::SyncSender<Message>, rx : mpsc::Receiver<Message>) {
     println!("Received stream.");
     // stream.write(b"Test");
@@ -44,6 +53,7 @@ fn handle_client(mut stream : TcpStream, tx : mpsc::SyncSender<Message>, rx : mp
     let mut response_msg;
     match msg {
         Some(Message::GetFeaturesRequest) => response_msg = handle_get_features_request(tx, rx),
+        Some(Message::LoginRequest) => response_msg = handle_login_request(tx, rx),
         Some(_) => response_msg = Message::ReportError { 
             errormessage: "Cannot handle opcode".to_string() 
         },
