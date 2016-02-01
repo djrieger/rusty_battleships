@@ -370,6 +370,7 @@ pub fn serialize_message(msg: Message) -> Vec<u8> {
         Message::OkResponse => msgbuf.push(100),
         Message::FeaturesResponse { numfeatures, features } => {
             msgbuf.push(101);
+            msgbuf.push(features.len() as u8);
             for feature in features {
                 append_string(&mut msgbuf, feature);
             }
