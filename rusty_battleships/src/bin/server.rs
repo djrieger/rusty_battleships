@@ -4,7 +4,7 @@ use std::io::Read;
 use std::io::BufReader;
 use std::str;
 use std::option::Option::None;
-//use std::thread::Thread;
+use std::thread::Thread;
 use std::thread;
 use std::sync::mpsc;
 use std::thread::sleep;
@@ -13,15 +13,19 @@ use std::time::Duration;
 use std::net::TcpStream;
 
 extern crate rusty_battleships;
-
 use rusty_battleships::message::{
     serialize_message,
-    deserialize_message
+    deserialize_message,
+    Message
 };
 
 /* tcpfun <PORT/IP:PORT>
  * In SERVER mode, the target port for the TCP socket is required.
  */
+
+fn handle_client(stream : TcpStream, tx : mpsc::SyncSender<Message>, rx : mpsc::Receiver<Message>) {
+	println!("Received stream.");
+}
 
 fn main() {
     let args: Vec<_> = env::args().collect(); // args[0] is the name of the program.
@@ -41,7 +45,21 @@ fn main() {
         let listener = TcpListener::bind((ip, port)).unwrap();
         let address = listener.local_addr().unwrap();
         println!("Started listening on port {} at address {}.", port, address);
+        let mut children = Vec::new();
+        let mut transmitters = Vec::new();
+
+       	let (tx_child, rx_main) = mpsc::sync_channel(0);
         for stream in listener.incoming() {
+        	let tx_child = tx_child.clone();
+        	let (tx_main, rx_child) = mpsc::channel();
+            let child = thread::spawn(move || {
+            	handle_client(stream.unwrap(), tx_child, rx_child);
+            });
+            children.push(child);
+            transmitters.push(tx_main);
+
+			//let (transmitter, receiver) = mpsc::sync_channel(0);
+            /*
             let tcpstream = stream.unwrap();
             tcpstream.set_read_timeout(None);
             let mut buff_reader = BufReader::new(tcpstream);
@@ -50,8 +68,10 @@ fn main() {
                 println!("{:?}", x); 
                 println!("{}", String::from_utf8(serialize_message(x)).unwrap());
             }
+            */
         }
-    } else { //Just for Testing purposes. Will be prettyfied.
+    } 
+    /*else { //Just for Testing purposes. Will be prettyfied.
         let message = "RANDOMSTUFF";
         let (transmitter, receiver) = mpsc::sync_channel(0);
 
@@ -66,5 +86,5 @@ fn main() {
         let received_message = receiver.recv().unwrap();
         println!("Parent thread received {}.", received_message);
         println!("Parent will now terminate.");
-    }
+    }*/
 }
