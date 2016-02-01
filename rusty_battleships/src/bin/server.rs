@@ -11,6 +11,8 @@ use std::thread;
 use std::sync::mpsc;
 use std::thread::sleep;
 use std::time::Duration;
+use std::sync::mpsc::Sender;
+use std::sync::mpsc::Receiver;
 
 use std::net::TcpStream;
 
@@ -68,6 +70,8 @@ fn handle_client(mut stream : TcpStream, tx : mpsc::SyncSender<Message>, rx : mp
     // }
 }
 
+// map JoinHandle -> Player
+
 fn main() {
     let args: Vec<_> = env::args().collect(); // args[0] is the name of the program.
     let mut port:u16 = 50000;
@@ -86,46 +90,73 @@ fn main() {
         let listener = TcpListener::bind((ip, port)).unwrap();
         let address = listener.local_addr().unwrap();
         println!("Started listening on port {} at address {}.", port, address);
-        let mut children = Vec::new();
-        let mut transmitters = Vec::new();
+        let mut endpoints: Vec<(mpsc::Sender<Message>, mpsc::Receiver<Message>)> = Vec::new();
+        let mut players = Vec::new();
 
-       	let (tx_child, rx_main) = mpsc::sync_channel(0);
-        for stream in listener.incoming() {
-        	let tx_child = tx_child.clone();
-        	let (tx_main, rx_child) = mpsc::channel();
-            let child = thread::spawn(move || {
-            	handle_client(stream.unwrap(), tx_child, rx_child);
-            });
-            children.push(child);
-            transmitters.push(tx_main);
+        let (tx_tcp_players, rx_main_players) : (mpsc::Sender<Player>, mpsc::Receiver<Player>) = mpsc::channel();
 
-			//let (transmitter, receiver) = mpsc::sync_channel(0);
-            /*
-            let tcpstream = stream.unwrap();
-            tcpstream.set_read_timeout(None);
-            let mut buff_reader = BufReader::new(tcpstream);
-            let msg = deserialize_message(&mut buff_reader);
-            if let Some(x) = msg {
-                println!("{:?}", x);
-                println!("{}", String::from_utf8(serialize_message(x)).unwrap());
+        let tcp_loop = move || {
+            for stream in listener.incoming() {
+                // channel child --> main
+                let (tx_child, rx_main) = mpsc::sync_channel(0);
+                // channel main --> child
+                let (tx_main, rx_child) = mpsc::channel();
+
+                let child = thread::spawn(move || {
+                    handle_client(stream.unwrap(), tx_child, rx_child);
+                });
+                tx_tcp_players.send(
+                    Player {
+                        nickname: "".to_string(),
+                        from_child_endpoint: rx_main,
+                        to_child_endpoint: tx_main,
+                    }
+                );
             }
-            */
-        }
-    }
-    /*else { //Just for Testing purposes. Will be prettyfied.
-        let message = "RANDOMSTUFF";
-        let (transmitter, receiver) = mpsc::sync_channel(0);
-
-        let function = move || {
-            println!("Child sending {} to parent.",  message);
-            sleep(Duration::new(5, 0));
-            transmitter.send(message).unwrap();
-            println!("Child will now terminate.");
         };
-        let child = thread::spawn(function);
 
-        let received_message = receiver.recv().unwrap();
-        println!("Parent thread received {}.", received_message);
-        println!("Parent will now terminate.");
-    }*/
+        let tcp_thread = thread::spawn(tcp_loop);
+
+        let get_player_name = | p: &Player, username: String | {
+            return p.nickname == username;
+        };
+
+        loop {
+            if let Ok(player) = rx_main_players.try_recv() {
+                players.push(player);
+                endpoints.push((player.to_child_endpoint, player.from_child_endpoint));
+            }
+            for (to_child_endpoint, from_child_endpoint) in &endpoints {
+                if let Ok(msg) = from_child_endpoint.try_recv() {
+                    match msg {
+                        Message::LoginRequest { username }=> {
+                            let mut player_exists = false;
+                            for player in &players {
+                                if player.nickname == username {
+                                    println!("Already exists");
+                                    player_exists = true;
+                                    break;
+                                }
+                            }
+                            if !player_exists {
+                                println!("Adding player");
+                            }
+                        },
+                        _ => { panic!("Not implemented yet"); }
+                    }
+                    // main thread recvs LoginRequest 
+                    // store new child in table
+                    // return ok
+                }
+            }
+        }
+        // tcp_thread.join();
+    }
+}
+
+struct Player {
+    nickname: String,
+    from_child_endpoint: mpsc::Receiver<Message>,
+    to_child_endpoint: mpsc::Sender<Message>
+    // thread_handle: JoinHandle
 }
