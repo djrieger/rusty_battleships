@@ -1,7 +1,9 @@
 use std::env;
 use std::net::TcpListener;
 use std::io::Read;
+use std::io::Write;
 use std::io::BufReader;
+use std::io::BufWriter;
 use std::str;
 use std::option::Option::None;
 use std::thread::Thread;
@@ -23,8 +25,21 @@ use rusty_battleships::message::{
  * In SERVER mode, the target port for the TCP socket is required.
  */
 
-fn handle_client(stream : TcpStream, tx : mpsc::SyncSender<Message>, rx : mpsc::Receiver<Message>) {
-	println!("Received stream.");
+fn handle_client(mut stream : TcpStream, tx : mpsc::SyncSender<Message>, rx : mpsc::Receiver<Message>) {
+    println!("Received stream.");
+    // stream.write(b"Test");
+
+    let mut response_stream = stream.try_clone().unwrap();
+    let mut buff_reader = BufReader::new(stream);
+    let mut buff_writer = BufWriter::new(response_stream);
+    let msg = deserialize_message(&mut buff_reader);
+    if let Some(x) = msg {
+        println!("{:?}", x); 
+        // stream.write(
+        println!("{}", String::from_utf8(serialize_message(x)).unwrap());
+        let serialized_msg = serialize_message(Message::ReportError { errormessage: "bla".to_string() });
+        buff_writer.write(&serialized_msg[..]);
+    }
 }
 
 fn main() {

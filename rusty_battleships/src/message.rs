@@ -34,7 +34,7 @@ pub enum Message {
         y:u8,
     },
     SurrenderRequest,
-    ReportErrorRequest {
+    ReportError{
         errormessage:String,
     },
 
@@ -234,7 +234,7 @@ pub fn deserialize_message(mut reader: &mut BufReader<TcpStream>) -> Option<Mess
             y: extract_number(&mut reader)
         }),
         013 => msg = Some(Message::SurrenderRequest),
-        099 => msg = Some(Message::ReportErrorRequest {
+        099 => msg = Some(Message::ReportError{
             errormessage: extract_string(&mut reader) 
         }), 
 
@@ -361,7 +361,7 @@ pub fn serialize_message(msg: Message) -> Vec<u8> {
             msgbuf.push(y);
         },
         Message::SurrenderRequest => msgbuf.push(013),
-        Message::ReportErrorRequest { errormessage } => {
+        Message::ReportError{ errormessage } => {
             msgbuf.push(099); 
             append_string(&mut msgbuf, errormessage);
         }, 
