@@ -1,20 +1,20 @@
+use std::cell::RefCell;
 use std::env;
-use std::net::TcpListener;
-use std::io::Read;
-use std::io::Write;
 use std::io::BufReader;
 use std::io::BufWriter;
-use std::str;
-use std::option::Option::None;
-use std::thread::Thread;
-use std::thread;
-use std::sync::mpsc;
-use std::thread::sleep;
-use std::time::Duration;
-use std::sync::mpsc::Sender;
-use std::sync::mpsc::Receiver;
-
+use std::io::Read;
+use std::io::Write;
+use std::net::TcpListener;
 use std::net::TcpStream;
+use std::option::Option::None;
+use std::str;
+use std::sync::mpsc::Receiver;
+use std::sync::mpsc::Sender;
+use std::sync::mpsc;
+use std::thread::Thread;
+use std::thread::sleep;
+use std::thread;
+use std::time::Duration;
 
 extern crate rusty_battleships;
 use rusty_battleships::message::{
@@ -26,14 +26,11 @@ use rusty_battleships::message::{
 fn handle_client(mut stream : TcpStream, tx : mpsc::SyncSender<Message>, rx : mpsc::Receiver<Message>) {
     println!("New incoming TCP stream");
 
-    // need to receive client messages in a loop here?
     let mut response_stream = stream.try_clone().unwrap();
     let mut buff_reader = BufReader::new(stream);
     let mut buff_writer = BufWriter::new(response_stream);
     loop {
-        // sleep(Duration::new(2, 0));
         let msg = deserialize_message(&mut buff_reader);
-        // If message received from client is valid...
         let mut response_msg;
         match msg {
             Some(msg) => {
@@ -41,9 +38,7 @@ fn handle_client(mut stream : TcpStream, tx : mpsc::SyncSender<Message>, rx : mp
                 response_msg = rx.recv().unwrap();
             },
             None => {
-                response_msg = Message::ReportErrorRequest { 
-                    errormessage: "Invalid request".to_string()
-                };
+                response_msg = Message::InvalidRequestResponse;
                 println!("Received invalid request");
             }
         }
@@ -85,64 +80,65 @@ fn main() {
             });
             tx_tcp_players.send(
                 Player {
-                    nickname: "".to_string(),
+                    nickname: RefCell::new(None),
                     from_child_endpoint: rx_main,
                     to_child_endpoint: tx_main,
                 }
-                );
+            );
         }
     };
 
     let tcp_thread = thread::spawn(tcp_loop);
 
-    let get_player_name = | p: &Player, username: String | {
-        return p.nickname == username;
-    };
+    // let get_player_name = | p: &Player, username: String | {
+    //     return p.nickname == username;
+    // };
 
     loop {
-        // Receive messages from tcp_loop
+        // Receive new players from tcp_loop
         if let Ok(player) = rx_main_players.try_recv() {
             players.push(player);
         }
-        // Receive messages from child threads
-        for (i, player) in players.iter().enumerate() {
+        // Receive Messages from child threads
+        for (i, mut player) in players.iter().enumerate() {
             if let Ok(msg) = player.from_child_endpoint.try_recv() {
                 print!("[Child {}] {:?}", i, msg);
-                if let Some(response_msg) = handle_main(msg, /*player,*/ &players) {
+                if let Some(response_msg) = handle_main(msg, &player, &players) {
                     println!(" -> {:?}", response_msg);
                     player.to_child_endpoint.send(response_msg);
                 }
             }
+            // let mut nick = player.nickname.borrow_mut();
+            // *nick = Some("David".to_string());
         }
     }
     // tcp_thread.join();
 }
 
-fn handle_main(msg: Message, /*sending_player: &mut Player, */ players: &Vec<Player>) -> Option<Message> {
+fn handle_main(msg: Message, player: &Player, players: &Vec<Player>) -> Option<Message> {
     match msg {
         Message::GetFeaturesRequest => {
             return Some(Message::FeaturesResponse {
                 numfeatures: 1,
                 features: vec!["Awesomeness".to_string()]
             });
-            // respond to child thread!
-            // need to send to current player.to_child_endpoint
-            // sending_player.to_child_endpoint.send(response_msg);
         },
         Message::LoginRequest { username }=> {
-            let mut player_exists = false;
+            // Determine if we already have a player with name 'username'
             for player in players {
-                if player.nickname == username {
-                    println!("Player {} already exists", username);
-                    player_exists = true;
-                    break;
+                let nick = player.nickname.borrow();
+                if let Some(ref nickname) = *nick {
+                    if *nickname == username {
+                        return Some(Message::NameTakenResponse {
+                            nickname: username 
+                        });
+                    }
                 }
             }
-            if !player_exists {
-                // now we need to store the player's name
-                // sending_player.nickname = username;
-                return Some(Message::OkResponse);
-            }
+            // Store player name
+            let mut nick = player.nickname.borrow_mut();
+            *nick = Some(username);
+            return Some(Message::OkResponse);
         },
         _ => { panic!("Not implemented yet"); }
     }
@@ -150,8 +146,7 @@ fn handle_main(msg: Message, /*sending_player: &mut Player, */ players: &Vec<Pla
 }
 
 struct Player {
-    nickname: String,
+    nickname: RefCell<Option<String>>,
     from_child_endpoint: mpsc::Receiver<Message>,
     to_child_endpoint: mpsc::Sender<Message>
-    // thread_handle: JoinHandle
 }
