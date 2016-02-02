@@ -39,7 +39,6 @@ pub enum Message {
     // Responses
     OkResponse,
     FeaturesResponse {
-        numfeatures:u8,
         features:Vec<String>,
     },
     NameTakenResponse {
@@ -258,21 +257,23 @@ pub fn get_reason(reason_index: u8) -> Reason {
 
 // FIXME: handle client closing the connection gracefully (don't unwrap, don't panic)
 
-fn extract_string(mut reader: &mut BufReader<TcpStream>) -> String {
+fn extract_string(mut reader: &mut BufReader<TcpStream>, allow_space: bool) -> String {
     let strlen = extract_number(&mut reader) as usize;
     let mut string_buffer = vec![0;strlen];
     reader.read_exact(&mut string_buffer).unwrap();
-    // FIXME: check whether characters are in range (see RFC)
+    // check whether characters are in range
+    let valid: bool = string_buffer.iter().fold(true, |in_range, &character| {
+        in_range && character <= 0x7E && character >= (if allow_space { 0x20 } else { 0x21 })
+    });
+    if !valid {
+        panic!("Invalid string");
+    }
     return str::from_utf8(&string_buffer).unwrap().to_string();
 }
 
 fn extract_number(reader: &mut BufReader<TcpStream>) -> u8 {
     let mut message_buffer:[u8;1] = [0;1];
-    // No idea how to do this properly.
-    // I want to block if there is no more input so as to wait
-    // for a new message
     reader.read_exact(&mut message_buffer).unwrap();
-    // Alternative to read_exact: reader.take(1).read(&mut message_buffer);
     return message_buffer[0];
 }
 
@@ -300,11 +301,10 @@ fn extract_placement(mut reader: &mut BufReader<TcpStream>) -> [ShipPlacement; 5
 fn extract_features(mut reader: &mut BufReader<TcpStream>) -> Message {
     let numfeatures = extract_number(&mut reader);
     let mut features = Vec::new();
-    for i in 0..numfeatures - 1 {
-        features.push(extract_string(&mut reader));
+    for _ in 0..numfeatures - 1 {
+        features.push(extract_string(&mut reader, true));
     }
     return Message::FeaturesResponse {
-        numfeatures: numfeatures,
         features: features
     };
 }
@@ -315,12 +315,12 @@ pub fn deserialize_message(mut reader: &mut BufReader<TcpStream>) -> Option<Mess
     match opcode {
         000 => msg = Some(Message::GetFeaturesRequest),
         001 => msg = Some(Message::LoginRequest {
-            username: extract_string(&mut reader)
+            username: extract_string(&mut reader, false)
         }),
         002 => msg = Some(Message::ReadyRequest),
         003 => msg = Some(Message::NotReadyRequest),
         004 => msg = Some(Message::ChallengePlayerRequest {
-            username: extract_string(&mut reader)
+            username: extract_string(&mut reader, false)
         }),
         010 => msg = Some(Message::PlaceShipsRequest {
             placement: extract_placement(&mut reader)
@@ -337,20 +337,20 @@ pub fn deserialize_message(mut reader: &mut BufReader<TcpStream>) -> Option<Mess
         }),
         013 => msg = Some(Message::SurrenderRequest),
         099 => msg = Some(Message::ReportErrorRequest {
-            errormessage: extract_string(&mut reader)
+            errormessage: extract_string(&mut reader, true)
         }),
 
 
         100 => msg = Some(Message::OkResponse),
         101 => msg = Some(extract_features(&mut reader)),
         102 => msg = Some(Message::NameTakenResponse {
-            nickname: extract_string(&mut reader)
+            nickname: extract_string(&mut reader, false)
         }),
         103 => msg = Some(Message::NoSuchPlayerResponse {
-            nickname: extract_string(&mut reader)
+            nickname: extract_string(&mut reader, false)
         }),
         104 => msg = Some(Message::NotWaitingResponse {
-            nickname: extract_string(&mut reader)
+            nickname: extract_string(&mut reader, false)
         }),
         105 => msg = Some(Message::GameAlreadyStartedResponse),
         110 => msg = Some(Message::IllegalPlacementResponse),
@@ -370,19 +370,19 @@ pub fn deserialize_message(mut reader: &mut BufReader<TcpStream>) -> Option<Mess
 
 
         200 => msg = Some(Message::PlayerJoinedUpdate {
-            nickname: extract_string(&mut reader)
+            nickname: extract_string(&mut reader, false)
         }),
         201 => msg = Some(Message::PlayerLeftUpdate {
-            nickname: extract_string(&mut reader)
+            nickname: extract_string(&mut reader, false)
         }),
         202 => msg = Some(Message::PlayerReadyUpdate {
-            nickname: extract_string(&mut reader)
+            nickname: extract_string(&mut reader, false)
         }),
         203 => msg = Some(Message::PlayerNotReadyUpdate {
-            nickname: extract_string(&mut reader)
+            nickname: extract_string(&mut reader, false)
         }),
         204 => msg = Some(Message::GameStartUpdate {
-            nickname: extract_string(&mut reader)
+            nickname: extract_string(&mut reader, false)
         }),
         210 => msg = Some(Message::YourTurnUpdate),
         211 => msg = Some(Message::EnemyTurnUpdate),
@@ -414,7 +414,7 @@ pub fn deserialize_message(mut reader: &mut BufReader<TcpStream>) -> Option<Mess
         }),
 
         255 => msg = Some(Message::ServerGoingDownUpdate{
-            errormessage: extract_string(&mut reader)
+            errormessage: extract_string(&mut reader, true)
         }),
 
         _   => {}
@@ -446,10 +446,10 @@ pub fn serialize_message(msg: Message) -> Vec<u8> {
         },
         Message::PlaceShipsRequest { placement } => {
             msgbuf.push(010);
-            for shipPlacement in &placement {
-                msgbuf.push(shipPlacement.x);
-                msgbuf.push(shipPlacement.y);
-                msgbuf.push(shipPlacement.direction as u8);
+            for ship_placement in &placement {
+                msgbuf.push(ship_placement.x);
+                msgbuf.push(ship_placement.y);
+                msgbuf.push(ship_placement.direction as u8);
             }
         },
         Message::ShootRequest { x, y } =>{
@@ -472,7 +472,7 @@ pub fn serialize_message(msg: Message) -> Vec<u8> {
 
 
         Message::OkResponse => msgbuf.push(100),
-        Message::FeaturesResponse { numfeatures, features } => {
+        Message::FeaturesResponse { features } => {
             msgbuf.push(101);
             msgbuf.push(features.len() as u8);
             for feature in features {
