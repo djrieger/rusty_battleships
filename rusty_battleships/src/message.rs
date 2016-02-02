@@ -256,13 +256,14 @@ pub fn get_reason(reason_index: u8) -> Reason {
     }
 }
 
-fn extract_string(mut reader: &mut BufReader<TcpStream>) -> String {
-    let strlen = extract_number(&mut reader);
+// FIXME: handle client closing the connection gracefully (don't unwrap, don't panic)
 
-    let mut string_buffer = vec![];
-    let mut chunk = reader.take(strlen as u64);
-    let status = chunk.read_to_end(&mut string_buffer);
-    return str::from_utf8(& string_buffer).unwrap().to_string();
+fn extract_string(mut reader: &mut BufReader<TcpStream>) -> String {
+    let strlen = extract_number(&mut reader) as usize;
+    let mut string_buffer = vec![0;strlen];
+    reader.read_exact(&mut string_buffer).unwrap();
+    // FIXME: check whether characters are in range (see RFC)
+    return str::from_utf8(&string_buffer).unwrap().to_string();
 }
 
 fn extract_number(reader: &mut BufReader<TcpStream>) -> u8 {
@@ -270,8 +271,7 @@ fn extract_number(reader: &mut BufReader<TcpStream>) -> u8 {
     // No idea how to do this properly.
     // I want to block if there is no more input so as to wait
     // for a new message
-    while !reader.read_exact(&mut message_buffer).is_ok() {
-    }
+    reader.read_exact(&mut message_buffer).unwrap();
     // Alternative to read_exact: reader.take(1).read(&mut message_buffer);
     return message_buffer[0];
 }
