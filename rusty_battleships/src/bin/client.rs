@@ -3,12 +3,7 @@ use std::net::{Ipv4Addr, TcpStream};
 use std::option::Option::None;
 
 extern crate argparse;
-
 use argparse::{ArgumentParser, Store};
-
-/* vlient <IP> <PORT>
- * In CLIENT mode, ip and port of the server is required.
- */
 
 fn main() {
     let mut port:u16 = 5000;

@@ -1,22 +1,15 @@
 use std::cell::RefCell;
-use std::env;
-use std::io::BufReader;
-use std::io::BufWriter;
-use std::io::Write;
-use std::net::TcpListener;
-use std::net::TcpStream;
+use std::io::{BufReader, BufWriter, Write};
+use std::net::{Ipv4Addr, TcpListener, TcpStream};
 use std::option::Option::None;
-use std::sync::mpsc::Receiver;
-use std::sync::mpsc::Sender;
 use std::sync::mpsc;
 use std::thread;
 
+extern crate argparse;
+use argparse::{ArgumentParser, Store};
+
 extern crate rusty_battleships;
-use rusty_battleships::message::{
-    serialize_message,
-    deserialize_message,
-    Message
-};
+use rusty_battleships::message::{serialize_message, deserialize_message, Message};
 
 struct Player {
     nickname: RefCell<Option<String>>,
@@ -99,13 +92,17 @@ fn handle_main(msg: Message, player: &Player, players: &Vec<Player>) -> Option<M
 }
 
 fn main() {
-    let args: Vec<_> = env::args().collect(); // args[0] is the name of the program.
-    let mut port:u16 = 50000;
-    let ip = "127.0.0.1"; //"0.0.0.0";
+    let mut port:u16 = 5000;
+    let mut ip = Ipv4Addr::new(127, 0, 0, 1);
 
-    if args.len() == 2 {
-        port = args[1].parse::<u16>().unwrap();
+    {  // this block limits scope of borrows by ap.refer() method
+        let mut ap = ArgumentParser::new();
+        ap.set_description("Rusty battleships: Game server.");
+        ap.refer(&mut ip).add_argument("IP", Store, "IPv4 address to listen to");
+        ap.refer(&mut port).add_option(&["-p", "--port"], Store, "port to listen on");
+        ap.parse_args_or_exit();
     }
+
     println!("Operating as server on port {}.", port);
 
     let listener = TcpListener::bind((ip, port)).unwrap();
