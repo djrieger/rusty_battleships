@@ -14,7 +14,6 @@ use std::sync::mpsc;
 use std::thread::Thread;
 use std::thread::sleep;
 use std::thread;
-use std::time::Duration;
 
 extern crate rusty_battleships;
 use rusty_battleships::message::{
@@ -22,6 +21,12 @@ use rusty_battleships::message::{
     deserialize_message,
     Message
 };
+
+struct Player {
+    nickname: RefCell<Option<String>>,
+    from_child_endpoint: mpsc::Receiver<Message>,
+    to_child_endpoint: mpsc::Sender<Message>
+}
 
 fn handle_client(mut stream : TcpStream, tx : mpsc::SyncSender<Message>, rx : mpsc::Receiver<Message>) {
     println!("New incoming TCP stream");
@@ -34,7 +39,9 @@ fn handle_client(mut stream : TcpStream, tx : mpsc::SyncSender<Message>, rx : mp
         let mut response_msg;
         match msg {
             Some(msg) => {
+                // Send parsed Message to main thread
                 tx.send(msg);
+                // Wait for response Message
                 response_msg = rx.recv().unwrap();
             },
             None => {
@@ -42,9 +49,42 @@ fn handle_client(mut stream : TcpStream, tx : mpsc::SyncSender<Message>, rx : mp
                 println!("Received invalid request");
             }
         }
+        // Serialize, send response and flush
         let serialized_msg = serialize_message(response_msg);
         buff_writer.write(&serialized_msg[..]).unwrap();
         buff_writer.flush();
+    }
+}
+
+fn handle_main(msg: Message, player: &Player, players: &Vec<Player>) -> Option<Message> {
+    match msg {
+        Message::GetFeaturesRequest => {
+            return Some(Message::FeaturesResponse {
+                numfeatures: 1,
+                features: vec!["Awesomeness".to_string()]
+            });
+        },
+        Message::LoginRequest { username }=> {
+            // Determine if we already have a player with name 'username'
+            for player in players {
+                let nick = player.nickname.borrow();
+                if let Some(ref nickname) = *nick {
+                    if *nickname == username {
+                        return Some(Message::NameTakenResponse {
+                            nickname: username 
+                        });
+                    }
+                }
+            }
+
+            // Store new name
+            // TODO: This currently does not work (setting the name has no effect):
+            // *player.nickname.borrow_mut() = Some(username);
+            // Like this (with a literal instead of a String variable), everything works just fine:
+            *player.nickname.borrow_mut() = Some("Eva".to_string());
+            return Some(Message::OkResponse);
+        },
+        _ => { return None; }
     }
 }
 
@@ -90,10 +130,7 @@ fn main() {
 
     let tcp_thread = thread::spawn(tcp_loop);
 
-    // let get_player_name = | p: &Player, username: String | {
-    //     return p.nickname == username;
-    // };
-
+    // Main loop
     loop {
         // Receive new players from tcp_loop
         if let Ok(player) = rx_main_players.try_recv() {
@@ -103,50 +140,15 @@ fn main() {
         for (i, mut player) in players.iter().enumerate() {
             if let Ok(msg) = player.from_child_endpoint.try_recv() {
                 print!("[Child {}] {:?}", i, msg);
-                if let Some(response_msg) = handle_main(msg, &player, &players) {
-                    println!(" -> {:?}", response_msg);
-                    player.to_child_endpoint.send(response_msg);
+                // Handle Message received from child
+                let opt_response = handle_main(msg, &player, &players);
+                if let Some(response) = opt_response {
+                    // handle_main generated a response -> send response Message back to child
+                    println!(" -> {:?}", response);
+                    player.to_child_endpoint.send(response);
                 }
             }
-            // let mut nick = player.nickname.borrow_mut();
-            // *nick = Some("David".to_string());
         }
     }
     // tcp_thread.join();
-}
-
-fn handle_main(msg: Message, player: &Player, players: &Vec<Player>) -> Option<Message> {
-    match msg {
-        Message::GetFeaturesRequest => {
-            return Some(Message::FeaturesResponse {
-                numfeatures: 1,
-                features: vec!["Awesomeness".to_string()]
-            });
-        },
-        Message::LoginRequest { username }=> {
-            // Determine if we already have a player with name 'username'
-            for player in players {
-                let nick = player.nickname.borrow();
-                if let Some(ref nickname) = *nick {
-                    if *nickname == username {
-                        return Some(Message::NameTakenResponse {
-                            nickname: username 
-                        });
-                    }
-                }
-            }
-            // Store player name
-            let mut nick = player.nickname.borrow_mut();
-            *nick = Some(username);
-            return Some(Message::OkResponse);
-        },
-        _ => { panic!("Not implemented yet"); }
-    }
-    return None;
-}
-
-struct Player {
-    nickname: RefCell<Option<String>>,
-    from_child_endpoint: mpsc::Receiver<Message>,
-    to_child_endpoint: mpsc::Sender<Message>
 }
