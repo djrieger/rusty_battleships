@@ -23,10 +23,6 @@ use rusty_battleships::message::{
     Message
 };
 
-/* tcpfun <PORT/IP:PORT>
- * In SERVER mode, the target port for the TCP socket is required.
- */
-
 fn handle_get_features_request(tx : mpsc::SyncSender<Message>, rx : mpsc::Receiver<Message>) -> Message {
     Message::FeaturesResponse {
         numfeatures: 1,
@@ -34,15 +30,16 @@ fn handle_get_features_request(tx : mpsc::SyncSender<Message>, rx : mpsc::Receiv
     }
 }
 
-fn handle_login_request(msg: Message, tx : mpsc::SyncSender<Message>, rx : mpsc::Receiver<Message>) -> Message {
-    tx.send(msg);
-    return rx.recv().unwrap();
-}
+// fn handle_login_request(username: Message, tx : mpsc::SyncSender<Message>, rx : mpsc::Receiver<Message>) -> Message {
+//     println!("Sending LoginRequest to main thread");
+//     tx.send(msg);
+//     return rx.recv().unwrap();
+// }
 
 fn handle_client(mut stream : TcpStream, tx : mpsc::SyncSender<Message>, rx : mpsc::Receiver<Message>) {
     println!("Received stream.");
-    // stream.write(b"Test");
 
+    // need to receive client messages in a loop here?
     let mut response_stream = stream.try_clone().unwrap();
     let mut buff_reader = BufReader::new(stream);
     let mut buff_writer = BufWriter::new(response_stream);
@@ -51,9 +48,11 @@ fn handle_client(mut stream : TcpStream, tx : mpsc::SyncSender<Message>, rx : mp
     let mut response_msg;
     match msg {
         Some(Message::GetFeaturesRequest) => response_msg = handle_get_features_request(tx, rx),
-        // Some(Message::LoginRequest) => response_msg = handle_login_request(tx, rx),
-        Some(_) => response_msg = Message::ReportErrorRequest {
-            errormessage: "Cannot handle opcode".to_string()
+        // Some(Message::LoginRequest { username }) => response_msg = handle_login_request(username, tx, rx),
+        Some(msg) => {
+            println!("Sending LoginRequest to main thread");
+            tx.send(msg);
+            response_msg = rx.recv().unwrap();
         },
         None => response_msg = Message::ReportErrorRequest { 
             errormessage: "Malformed message".to_string()
@@ -61,13 +60,6 @@ fn handle_client(mut stream : TcpStream, tx : mpsc::SyncSender<Message>, rx : mp
     }
     let serialized_msg = serialize_message(response_msg);
     buff_writer.write(&serialized_msg[..]);
-    // println!("{:?}", x);
-    // stream.write(
-    // println!("{}", String::from_utf8(serialize_message(x)).unwrap());
-    // } else {
-    //     let serialized_msg = serialize_message(Message::ReportError { errormessage: "Malformed message received".to_string() });
-    //     buff_writer.write(&serialized_msg[..]);
-    // }
 }
 
 // map JoinHandle -> Player
@@ -75,7 +67,7 @@ fn handle_client(mut stream : TcpStream, tx : mpsc::SyncSender<Message>, rx : mp
 fn main() {
     let args: Vec<_> = env::args().collect(); // args[0] is the name of the program.
     let mut port:u16 = 50000;
-    let ip = "0.0.0.0";
+    let ip = "127.0.0.1"; //"0.0.0.0";
     let mut do_thread_testing = false; //Just for Testing purposes. Will be prettyfied.
 
     if args.len() == 2 {
@@ -90,9 +82,10 @@ fn main() {
         let listener = TcpListener::bind((ip, port)).unwrap();
         let address = listener.local_addr().unwrap();
         println!("Started listening on port {} at address {}.", port, address);
-        let mut endpoints: Vec<(mpsc::Sender<Message>, mpsc::Receiver<Message>)> = Vec::new();
+        // let mut endpoints: Vec<(&mpsc::Sender<Message>, &mpsc::Receiver<Message>)> = Vec::new();
         let mut players = Vec::new();
 
+        // channel for letting tcp_loop tell main loop about new players
         let (tx_tcp_players, rx_main_players) : (mpsc::Sender<Player>, mpsc::Receiver<Player>) = mpsc::channel();
 
         let tcp_loop = move || {
@@ -122,35 +115,41 @@ fn main() {
         };
 
         loop {
+            // Receive messages from tcp_loop
             if let Ok(player) = rx_main_players.try_recv() {
+                // endpoints.push((&player.to_child_endpoint, &player.from_child_endpoint));
                 players.push(player);
-                endpoints.push((player.to_child_endpoint, player.from_child_endpoint));
             }
-            for (to_child_endpoint, from_child_endpoint) in &endpoints {
-                if let Ok(msg) = from_child_endpoint.try_recv() {
-                    match msg {
-                        Message::LoginRequest { username }=> {
-                            let mut player_exists = false;
-                            for player in &players {
-                                if player.nickname == username {
-                                    println!("Already exists");
-                                    player_exists = true;
-                                    break;
-                                }
-                            }
-                            if !player_exists {
-                                println!("Adding player");
-                            }
-                        },
-                        _ => { panic!("Not implemented yet"); }
-                    }
-                    // main thread recvs LoginRequest 
-                    // store new child in table
-                    // return ok
+            // Receive messages from child threads
+            for player in &players {
+            // for &(ref to_child_endpoint, ref from_child_endpoint) in &endpoints {
+                if let Ok(msg) = player.from_child_endpoint.try_recv() {
+                    handle_main(msg, /*player,*/ &players);
                 }
             }
         }
         // tcp_thread.join();
+    }
+}
+
+fn handle_main(msg: Message, /*sending_player: &mut Player, */ players: &Vec<Player>) {
+    match msg {
+        Message::LoginRequest { username }=> {
+            let mut player_exists = false;
+            for player in players {
+                if player.nickname == username {
+                    println!("Player {} already exists", username);
+                    player_exists = true;
+                    break;
+                }
+            }
+            if !player_exists {
+                println!("Adding player {}", username);
+                // now we need to store the player's name
+                // sending_player.nickname = username;
+            }
+        },
+        _ => { panic!("Not implemented yet"); }
     }
 }
 
