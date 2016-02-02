@@ -6,10 +6,13 @@ use std::sync::mpsc;
 use std::thread;
 
 extern crate argparse;
-use argparse::{ArgumentParser, Store};
+use argparse::{ArgumentParser, Print, Store};
 
 extern crate rusty_battleships;
 use rusty_battleships::message::{serialize_message, deserialize_message, Message};
+
+const DESCRIPTION: &'static str = "rusty battleships: game client";
+const VERSION: &'static str = env!("CARGO_PKG_VERSION");
 
 struct Player {
     nickname: RefCell<Option<String>>,
@@ -50,7 +53,7 @@ fn handle_main(msg: Message, player: &Player, players: &Vec<Player>) -> Option<M
         Message::GetFeaturesRequest => {
             return Some(Message::FeaturesResponse {
                 numfeatures: 1,
-                features: vec!["Awesomeness".to_string()]
+                features: vec!["Awesomeness".to_owned()]
             });
         },
         Message::LoginRequest { username }=> {
@@ -70,7 +73,7 @@ fn handle_main(msg: Message, player: &Player, players: &Vec<Player>) -> Option<M
             // TODO: This currently does not work (setting the name has no effect):
             // *player.nickname.borrow_mut() = Some(username);
             // Like this (with a literal instead of a String variable), everything works just fine:
-            *player.nickname.borrow_mut() = Some("Eva".to_string());
+            *player.nickname.borrow_mut() = Some("Eva".to_owned());
             return Some(Message::OkResponse);
         },
         Message::ReadyRequest => {
@@ -97,9 +100,11 @@ fn main() {
 
     {  // this block limits scope of borrows by ap.refer() method
         let mut ap = ArgumentParser::new();
-        ap.set_description("Rusty battleships: Game server.");
+        ap.set_description(DESCRIPTION);
         ap.refer(&mut ip).add_argument("IP", Store, "IPv4 address to listen to");
         ap.refer(&mut port).add_option(&["-p", "--port"], Store, "port to listen on");
+        ap.add_option(&["-v", "--version"], Print(DESCRIPTION.to_owned() + " v" + VERSION),
+            "show version number");
         ap.parse_args_or_exit();
     }
 
