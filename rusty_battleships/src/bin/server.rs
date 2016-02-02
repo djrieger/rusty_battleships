@@ -60,7 +60,6 @@ fn handle_main(msg: Message, player: &Player, players: &Vec<Player>) -> Option<M
     match msg {
         Message::GetFeaturesRequest => {
             return Some(Message::FeaturesResponse {
-                numfeatures: 1,
                 features: vec!["Awesomeness".to_owned()]
             });
         },
