@@ -2,17 +2,13 @@ use std::cell::RefCell;
 use std::env;
 use std::io::BufReader;
 use std::io::BufWriter;
-use std::io::Read;
 use std::io::Write;
 use std::net::TcpListener;
 use std::net::TcpStream;
 use std::option::Option::None;
-use std::str;
 use std::sync::mpsc::Receiver;
 use std::sync::mpsc::Sender;
 use std::sync::mpsc;
-use std::thread::Thread;
-use std::thread::sleep;
 use std::thread;
 
 extern crate rusty_battleships;
@@ -28,15 +24,15 @@ struct Player {
     to_child_endpoint: mpsc::Sender<Message>
 }
 
-fn handle_client(mut stream : TcpStream, tx : mpsc::SyncSender<Message>, rx : mpsc::Receiver<Message>) {
+fn handle_client(stream : TcpStream, tx : mpsc::SyncSender<Message>, rx : mpsc::Receiver<Message>) {
     println!("New incoming TCP stream");
 
-    let mut response_stream = stream.try_clone().unwrap();
+    let response_stream = stream.try_clone().unwrap();
     let mut buff_reader = BufReader::new(stream);
     let mut buff_writer = BufWriter::new(response_stream);
     loop {
         let msg = deserialize_message(&mut buff_reader);
-        let mut response_msg;
+        let response_msg;
         match msg {
             Some(msg) => {
                 // Send parsed Message to main thread
@@ -71,7 +67,7 @@ fn handle_main(msg: Message, player: &Player, players: &Vec<Player>) -> Option<M
                 if let Some(ref nickname) = *nick {
                     if *nickname == username {
                         return Some(Message::NameTakenResponse {
-                            nickname: username 
+                            nickname: username
                         });
                     }
                 }
@@ -108,8 +104,6 @@ fn main() {
     let ip = "127.0.0.1"; //"0.0.0.0";
 
     if args.len() == 2 {
-        port = args[1].parse::<u16>().unwrap();
-    } else if args.len() == 3 && args[2] == "threadtest" { //Just for Testing purposes. Will be prettyfied.
         port = args[1].parse::<u16>().unwrap();
     }
     println!("Operating as server on port {}.", port);
