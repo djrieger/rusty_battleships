@@ -2,8 +2,14 @@
 name = "rusty_battleships"
 version = "0.0.1"
 dependencies = [
+ "argparse 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "qmlrs 0.0.1 (git+git://github.com/Landkeks/qmlrs.git)",
 ]
+
+[[package]]
+name = "argparse"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "libc"

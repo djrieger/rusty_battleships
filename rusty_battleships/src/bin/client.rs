@@ -1,21 +1,27 @@
-use std::env;
-use std::net::TcpStream;
 use std::io::Write;
+use std::net::{Ipv4Addr, TcpStream};
 use std::option::Option::None;
+
+extern crate argparse;
+
+use argparse::{ArgumentParser, Store};
 
 /* vlient <IP> <PORT>
  * In CLIENT mode, ip and port of the server is required.
  */
 
 fn main() {
-    let args: Vec<_> = env::args().collect(); // args[0] is the name of the program.
     let mut port:u16 = 5000;
-    let mut ip = "127.0.0.1";
+    let mut ip = Ipv4Addr::new(127, 0, 0, 1);
 
-    if args.len() == 3 {
-    	ip = &args[1];
-    	port = args[2].parse::<u16>().unwrap();
+    {  // this block limits scope of borrows by ap.refer() method
+        let mut ap = ArgumentParser::new();
+        ap.set_description("Rusty battleships: Game client.");
+        ap.refer(&mut ip).add_argument("IP", Store, "IPv4 address");
+        ap.refer(&mut port).add_option(&["-p", "--port"], Store, "port the server listens on");
+        ap.parse_args_or_exit();
     }
+
     println!("Operating as client on port {}.", port);
 	println!("Connecting to {}.", ip);
 
