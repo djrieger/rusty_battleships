@@ -24,28 +24,32 @@ use rusty_battleships::message::{
 };
 
 fn handle_client(mut stream : TcpStream, tx : mpsc::SyncSender<Message>, rx : mpsc::Receiver<Message>) {
-    println!("Received stream.");
+    println!("New incoming TCP stream");
 
     // need to receive client messages in a loop here?
     let mut response_stream = stream.try_clone().unwrap();
     let mut buff_reader = BufReader::new(stream);
     let mut buff_writer = BufWriter::new(response_stream);
     loop {
+        // sleep(Duration::new(2, 0));
         let msg = deserialize_message(&mut buff_reader);
         // If message received from client is valid...
         let mut response_msg;
         match msg {
             Some(msg) => {
-                println!("Sending message to main thread");
                 tx.send(msg);
                 response_msg = rx.recv().unwrap();
             },
-            None => response_msg = Message::ReportErrorRequest { 
-                errormessage: "Invalid request".to_string()
+            None => {
+                response_msg = Message::ReportErrorRequest { 
+                    errormessage: "Invalid request".to_string()
+                };
+                println!("Received invalid request");
             }
         }
         let serialized_msg = serialize_message(response_msg);
-        buff_writer.write(&serialized_msg[..]);
+        buff_writer.write(&serialized_msg[..]).unwrap();
+        buff_writer.flush();
     }
 }
 
@@ -103,9 +107,9 @@ fn main() {
         // Receive messages from child threads
         for (i, player) in players.iter().enumerate() {
             if let Ok(msg) = player.from_child_endpoint.try_recv() {
-                println!("[Child {}] Main thread received {:?}", i, msg);
+                print!("[Child {}] {:?}", i, msg);
                 if let Some(response_msg) = handle_main(msg, /*player,*/ &players) {
-                    println!("[Child {}] Responding with {:?}", i, response_msg);
+                    println!(" -> {:?}", response_msg);
                     player.to_child_endpoint.send(response_msg);
                 }
             }

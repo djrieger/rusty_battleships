@@ -267,7 +267,12 @@ fn extract_string(mut reader: &mut BufReader<TcpStream>) -> String {
 
 fn extract_number(reader: &mut BufReader<TcpStream>) -> u8 {
     let mut message_buffer:[u8;1] = [0;1];
-    let result = reader.read_exact(&mut message_buffer);
+    // No idea how to do this properly.
+    // I want to block if there is no more input so as to wait
+    // for a new message
+    while !reader.read_exact(&mut message_buffer).is_ok() {
+    }
+    // Alternative to read_exact: reader.take(1).read(&mut message_buffer);
     return message_buffer[0];
 }
 
