@@ -11,8 +11,16 @@ use argparse::{ArgumentParser, Print, Store};
 extern crate rusty_battleships;
 use rusty_battleships::message::{serialize_message, deserialize_message, Message};
 
-const DESCRIPTION: &'static str = "rusty battleships: game client";
-const VERSION: &'static str = env!("CARGO_PKG_VERSION");
+// http://stackoverflow.com/questions/35157399/how-to-concatenate-static-strings-in-rust/35159310
+macro_rules! description {
+    () => ( "rusty battleships: game server" )
+}
+macro_rules! version {
+    () => ( env!("CARGO_PKG_VERSION") )
+}
+macro_rules! version_string {
+    () => ( concat!(description!(), " v", version!()) )
+}
 
 struct Player {
     nickname: RefCell<Option<String>>,
@@ -100,10 +108,10 @@ fn main() {
 
     {  // this block limits scope of borrows by ap.refer() method
         let mut ap = ArgumentParser::new();
-        ap.set_description(DESCRIPTION);
+        ap.set_description(description!());
         ap.refer(&mut ip).add_argument("IP", Store, "IPv4 address to listen to");
         ap.refer(&mut port).add_option(&["-p", "--port"], Store, "port to listen on");
-        ap.add_option(&["-v", "--version"], Print(DESCRIPTION.to_owned() + " v" + VERSION),
+        ap.add_option(&["-v", "--version"], Print(version_string!().to_owned()),
             "show version number");
         ap.parse_args_or_exit();
     }
