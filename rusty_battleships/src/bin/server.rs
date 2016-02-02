@@ -84,6 +84,20 @@ fn handle_main(msg: Message, player: &Player, players: &Vec<Player>) -> Option<M
             *player.nickname.borrow_mut() = Some("Eva".to_string());
             return Some(Message::OkResponse);
         },
+        Message::ReadyRequest => {
+            // TODO: Save ready state for this player
+            return Some(Message::OkResponse);
+        },
+        Message::NotReadyRequest => {
+            // TODO: Check if client is part of a Game and if Game is running
+            // return Some(Message::GameAlreadyStartedResponse);
+            return Some(Message::OkResponse);
+        },
+        Message::ChallengePlayerRequest { username } => {
+            // TODO: check if other player exists and is ready
+            // TODO: return one of OK, NOT_WAITING, NO_SUCH_PLAYER
+            return Some(Message::OkResponse);
+        },
         _ => { return None; }
     }
 }
