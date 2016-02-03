@@ -255,12 +255,17 @@ pub fn get_reason(reason_index: u8) -> Reason {
     }
 }
 
-// FIXME: handle client closing the connection gracefully (don't unwrap, don't panic)
+fn read_into_buffer(mut message_buffer: &mut [u8], reader: &mut BufReader<TcpStream>) {
+    if let Err(_) = reader.read_exact(&mut message_buffer) {
+        // FIXME: handle client closing the connection gracefully (don't panic)
+        panic!("No more data from client");
+    }
+}
 
 fn extract_string(mut reader: &mut BufReader<TcpStream>, allow_space: bool) -> String {
     let strlen = extract_number(&mut reader) as usize;
     let mut string_buffer = vec![0;strlen];
-    reader.read_exact(&mut string_buffer).unwrap();
+    read_into_buffer(&mut string_buffer, &mut reader);
     // check whether characters are in range
     let valid: bool = string_buffer.iter().fold(true, |in_range, &character| {
         in_range && character <= 0x7E && character >= (if allow_space { 0x20 } else { 0x21 })
@@ -271,9 +276,9 @@ fn extract_string(mut reader: &mut BufReader<TcpStream>, allow_space: bool) -> S
     return str::from_utf8(&string_buffer).unwrap().to_string();
 }
 
-fn extract_number(reader: &mut BufReader<TcpStream>) -> u8 {
+fn extract_number(mut reader: &mut BufReader<TcpStream>) -> u8 {
     let mut message_buffer:[u8;1] = [0;1];
-    reader.read_exact(&mut message_buffer).unwrap();
+    read_into_buffer(&mut message_buffer, &mut reader);
     return message_buffer[0];
 }
 
@@ -325,7 +330,7 @@ pub fn deserialize_message(mut reader: &mut BufReader<TcpStream>) -> Option<Mess
         010 => msg = Some(Message::PlaceShipsRequest {
             placement: extract_placement(&mut reader)
         }),
-        11 => msg = Some(Message::ShootRequest {
+        011 => msg = Some(Message::ShootRequest {
             x: extract_number(&mut reader),
             y: extract_number(&mut reader)
         }),
@@ -453,7 +458,7 @@ pub fn serialize_message(msg: Message) -> Vec<u8> {
             }
         },
         Message::ShootRequest { x, y } =>{
-            msgbuf.push(11);
+            msgbuf.push(011);
             msgbuf.push(x);
             msgbuf.push(y);
         },
