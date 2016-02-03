@@ -71,24 +71,32 @@ fn main() {
         let mut buff_writer = BufWriter::new(sender);
         let mut buff_reader = BufReader::new(receiver);
 
+        // This thread blocks while waiting for messages from the server.
+        // Any received messages are sent to the main thread via tx_tcp
+        let subloop = move || {
+            loop {
+                // Parse server response and send to main thread
+                let server_response = deserialize_message(&mut buff_reader).unwrap();
+                println!("Got {:?} from server", server_response);
+                tx_tcp.send(server_response);
+            }
+        };
+        let tcp_recv_thread = thread::spawn(subloop);
+
+        // Request features from server
         let serialized_msg = serialize_message(Message::GetFeaturesRequest);
         buff_writer.write(&serialized_msg[..]).unwrap();
         buff_writer.flush();
 
         loop {
             // See if main thread has any messages to be sent to the server
+            // FIXME kann hier blocken bzw kein try, sync_channel...?
             if let Ok(msg) = rcv_tcp.try_recv() {
                 let serialized_msg = serialize_message(msg);
                 buff_writer.write(&serialized_msg[..]).unwrap();
                 buff_writer.flush();
             }
 
-            // Parse server response and send to main thread
-            // let server_response = deserialize_message(&mut buff_reader).unwrap();
-            // println!("Got {:?} from server", server_response);
-            // tx_tcp.send(server_response);
-
-            // FIXME how to solve blocking while waiting for server response? extra thread?
         }
     };
 
