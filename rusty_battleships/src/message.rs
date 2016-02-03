@@ -301,7 +301,7 @@ fn extract_placement(mut reader: &mut BufReader<TcpStream>) -> [ShipPlacement; 5
 fn extract_features(mut reader: &mut BufReader<TcpStream>) -> Message {
     let numfeatures = extract_number(&mut reader);
     let mut features = Vec::new();
-    for _ in 0..numfeatures - 1 {
+    for _ in 0..numfeatures {
         features.push(extract_string(&mut reader, true));
     }
     return Message::FeaturesResponse {
