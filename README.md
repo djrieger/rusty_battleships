@@ -46,16 +46,26 @@ DYLD_FRAMEWORK_PATH=$QTDIR/lib
 Ubuntu packages
 ---------------
 
-The following Ubuntu packages must be installed to compile the project:
+The following Ubuntu packages must be installed to compile the project (Only Ubuntu 15.04 and newer):
 
 * qml-module-qtquick-controls
 * qml-module-qtquick-dialogs
 * qtbase5-dev
 * qtdeclarative5-dev
 
-They are available in Ubuntu 15.04 and newer versions. For older versions, such as 14.04 LTS, use the online installer. In this case, export the following, after replacing <QT-Path> and <QT-Version> qith the path to your Qt installation and your Qt version:
+For older versions, such as 14.04 LTS, use the online installer from http://www.qt.io/download-open-source/ to install the Qt modules for your platform (you don't need the source and android packages!). Then export the following, after replacing <QT-Path> and <QT-Version> with the path to your Qt installation and your Qt version (e.g. /Qt/5.5/...):
 
 $ export CMAKE_PREFIX_PATH=<QT-Path>/<QT-Version>/gcc_64/
 $ export QTDIR=<QT-Path>/<QT-Version>/gcc_64/
-$ export DYLD_FRAMEWORK_PATH=<QT-Path>/<QT-Version>/gcc_64/lib
+$ export LD_LIBRARY_PATH=<QT-Path>/<QT-Version>/gcc_64/lib
 $ export PKG_CONFIG_PATH=<QT-Path>/<QT-Version>/gcc_64/lib/pkgconfig/
+
+Please note, that exports only apply to the terminal in which the exports were executed. You can also add these four lines to your ~/.bashrc.
+
+You also need the OpenGL dev libraries:
+$ sudo apt-get install build-essential libgl1-mesa-dev
+
+
+
+
+
