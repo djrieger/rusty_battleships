@@ -43,7 +43,8 @@ Q_OBJECT! { Bridge:
 
 fn main() {
 
-    let (tx, rcv) : (mpsc::Sender<Message>, mpsc::Receiver<Message>) = mpsc::channel();
+    let (tx_main, rcv_tcp) : (mpsc::Sender<Message>, mpsc::Receiver<Message>) = mpsc::channel();
+    let (tx_tcp, rcv_main) : (mpsc::Sender<Message>, mpsc::Receiver<Message>) = mpsc::channel();
 
     let tcp_loop = move || {
         let mut port:u16 = 5000;
@@ -70,28 +71,32 @@ fn main() {
         let mut buff_writer = BufWriter::new(sender);
         let mut buff_reader = BufReader::new(receiver);
 
+        let serialized_msg = serialize_message(Message::GetFeaturesRequest);
+        buff_writer.write(&serialized_msg[..]).unwrap();
+        buff_writer.flush();
+
         loop {
             // See if main thread has any messages to be sent to the server
-            if let Ok(msg) = rcv.try_recv() {
+            if let Ok(msg) = rcv_tcp.try_recv() {
                 let serialized_msg = serialize_message(msg);
                 buff_writer.write(&serialized_msg[..]).unwrap();
                 buff_writer.flush();
             }
 
+            // Parse server response and send to main thread
             // let server_response = deserialize_message(&mut buff_reader).unwrap();
-            // println!("{:?}", server_response);
+            // println!("Got {:?} from server", server_response);
+            // tx_tcp.send(server_response);
 
-            // FIXME send server response back to main thread
             // FIXME how to solve blocking while waiting for server response? extra thread?
-
-            // send_message(Message::GetFeaturesRequest, &mut buff_writer);
         }
     };
 
+    // FIXME where can main do rcv_main.try_recv()? Can this be integrated into Qt's event loop?
     let tcp_thread = thread::spawn(tcp_loop);
 
     let mut engine = qmlrs::Engine::new();
-    engine.set_property("bridge", Bridge { sender: tx });
+    engine.set_property("bridge", Bridge { sender: tx_main });
     engine.load_data(WINDOW);
     engine.exec();
 }
