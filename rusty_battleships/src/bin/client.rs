@@ -1,9 +1,12 @@
-use std::io::Write;
 use std::net::{Ipv4Addr, TcpStream};
+use std::io::{BufReader, BufWriter, Write};
 use std::option::Option::None;
 
 extern crate argparse;
 use argparse::{ArgumentParser, Print, Store};
+
+extern crate rusty_battleships;
+use rusty_battleships::message::{serialize_message, deserialize_message, Message};
 
 // http://stackoverflow.com/questions/35157399/how-to-concatenate-static-strings-in-rust/35159310
 macro_rules! description {
@@ -14,6 +17,11 @@ macro_rules! version {
 }
 macro_rules! version_string {
     () => ( concat!(description!(), " v", version!()) )
+}
+
+fn send_message(msg: Message, stream: &mut BufWriter<TcpStream>) {
+    let serialized_msg = serialize_message(msg);
+    stream.write(&serialized_msg[..]).unwrap();
 }
 
 fn main() {
@@ -36,9 +44,16 @@ fn main() {
     //Connect to the specified address and port.
 	let mut sender = TcpStream::connect((ip, port)).unwrap();
 	sender.set_write_timeout(None);
-	let message = "123".to_owned();
-	//	let message = b"123"; //Directly into bytes!
-	let message_bytes:Vec<u8> = message.into_bytes();
-	sender.write(&message_bytes);
 
+    let receiver = sender.try_clone().unwrap();
+    let mut buff_writer = BufWriter::new(sender);
+    let mut buff_reader = BufReader::new(receiver);
+
+    send_message(Message::GetFeaturesRequest, &mut buff_writer);
+    send_message(Message::LoginRequest { username: String::from("foobar") }, &mut buff_writer);
+    buff_writer.flush();
+    loop {
+        let server_response = deserialize_message(&mut buff_reader).unwrap();
+        println!("{:?}", server_response);
+    }
 }
