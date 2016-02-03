@@ -52,3 +52,10 @@ The following Ubuntu packages must be installed to compile the project:
 * qml-module-qtquick-dialogs
 * qtbase5-dev
 * qtdeclarative5-dev
+
+They are available in Ubuntu 15.04 and newer versions. For older versions, such as 14.04 LTS, use the online installer. In this case, export the following, after replacing <QT-Path> and <QT-Version> qith the path to your Qt installation and your Qt version:
+
+$ export CMAKE_PREFIX_PATH=<QT-Path>/<QT-Version>/gcc_64/
+$ export QTDIR=<QT-Path>/<QT-Version>/gcc_64/
+$ export DYLD_FRAMEWORK_PATH=<QT-Path>/<QT-Version>/gcc_64/lib
+$ export PKG_CONFIG_PATH=<QT-Path>/<QT-Version>/gcc_64/lib/pkgconfig/
