@@ -1,6 +1,7 @@
 import QtQuick 2.2
 import QtQuick.Controls 1.2
 import QtQuick.Layouts 1.0
+import QtQuick.Dialogs 1.1
 
 ApplicationWindow {
     visible: true
@@ -39,6 +40,25 @@ ApplicationWindow {
                 columns: 10
             }
         }
+
+         RowLayout {
+              TextField {
+                id: usernameField
+                Layout.fillWidth: true
+
+                placeholderText: "Enter nickname"
+                focus: true
+
+                onAccepted: login()
+              }
+
+              Button {
+                text: "Login"
+
+                onClicked: login()
+              }
+
+            }
 
         ListView {
             id: userList
@@ -87,4 +107,9 @@ ApplicationWindow {
             }
         }
     }
+
+               function login() {
+                  bridge.send_login_request(usernameField.text);
+              }
 }
+
