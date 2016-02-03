@@ -63,7 +63,10 @@ fn handle_main(msg: Message, player: &Player, players: &Vec<Player>) -> Option<M
                 features: vec!["Awesomeness".to_owned()]
             });
         },
-        Message::LoginRequest { username }=> {
+        Message::LoginRequest { username } => {
+            if username.len() == 0 {
+                return Some(Message::InvalidRequestResponse);
+            }
             // Determine if we already have a player with name 'username'
             for player in players {
                 let nick = player.nickname.borrow();
