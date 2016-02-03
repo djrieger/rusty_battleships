@@ -14,10 +14,10 @@ ApplicationWindow {
     minimumHeight: 600 + 2 * margin
 
     Timer {
-      interval: 500
+      interval: 50
       running: true
       repeat: true
-      onTriggered: console.log("ping!") // TODO: poll model, update view
+      onTriggered: infoLabel.text = bridge.poll_state() // console.log("ping!") // TODO: poll model, update view
     }
 
     RowLayout {
@@ -56,6 +56,11 @@ ApplicationWindow {
                 text: "Login"
 
                 onClicked: login()
+              }
+
+              Label {
+                id: infoLabel
+                text: ""
               }
 
             }

@@ -26,8 +26,16 @@ macro_rules! version_string {
 
 static WINDOW: &'static str = include_str!("assets/main_window.qml");
 
+enum State {
+    Unregistered,
+    NameTaken,
+    Registered
+}
+
 struct Bridge {
-    sender: mpsc::Sender<Message>
+    sender: mpsc::Sender<Message>,
+    receiver: mpsc::Receiver<Message>,
+    state: State,
 }
 
 impl Bridge {
@@ -35,14 +43,30 @@ impl Bridge {
         println!("Sending login request for {} ...", username);
         self.sender.send(Message::LoginRequest { username: username });
     }
+
+    fn poll_state(&mut self) -> &str {
+        if let Ok(msg) = self.receiver.try_recv() {
+            match msg {
+                Message::OkResponse => self.state = State::Registered,
+                Message::NameTakenResponse { nickname } => self.state = State::NameTaken,
+                _ => {},
+            }
+        }
+        return match self.state {
+            State::Unregistered => "unregistered",
+            State::NameTaken => "nametaken",
+            State::Registered => "registered",
+            // _ => "",
+        };
+    }
 }
 
 Q_OBJECT! { Bridge:
     slot fn send_login_request(String);
+    slot fn poll_state();
 }
 
 fn main() {
-
     let (tx_main, rcv_tcp) : (mpsc::Sender<Message>, mpsc::Receiver<Message>) = mpsc::channel();
     let (tx_tcp, rcv_main) : (mpsc::Sender<Message>, mpsc::Receiver<Message>) = mpsc::channel();
 
@@ -100,11 +124,15 @@ fn main() {
         }
     };
 
-    // FIXME where can main do rcv_main.try_recv()? Can this be integrated into Qt's event loop?
     let tcp_thread = thread::spawn(tcp_loop);
-
     let mut engine = qmlrs::Engine::new();
-    engine.set_property("bridge", Bridge { sender: tx_main });
+    let mut bridge = Bridge { 
+        state: State::Unregistered,
+        sender: tx_main,
+        receiver: rcv_main
+    };
+    bridge.state = State::Unregistered;
+    engine.set_property("bridge", bridge);
     engine.load_data(WINDOW);
     engine.exec();
 }
