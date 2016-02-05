@@ -26,7 +26,7 @@ macro_rules! version_string {
     () => ( concat!(description!(), " v", version!()) )
 }
 
-fn handle_client(stream : TcpStream, tx : mpsc::SyncSender<Message>, rx : mpsc::Receiver<Message>) {
+fn handle_client(stream: TcpStream, tx: mpsc::SyncSender<Message>, rx: mpsc::Receiver<Message>) {
     println!("New incoming TCP stream");
 
     let response_stream = stream.try_clone().unwrap();
@@ -38,9 +38,9 @@ fn handle_client(stream : TcpStream, tx : mpsc::SyncSender<Message>, rx : mpsc::
         match msg {
             Ok(msg) => {
                 // Send parsed Message to main thread
-                tx.send(msg);
+                tx.send(msg).expect("Main thread died, exiting.");
                 // Wait for response Message
-                response_msg = rx.recv().unwrap();
+                response_msg = rx.recv().expect("Main thread died before answering, exiting.");
             },
             Err(e) => {
                 response_msg = Message::InvalidRequestResponse;
@@ -49,8 +49,8 @@ fn handle_client(stream : TcpStream, tx : mpsc::SyncSender<Message>, rx : mpsc::
         }
         // Serialize, send response and flush
         let serialized_msg = serialize_message(response_msg);
-        buff_writer.write(&serialized_msg[..]).unwrap();
-        buff_writer.flush();
+        buff_writer.write(&serialized_msg[..]).expect("Could not write to TCP steam, exiting.");
+        buff_writer.flush().expect("Could not write to TCP steam, exiting.");
     }
 }
 
@@ -156,8 +156,10 @@ fn main() {
 
     println!("Operating as server on port {}.", port);
 
-    let listener = TcpListener::bind((ip, port)).unwrap();
-    let address = listener.local_addr().unwrap();
+    let listener = TcpListener::bind((ip, port))
+            .expect(&format!("Could not bind to port {}", port));
+    let address = listener.local_addr()
+            .expect("Could not get local address.");
     println!("Started listening on port {} at address {}.", port, address);
     let mut players = Vec::new();
     let mut lobby = HashMap::new();
@@ -181,7 +183,7 @@ fn main() {
                     from_child_endpoint: rx_main,
                     to_child_endpoint: tx_main,
                 }
-                );
+            ).expect("Main thread died, exiting.");
         }
     };
 
@@ -194,7 +196,7 @@ fn main() {
             players.push(player);
         }
         // Receive Messages from child threads
-        for (i, mut player) in players.iter().enumerate() {
+        for (i, player) in players.iter().enumerate() {
             if let Ok(msg) = player.from_child_endpoint.try_recv() {
                 print!("[Child {}] {:?}", i, msg);
                 // Handle Message received from child
