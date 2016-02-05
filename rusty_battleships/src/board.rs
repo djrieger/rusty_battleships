@@ -1,5 +1,7 @@
 use std::collections::hash_map::Entry;
+use std::collections::hash_map::OccupiedEntry;
 use std::sync::mpsc;
+use std::cell::RefCell;
 
 // extern crate rusty_battleships;
 use message::{serialize_message, deserialize_message, Message};
@@ -10,31 +12,26 @@ pub const W: usize = 16;
 pub const H: usize = 10;
 pub const SHIP_COUNT: usize = 2;
 
-pub struct PlayerHandle<'a> {
-    player: Option<&'a RegisteredPlayer<'a>>,
-    from_child_endpoint: mpsc::Receiver<Message>,
-    to_child_endpoint: mpsc::Sender<Message>,
+pub struct PlayerHandle {
+    pub nickname: RefCell<Option<String>>,
+    pub from_child_endpoint: mpsc::Receiver<Message>,
+    pub to_child_endpoint: mpsc::Sender<Message>,
 }
 
-pub struct RegisteredPlayer<'a> {
-    nickname: &'a str,
-    map_entry: &'a Entry<'a, &'a str, &'a Player<'a>>,
+pub struct Player<'a> {
+    pub state: PlayerState,
+    pub game: Option<&'a Game>,
 }
 
-pub struct Player<'b> {
-    state: PlayerState,
-    game: Option<&'b Game<'b>>,
-}
-
-enum PlayerState {
+pub enum PlayerState {
     Available,
     Ready,
     Waiting,
 }
 
-pub struct Game<'b> {
-    boards: (&'b Board, &'b Board),
-    players: (&'b Player<'b>, &'b Player<'b>),
+pub struct Game {
+    pub boards: (Board, Board),
+    pub players: (String, String),
     // time elapsed / round
     // active player
 }

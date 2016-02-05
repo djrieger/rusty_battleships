@@ -1,3 +1,5 @@
+use std::collections::hash_map::Entry;
+use std::collections::HashMap;
 use std::cell::RefCell;
 use std::io::{BufReader, BufWriter, Write};
 use std::net::{Ipv4Addr, TcpListener, TcpStream};
@@ -10,6 +12,7 @@ use argparse::{ArgumentParser, Print, Store};
 
 extern crate rusty_battleships;
 use rusty_battleships::message::{serialize_message, deserialize_message, Message};
+use rusty_battleships::board;
 
 // http://stackoverflow.com/questions/35157399/how-to-concatenate-static-strings-in-rust/35159310
 macro_rules! description {
@@ -20,12 +23,6 @@ macro_rules! version {
 }
 macro_rules! version_string {
     () => ( concat!(description!(), " v", version!()) )
-}
-
-struct Player {
-    nickname: RefCell<Option<String>>,
-    from_child_endpoint: mpsc::Receiver<Message>,
-    to_child_endpoint: mpsc::Sender<Message>
 }
 
 fn handle_client(stream : TcpStream, tx : mpsc::SyncSender<Message>, rx : mpsc::Receiver<Message>) {
@@ -56,7 +53,7 @@ fn handle_client(stream : TcpStream, tx : mpsc::SyncSender<Message>, rx : mpsc::
     }
 }
 
-fn handle_main(msg: Message, player: &Player, players: &Vec<Player>) -> Option<Message> {
+fn handle_main(msg: Message, player: &board::PlayerHandle, players: &Vec<board::PlayerHandle>, lobby: &mut HashMap<String, board::Player>) -> Option<Message> {
     match msg {
         Message::GetFeaturesRequest => {
             return Some(Message::FeaturesResponse {
@@ -68,23 +65,18 @@ fn handle_main(msg: Message, player: &Player, players: &Vec<Player>) -> Option<M
                 return Some(Message::InvalidRequestResponse);
             }
             // Determine if we already have a player with name 'username'
-            for player in players {
-                let nick = player.nickname.borrow();
-                if let Some(ref nickname) = *nick {
-                    if *nickname == username {
-                        return Some(Message::NameTakenResponse {
-                            nickname: username
-                        });
-                    }
-                }
+            if lobby.contains_key(&username) {
+                return Some(Message::NameTakenResponse { nickname: username });
+            } else {
+                // Update lobby hashtable
+                lobby.insert(username.clone(), board::Player {
+                    state: board::PlayerState::Available,
+                    game: None,
+                });
+                // Update player struct
+                *player.nickname.borrow_mut() = Some(username);
+                return Some(Message::OkResponse);
             }
-
-            // Store new name
-            // TODO: This currently does not work (setting the name has no effect):
-            // *player.nickname.borrow_mut() = Some(username);
-            // Like this (with a literal instead of a String variable), everything works just fine:
-            *player.nickname.borrow_mut() = Some("Eva".to_owned());
-            return Some(Message::OkResponse);
         },
         Message::ReadyRequest => {
             // TODO: Save ready state for this player
@@ -105,6 +97,44 @@ fn handle_main(msg: Message, player: &Player, players: &Vec<Player>) -> Option<M
 }
 
 fn main() {
+    let mut map = HashMap::new();
+    let player_bob = board::Player {
+        state: board::PlayerState::Available,
+        game: None,
+    };
+    let player_alice = board::Player {
+        state: board::PlayerState::Ready,
+        game: None,
+    };
+    let name_bob = "Bob";
+    let name_alice = "Alice";
+    map.insert(name_bob, player_bob);
+    map.insert(name_alice, player_alice);
+
+    let first_ship = board::Ship { x: 1, y: 2, length: 4, horizontal: true, health_points: 4 };
+    let second_ship = board::Ship { x: 5, y: 2, length: 2, horizontal: false, health_points: 2 };
+    let first_board = board::Board::new(5, 8, [ first_ship, second_ship ]);
+    let second_board = first_board.clone();
+
+    let game = board::Game {
+        players: (String::from(name_alice), String::from(name_bob)),
+        boards: (first_board, second_board),
+    }; 
+
+    // let alice_entry = map.entry(name_alice);
+    // let alice = board::RegisteredPlayer {
+    //     nickname: name_alice,
+    //     map_entry: alice_entry,
+    // };
+    // next: Game, Boards
+
+
+
+
+
+
+
+
     let mut port:u16 = 5000;
     let mut ip = Ipv4Addr::new(127, 0, 0, 1);
 
@@ -114,7 +144,7 @@ fn main() {
         ap.refer(&mut ip).add_argument("IP", Store, "IPv4 address to listen to");
         ap.refer(&mut port).add_option(&["-p", "--port"], Store, "port to listen on");
         ap.add_option(&["-v", "--version"], Print(version_string!().to_owned()),
-            "show version number");
+        "show version number");
         ap.parse_args_or_exit();
     }
 
@@ -124,9 +154,10 @@ fn main() {
     let address = listener.local_addr().unwrap();
     println!("Started listening on port {} at address {}.", port, address);
     let mut players = Vec::new();
+    let mut lobby = HashMap::new();
 
     // channel for letting tcp_loop tell main loop about new players
-    let (tx_tcp_players, rx_main_players) : (mpsc::Sender<Player>, mpsc::Receiver<Player>) = mpsc::channel();
+    let (tx_tcp_players, rx_main_players) : (mpsc::Sender<board::PlayerHandle>, mpsc::Receiver<board::PlayerHandle>) = mpsc::channel();
 
     let tcp_loop = move || {
         for stream in listener.incoming() {
@@ -139,12 +170,12 @@ fn main() {
                 handle_client(stream.unwrap(), tx_child, rx_child);
             });
             tx_tcp_players.send(
-                Player {
+                board::PlayerHandle {
                     nickname: RefCell::new(None),
                     from_child_endpoint: rx_main,
                     to_child_endpoint: tx_main,
                 }
-            );
+                );
         }
     };
 
@@ -161,7 +192,7 @@ fn main() {
             if let Ok(msg) = player.from_child_endpoint.try_recv() {
                 print!("[Child {}] {:?}", i, msg);
                 // Handle Message received from child
-                let opt_response = handle_main(msg, &player, &players);
+                let opt_response = handle_main(msg, &player, &players, &mut lobby);
                 if let Some(response) = opt_response {
                     // handle_main generated a response -> send response Message back to child
                     println!(" -> {:?}", response);
