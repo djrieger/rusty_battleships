@@ -12,6 +12,8 @@ use argparse::{ArgumentParser, Print, Store};
 extern crate rusty_battleships;
 use rusty_battleships::message::{serialize_message, deserialize_message, Message};
 use rusty_battleships::board;
+use rusty_battleships::board::Player;
+use rusty_battleships::board::PlayerState;
 
 // http://stackoverflow.com/questions/35157399/how-to-concatenate-static-strings-in-rust/35159310
 macro_rules! description {
@@ -79,12 +81,17 @@ fn handle_main(msg: Message, player: &board::PlayerHandle, players: &Vec<board::
         },
         Message::ReadyRequest => {
             // TODO: Save ready state for this player
+            lobby.get(&(player.nickname)).unwrap().state = PlayerState::Ready;
             return Some(Message::OkResponse);
         },
         Message::NotReadyRequest => {
             // TODO: Check if client is part of a Game and if Game is running
             // return Some(Message::GameAlreadyStartedResponse);
-            return Some(Message::OkResponse);
+            let p:&Player = lobby.get(&(player.nickname)).unwrap();
+            match p.game {
+                Some(_) => return Some(Message::OkResponse),
+                None    => return Some(Message::GameAlreadyStartedResponse)
+            }
         },
         Message::ChallengePlayerRequest { username } => {
             // TODO: check if other player exists and is ready
