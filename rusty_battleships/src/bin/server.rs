@@ -1,4 +1,3 @@
-use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::cell::RefCell;
 use std::io::{BufReader, BufWriter, Write};
@@ -35,15 +34,15 @@ fn handle_client(stream : TcpStream, tx : mpsc::SyncSender<Message>, rx : mpsc::
         let msg = deserialize_message(&mut buff_reader);
         let response_msg;
         match msg {
-            Some(msg) => {
+            Ok(msg) => {
                 // Send parsed Message to main thread
                 tx.send(msg);
                 // Wait for response Message
                 response_msg = rx.recv().unwrap();
             },
-            None => {
+            Err(e) => {
                 response_msg = Message::InvalidRequestResponse;
-                println!("Received invalid request");
+                println!("Received invalid request: {}", e);
             }
         }
         // Serialize, send response and flush
@@ -119,7 +118,7 @@ fn main() {
     let game = board::Game {
         players: (String::from(name_alice), String::from(name_bob)),
         boards: (first_board, second_board),
-    }; 
+    };
 
     // let alice_entry = map.entry(name_alice);
     // let alice = board::RegisteredPlayer {

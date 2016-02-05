@@ -1,9 +1,4 @@
-use std::io::Read;
-use std::io::BufReader;
-use std::str;
-use std::option::Option::None;
-use std::io::Write;
-
+use std::io::{BufReader, Error, ErrorKind, Read, Result, Write};
 use std::net::TcpStream;
 
 #[derive(Debug, Hash, Eq, PartialEq)]
@@ -220,16 +215,6 @@ pub enum Direction {
     West = 3,
 }
 
-pub fn get_direction(direction_index: u8) -> Direction {
-    return match direction_index {
-        0 => Direction::North,
-        1 => Direction::East,
-        2 => Direction::South,
-        3 => Direction::West,
-        _ => panic!("Invalid direction index")
-    }
-}
-
 #[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
 pub struct ShipPlacement {
     pub x:u8,
@@ -245,192 +230,204 @@ pub enum Reason {
     Afk = 3,
 }
 
-pub fn get_reason(reason_index: u8) -> Reason {
-    return match reason_index {
-        0 => Reason::Obliterated,
-        1 => Reason::Disconnected,
-        2 => Reason::Surrendered,
-        3 => Reason::Afk,
-        _ => panic!("Invalid index for reason")
+fn read_into_buffer(mut message_buffer: &mut [u8], reader: &mut BufReader<TcpStream>)
+        -> Result<()> {
+    reader.read_exact(&mut message_buffer).map_err(|e| {
+        if e.kind() == ErrorKind::UnexpectedEof {
+            Error::new(ErrorKind::UnexpectedEof, "TCP stream closed unexpectedly.")
+        } else {
+            e
+        }
+    })
+}
+
+fn extract_number(mut reader: &mut BufReader<TcpStream>) -> Result<u8> {
+    let mut message_buffer:[u8;1] = [0;1];
+    try!(read_into_buffer(&mut message_buffer, &mut reader));
+    return Ok(message_buffer[0]);
+}
+
+fn extract_bool(mut reader: &mut BufReader<TcpStream>) -> Result<bool> {
+    match try!(extract_number(&mut reader)) {
+        1 => Ok(true),
+        0 => Ok(false),
+        _ => Err(Error::new(ErrorKind::InvalidData, "Invalid boolean value."))
     }
 }
 
-fn read_into_buffer(mut message_buffer: &mut [u8], reader: &mut BufReader<TcpStream>) {
-    if let Err(_) = reader.read_exact(&mut message_buffer) {
-        // FIXME: handle client closing the connection gracefully (don't panic)
-        panic!("No more data from client");
+pub fn extract_direction(mut reader: &mut BufReader<TcpStream>) -> Result<Direction> {
+    match try!(extract_number(&mut reader)) {
+        0 => Ok(Direction::North),
+        1 => Ok(Direction::East),
+        2 => Ok(Direction::South),
+        3 => Ok(Direction::West),
+        _ => Err(Error::new(ErrorKind::InvalidData, "Invalid direction value."))
     }
 }
 
-fn extract_string(mut reader: &mut BufReader<TcpStream>, allow_space: bool) -> String {
-    let strlen = extract_number(&mut reader) as usize;
+pub fn extract_reason(mut reader: &mut BufReader<TcpStream>) -> Result<Reason> {
+    match try!(extract_number(&mut reader)) {
+        0 => Ok(Reason::Obliterated),
+        1 => Ok(Reason::Disconnected),
+        2 => Ok(Reason::Surrendered),
+        3 => Ok(Reason::Afk),
+        _ => Err(Error::new(ErrorKind::InvalidData, "Invalid reason value."))
+    }
+}
+
+fn extract_string(mut reader: &mut BufReader<TcpStream>, allow_space: bool)
+        -> Result<String> {
+    let strlen = try!(extract_number(&mut reader)) as usize;
     let mut string_buffer = vec![0;strlen];
-    read_into_buffer(&mut string_buffer, &mut reader);
+    try!(read_into_buffer(&mut string_buffer, &mut reader));
+
     // check whether characters are in range
     let valid: bool = string_buffer.iter().fold(true, |in_range, &character| {
         in_range && character <= 0x7E && character >= (if allow_space { 0x20 } else { 0x21 })
     });
     if !valid {
-        panic!("Invalid string");
+        return Err(Error::new(ErrorKind::InvalidData, "String contains invalid characters."));
     }
-    return str::from_utf8(&string_buffer).unwrap().to_string();
+
+    return Ok(String::from_utf8(string_buffer).unwrap());
 }
 
-fn extract_number(mut reader: &mut BufReader<TcpStream>) -> u8 {
-    let mut message_buffer:[u8;1] = [0;1];
-    read_into_buffer(&mut message_buffer, &mut reader);
-    return message_buffer[0];
-}
-
-fn extract_bool(mut reader: &mut BufReader<TcpStream>) -> bool {
-    let intval = extract_number(&mut reader);
-    match intval {
-        1 => return true,
-        0 => return false,
-        _ => panic!("invalid bool")
-    }
-}
-
-fn extract_placement(mut reader: &mut BufReader<TcpStream>) -> [ShipPlacement; 5] {
-    let mut placement:[ShipPlacement; 5] = [ShipPlacement { x: 0, y: 0, direction: Direction::North }; 5];
-    for i in 0..4 {
-        placement[i] = ShipPlacement {
-            x: extract_number(&mut reader),
-            y: extract_number(&mut reader),
-            direction: get_direction(extract_number(&mut reader)),
-        };
-    }
-    return placement;
-}
-
-fn extract_features(mut reader: &mut BufReader<TcpStream>) -> Message {
-    let numfeatures = extract_number(&mut reader);
+fn extract_features(mut reader: &mut BufReader<TcpStream>) -> Result<Vec<String>> {
+    let numfeatures = try!(extract_number(&mut reader));
     let mut features = Vec::new();
     for _ in 0..numfeatures {
-        features.push(extract_string(&mut reader, true));
+        features.push(try!(extract_string(&mut reader, true)));
     }
-    return Message::FeaturesResponse {
-        features: features
-    };
+    return Ok(features);
 }
 
-pub fn deserialize_message(mut reader: &mut BufReader<TcpStream>) -> Option<Message> {
-    let mut msg: Option<Message> = None;
-    let opcode = extract_number(&mut reader);
-    match opcode {
-        000 => msg = Some(Message::GetFeaturesRequest),
-        001 => msg = Some(Message::LoginRequest {
-            username: extract_string(&mut reader, false)
-        }),
-        002 => msg = Some(Message::ReadyRequest),
-        003 => msg = Some(Message::NotReadyRequest),
-        004 => msg = Some(Message::ChallengePlayerRequest {
-            username: extract_string(&mut reader, false)
-        }),
-        010 => msg = Some(Message::PlaceShipsRequest {
-            placement: extract_placement(&mut reader)
-        }),
-        011 => msg = Some(Message::ShootRequest {
-            x: extract_number(&mut reader),
-            y: extract_number(&mut reader)
-        }),
-        012 => msg = Some(Message::MoveAndShootRequest {
-            id: extract_number(&mut reader),
-            direction: get_direction(extract_number(&mut reader)),
-            x: extract_number(&mut reader),
-            y: extract_number(&mut reader)
-        }),
-        013 => msg = Some(Message::SurrenderRequest),
-        099 => msg = Some(Message::ReportErrorRequest {
-            errormessage: extract_string(&mut reader, true)
-        }),
-
-
-        100 => msg = Some(Message::OkResponse),
-        101 => msg = Some(extract_features(&mut reader)),
-        102 => msg = Some(Message::NameTakenResponse {
-            nickname: extract_string(&mut reader, false)
-        }),
-        103 => msg = Some(Message::NoSuchPlayerResponse {
-            nickname: extract_string(&mut reader, false)
-        }),
-        104 => msg = Some(Message::NotWaitingResponse {
-            nickname: extract_string(&mut reader, false)
-        }),
-        105 => msg = Some(Message::GameAlreadyStartedResponse),
-        110 => msg = Some(Message::IllegalPlacementResponse),
-        111 => msg = Some(Message::HitResponse {
-            x: extract_number(&mut reader),
-            y: extract_number(&mut reader)
-        }),
-        112 => msg = Some(Message::MissResponse {
-            x: extract_number(&mut reader),
-            y: extract_number(&mut reader)
-        }),
-        113 => msg = Some(Message::DestroyedResponse {
-            x: extract_number(&mut reader),
-            y: extract_number(&mut reader)
-        }),
-        199 => msg = Some(Message::InvalidRequestResponse),
-
-
-        200 => msg = Some(Message::PlayerJoinedUpdate {
-            nickname: extract_string(&mut reader, false)
-        }),
-        201 => msg = Some(Message::PlayerLeftUpdate {
-            nickname: extract_string(&mut reader, false)
-        }),
-        202 => msg = Some(Message::PlayerReadyUpdate {
-            nickname: extract_string(&mut reader, false)
-        }),
-        203 => msg = Some(Message::PlayerNotReadyUpdate {
-            nickname: extract_string(&mut reader, false)
-        }),
-        204 => msg = Some(Message::GameStartUpdate {
-            nickname: extract_string(&mut reader, false)
-        }),
-        210 => msg = Some(Message::YourTurnUpdate),
-        211 => msg = Some(Message::EnemyTurnUpdate),
-        212 => msg = Some(Message::EnemyVisibleUpdate {
-            x: extract_number(&mut reader),
-            y: extract_number(&mut reader)
-        }),
-        213 => msg = Some(Message::EnemyInvisibleUpdate {
-            x: extract_number(&mut reader),
-            y: extract_number(&mut reader)
-        }),
-        214 => msg = Some(Message::EnemyHitUpdate {
-            x: extract_number(&mut reader),
-            y: extract_number(&mut reader)
-        }),
-        215 => msg = Some(Message::EnemyMissUpdate {
-            x: extract_number(&mut reader),
-            y: extract_number(&mut reader)
-        }),
-        216 => msg = Some(Message::GameOverUpdate {
-            victorious: extract_bool(&mut reader),
-            reason: get_reason(extract_number(&mut reader)),
-        }),
-        217 => msg = Some(Message::AfkWarningUpdate {
-            strikes: extract_number(&mut reader)
-        }),
-        218 => msg = Some(Message::EnemyAfkUpdate{
-            strikes: extract_number(&mut reader)
-        }),
-
-        255 => msg = Some(Message::ServerGoingDownUpdate{
-            errormessage: extract_string(&mut reader, true)
-        }),
-
-        _   => {}
+fn extract_placement(mut reader: &mut BufReader<TcpStream>) -> Result<[ShipPlacement; 5]> {
+    let mut placement:[ShipPlacement; 5]
+            = [ShipPlacement { x: 0, y: 0, direction: Direction::North }; 5];
+    for i in 0..4 {
+        placement[i] = ShipPlacement {
+            x: try!(extract_number(&mut reader)),
+            y: try!(extract_number(&mut reader)),
+            direction: try!(extract_direction(&mut reader)),
+        };
     }
-    return msg;
+    return Ok(placement);
+}
+
+pub fn deserialize_message(mut reader: &mut BufReader<TcpStream>) -> Result<Message> {
+    match try!(extract_number(&mut reader)) {
+        000 => Ok(Message::GetFeaturesRequest),
+        001 => Ok(Message::LoginRequest {
+            username: try!(extract_string(&mut reader, false))
+        }),
+        002 => Ok(Message::ReadyRequest),
+        003 => Ok(Message::NotReadyRequest),
+        004 => Ok(Message::ChallengePlayerRequest {
+            username: try!(extract_string(&mut reader, false))
+        }),
+        010 => Ok(Message::PlaceShipsRequest {
+            placement: try!(extract_placement(&mut reader))
+        }),
+        011 => Ok(Message::ShootRequest {
+            x: try!(extract_number(&mut reader)),
+            y: try!(extract_number(&mut reader))
+        }),
+        012 => Ok(Message::MoveAndShootRequest {
+            id: try!(extract_number(&mut reader)),
+            direction: try!(extract_direction(&mut reader)),
+            x: try!(extract_number(&mut reader)),
+            y: try!(extract_number(&mut reader))
+        }),
+        013 => Ok(Message::SurrenderRequest),
+        099 => Ok(Message::ReportErrorRequest {
+            errormessage: try!(extract_string(&mut reader, true))
+        }),
+
+
+        100 => Ok(Message::OkResponse),
+        101 => Ok(Message::FeaturesResponse {
+            features: try!(extract_features(&mut reader))
+        }),
+        102 => Ok(Message::NameTakenResponse {
+            nickname: try!(extract_string(&mut reader, false))
+        }),
+        103 => Ok(Message::NoSuchPlayerResponse {
+            nickname: try!(extract_string(&mut reader, false))
+        }),
+        104 => Ok(Message::NotWaitingResponse {
+            nickname: try!(extract_string(&mut reader, false))
+        }),
+        105 => Ok(Message::GameAlreadyStartedResponse),
+        110 => Ok(Message::IllegalPlacementResponse),
+        111 => Ok(Message::HitResponse {
+            x: try!(extract_number(&mut reader)),
+            y: try!(extract_number(&mut reader))
+        }),
+        112 => Ok(Message::MissResponse {
+            x: try!(extract_number(&mut reader)),
+            y: try!(extract_number(&mut reader))
+        }),
+        113 => Ok(Message::DestroyedResponse {
+            x: try!(extract_number(&mut reader)),
+            y: try!(extract_number(&mut reader))
+        }),
+        199 => Ok(Message::InvalidRequestResponse),
+
+
+        200 => Ok(Message::PlayerJoinedUpdate {
+            nickname: try!(extract_string(&mut reader, false))
+        }),
+        201 => Ok(Message::PlayerLeftUpdate {
+            nickname: try!(extract_string(&mut reader, false))
+        }),
+        202 => Ok(Message::PlayerReadyUpdate {
+            nickname: try!(extract_string(&mut reader, false))
+        }),
+        203 => Ok(Message::PlayerNotReadyUpdate {
+            nickname: try!(extract_string(&mut reader, false))
+        }),
+        204 => Ok(Message::GameStartUpdate {
+            nickname: try!(extract_string(&mut reader, false))
+        }),
+        210 => Ok(Message::YourTurnUpdate),
+        211 => Ok(Message::EnemyTurnUpdate),
+        212 => Ok(Message::EnemyVisibleUpdate {
+            x: try!(extract_number(&mut reader)),
+            y: try!(extract_number(&mut reader))
+        }),
+        213 => Ok(Message::EnemyInvisibleUpdate {
+            x: try!(extract_number(&mut reader)),
+            y: try!(extract_number(&mut reader))
+        }),
+        214 => Ok(Message::EnemyHitUpdate {
+            x: try!(extract_number(&mut reader)),
+            y: try!(extract_number(&mut reader))
+        }),
+        215 => Ok(Message::EnemyMissUpdate {
+            x: try!(extract_number(&mut reader)),
+            y: try!(extract_number(&mut reader))
+        }),
+        216 => Ok(Message::GameOverUpdate {
+            victorious: try!(extract_bool(&mut reader)),
+            reason: try!(extract_reason(&mut reader))
+        }),
+        217 => Ok(Message::AfkWarningUpdate {
+            strikes: try!(extract_number(&mut reader))
+        }),
+        218 => Ok(Message::EnemyAfkUpdate{
+            strikes: try!(extract_number(&mut reader))
+        }),
+
+        255 => Ok(Message::ServerGoingDownUpdate{
+            errormessage: try!(extract_string(&mut reader, true))
+        }),
+
+        _   => Err(Error::new(ErrorKind::InvalidData, "Invalid opcode."))
+    }
 }
 
 fn append_string(mut buf: &mut Vec<u8>, string: String) {
-    if string.len() > 255 {
-        panic!("String exceeds maximum allowed length.");
-    }
+    assert!(string.len() <= 255, "String exceeds maximum allowed length.");
     buf.push(string.len() as u8);
     write!(&mut buf, "{}", string);
 }
