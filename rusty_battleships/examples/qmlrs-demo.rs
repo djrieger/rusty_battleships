@@ -20,21 +20,35 @@ macro_rules! description {
 macro_rules! version {
     () => ( env!("CARGO_PKG_VERSION") )
 }
-macro_rules! version_string {
+macro_rules! version_string {            // Like this (with a literal instead of a String variable), everything works just fine:
+
     () => ( concat!(description!(), " v", version!()) )
 }
 
 static WINDOW: &'static str = include_str!("assets/main_window.qml");
 
+#[derive(Copy, Clone)]
 enum State {
     Unregistered,
+    AwaitFeatures,
     NameTaken,
-    Registered
+    Registered,
+    Available,
+    AwaitingReadyResponse,
+    Waiting,
+    AwaitingNotReadyResponse,
+    AwaitingGameStart,
+    PlacingShips,
+    AwaitingPlacementResponse,
+    OpponentPlacing,
+    PlanningTurn,
+    OpponentPlanningTurn,
+    GameOver,
 }
 
 struct Bridge {
     sender: mpsc::Sender<Message>,
-    receiver: mpsc::Receiver<Message>,
+    receiver: mpsc::Receiver<State>,
     state: State,
 }
 
@@ -46,11 +60,7 @@ impl Bridge {
 
     fn poll_state(&mut self) -> &str {
         if let Ok(msg) = self.receiver.try_recv() {
-            match msg {
-                Message::OkResponse => self.state = State::Registered,
-                Message::NameTakenResponse { nickname } => self.state = State::NameTaken,
-                _ => {},
-            }
+            self.state = msg;
         }
         return match self.state {
             State::Unregistered => "unregistered",
@@ -67,8 +77,9 @@ Q_OBJECT! { Bridge:
 }
 
 fn main() {
+    let mut current_state = State::Unregistered;
     let (tx_main, rcv_tcp) : (mpsc::Sender<Message>, mpsc::Receiver<Message>) = mpsc::channel();
-    let (tx_tcp, rcv_main) : (mpsc::Sender<Message>, mpsc::Receiver<Message>) = mpsc::channel();
+    let (tx_tcp, rcv_main) : (mpsc::Sender<State>, mpsc::Receiver<State>) = mpsc::channel();
 
     let tcp_loop = move || {
         let mut port:u16 = 5000;
@@ -102,7 +113,12 @@ fn main() {
                 // Parse server response and send to main thread
                 let server_response = deserialize_message(&mut buff_reader).unwrap();
                 println!("Got {:?} from server", server_response);
-                tx_tcp.send(server_response);
+                match server_response {
+                    Message::OkResponse => current_state = State::Registered,
+                    Message::NameTakenResponse { nickname } => current_state = State::NameTaken,
+                    _ => {},
+                }
+                tx_tcp.send(current_state);
             }
         };
         let tcp_recv_thread = thread::spawn(subloop);
