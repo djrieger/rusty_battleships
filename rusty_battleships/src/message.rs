@@ -46,7 +46,6 @@ pub enum Message {
         nickname:String,
     },
     GameAlreadyStartedResponse,
-    IllegalPlacementResponse,
     HitResponse {
         x:u8,
         y:u8,
@@ -59,6 +58,7 @@ pub enum Message {
         x:u8,
         y:u8,
     },
+    NotYourTurnResponse,
     InvalidRequestResponse,
 
     // Updates
@@ -146,10 +146,10 @@ fn message_type(msg: Message) -> (MessageEnvironment, MessageType) {
         Message::NotWaitingResponse{..} |
         Message::GameAlreadyStartedResponse => (MessageEnvironment::Lobby, MessageType::Response),
 
-        Message::IllegalPlacementResponse |
         Message::HitResponse {..} |
         Message::MissResponse {..} |
-        Message::DestroyedResponse {..} => (MessageEnvironment::Game, MessageType::Response),
+        Message::DestroyedResponse {..} |
+        Message::NotYourTurnResponse => (MessageEnvironment::Game, MessageType::Response),
 
         Message::OkResponse |
         Message::InvalidRequestResponse => (MessageEnvironment::All, MessageType::Response),
@@ -358,7 +358,6 @@ pub fn deserialize_message(mut reader: &mut BufReader<TcpStream>) -> Result<Mess
             nickname: try!(extract_string(&mut reader, false))
         }),
         105 => Ok(Message::GameAlreadyStartedResponse),
-        110 => Ok(Message::IllegalPlacementResponse),
         111 => Ok(Message::HitResponse {
             x: try!(extract_number(&mut reader)),
             y: try!(extract_number(&mut reader))
@@ -371,6 +370,7 @@ pub fn deserialize_message(mut reader: &mut BufReader<TcpStream>) -> Result<Mess
             x: try!(extract_number(&mut reader)),
             y: try!(extract_number(&mut reader))
         }),
+        114 => Ok(Message::NotYourTurnResponse),
         199 => Ok(Message::InvalidRequestResponse),
 
 
@@ -495,7 +495,6 @@ pub fn serialize_message(msg: Message) -> Vec<u8> {
             append_string(&mut msgbuf, nickname);
         },
         Message::GameAlreadyStartedResponse => msgbuf.push(105),
-        Message::IllegalPlacementResponse => msgbuf.push(110),
         Message::HitResponse { x, y } => {
             msgbuf.push(111);
             msgbuf.push(x);
@@ -511,6 +510,7 @@ pub fn serialize_message(msg: Message) -> Vec<u8> {
             msgbuf.push(x);
             msgbuf.push(y);
         },
+        Message::NotYourTurnResponse => msgbuf.push(114),
         Message::InvalidRequestResponse => msgbuf.push(199),
 
 
