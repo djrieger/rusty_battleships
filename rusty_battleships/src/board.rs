@@ -26,6 +26,7 @@ pub enum PlayerState {
     Available,
     Ready,
     Waiting,
+    Playing
 }
 
 pub struct Game {

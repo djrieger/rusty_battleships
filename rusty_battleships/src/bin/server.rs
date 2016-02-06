@@ -113,9 +113,35 @@ fn handle_main(msg: Message, player: &mut board::PlayerHandle, player_names: &mu
             panic!("Invalid state or request!");
         },
         Message::ChallengePlayerRequest { username } => {
-            // TODO: check if other player exists and is ready
-            // TODO: return one of OK, NOT_WAITING, NO_SUCH_PLAYER
+            // TODO: Spiel starten!
+            // DONE: Spielerstatus auf Playing setzen
+            // DONE: check if other player exists and is ready
+            // DONE: return one of OK, NOT_WAITING, NO_SUCH_PLAYER
+            // STRUCTURE: Spieler schon im Spiel? => NOT_WAITING
+                        //TODO: Nicht?
+                            //Wartet der Spieler? => OkResponse
+                            //Nicht? => NOT_WAITING
             return Some(Message::OkResponse);
+            if let Some(ref challenger_name) = player.nickname {
+                if let Some(ref mut challenged_player) = lobby.get_mut(&username) {
+                    match challenged_player.game {
+                        Some(_) => return Some(Message::NotWaitingResponse {nickname:username}),
+                        None    => {
+                            match challenged_player.state {
+                                PlayerState::Ready => {
+                                    challenged_player.state = PlayerState::Playing;
+                                    return Some(Message::OkResponse);
+                                },
+                                _ => return Some(Message::NotWaitingResponse {nickname:username}),
+                            }
+                        }
+                    }
+                        
+                } else {
+                    return Some(Message::NoSuchPlayerResponse {nickname:username});
+                }
+            }
+            panic!("Invalod state or request!");
         },
         _ => { return None; }
     }
