@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::collections::hash_map::Entry;
 use std::cell::RefCell;
 use std::io::{BufReader, BufWriter, Write};
 use std::net::{Ipv4Addr, TcpListener, TcpStream};
@@ -54,6 +55,16 @@ fn handle_client(stream: TcpStream, tx: mpsc::SyncSender<Message>, rx: mpsc::Rec
     }
 }
 
+// FIXME: Lifetime trouble, untested due to failed compilation
+// fn retrieve_player_from_lobby(lobby: &mut HashMap<String, board::Player>, player: &board::PlayerHandle) -> &'static board::Player {
+//     if let Some(ref username) = *player.nickname.borrow() {
+//         if let Some(ref mut x) = lobby.get_mut(username) {
+//             return x;
+//         }
+//     } 
+//     panic!("Invalid state");
+// }
+
 fn handle_main(msg: Message, player: &board::PlayerHandle, players: &Vec<board::PlayerHandle>, lobby: &mut HashMap<String, board::Player>) -> Option<Message> {
     match msg {
         Message::GetFeaturesRequest => {
@@ -80,18 +91,26 @@ fn handle_main(msg: Message, player: &board::PlayerHandle, players: &Vec<board::
             }
         },
         Message::ReadyRequest => {
-            // TODO: Save ready state for this player
-            lobby.get(&(player.nickname)).unwrap().state = PlayerState::Ready;
-            return Some(Message::OkResponse);
+            if let Some(ref username) = *player.nickname.borrow() {
+                if let Some(ref mut x) = lobby.get_mut(username) {
+                    x.state = PlayerState::Ready;
+                    return Some(Message::OkResponse);
+                }
+            }
+            panic!("Invalid state or request!");
         },
         Message::NotReadyRequest => {
             // TODO: Check if client is part of a Game and if Game is running
             // return Some(Message::GameAlreadyStartedResponse);
-            let p:&Player = lobby.get(&(player.nickname)).unwrap();
-            match p.game {
-                Some(_) => return Some(Message::OkResponse),
-                None    => return Some(Message::GameAlreadyStartedResponse)
+            if let Some(ref username) = *player.nickname.borrow() {
+                if let Some(ref mut x) = lobby.get_mut(username) {
+                    match x.game {
+                        Some(_) => return Some(Message::OkResponse),
+                        None    => return Some(Message::GameAlreadyStartedResponse)
+                    }
+                }
             }
+            panic!("Invalid state or request!");
         },
         Message::ChallengePlayerRequest { username } => {
             // TODO: check if other player exists and is ready
