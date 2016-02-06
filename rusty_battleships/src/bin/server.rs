@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::collections::hash_map::Entry;
 use std::cell::RefCell;
 use std::io::{BufReader, BufWriter, Write};
 use std::net::{Ipv4Addr, TcpListener, TcpStream};
@@ -61,7 +60,7 @@ fn handle_client(stream: TcpStream, tx: mpsc::SyncSender<Message>, rx: mpsc::Rec
 //         if let Some(ref mut x) = lobby.get_mut(username) {
 //             return x;
 //         }
-//     } 
+//     }
 //     panic!("Invalid state");
 // }
 
@@ -105,6 +104,7 @@ fn handle_main(msg: Message, player: &board::PlayerHandle, players: &Vec<board::
             if let Some(ref username) = *player.nickname.borrow() {
                 if let Some(ref mut x) = lobby.get_mut(username) {
                     match x.game {
+                        // TODO: initialize game
                         Some(_) => return Some(Message::OkResponse),
                         None    => return Some(Message::GameAlreadyStartedResponse)
                     }
