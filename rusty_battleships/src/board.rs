@@ -1,7 +1,6 @@
 use std::collections::hash_map::Entry;
 use std::collections::hash_map::OccupiedEntry;
 use std::sync::mpsc;
-use std::cell::RefCell;
 
 // extern crate rusty_battleships;
 use message::{serialize_message, deserialize_message, Message};
@@ -13,7 +12,7 @@ pub const H: usize = 10;
 pub const SHIP_COUNT: usize = 2;
 
 pub struct PlayerHandle {
-    pub nickname: RefCell<Option<String>>,
+    pub nickname: Option<String>,
     pub from_child_endpoint: mpsc::Receiver<Message>,
     pub to_child_endpoint: mpsc::Sender<Message>,
 }

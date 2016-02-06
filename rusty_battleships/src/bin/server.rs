@@ -1,5 +1,4 @@
-use std::collections::HashMap;
-use std::cell::RefCell;
+use std::collections::{HashMap, HashSet};
 use std::io::{BufReader, BufWriter, Write};
 use std::net::{Ipv4Addr, TcpListener, TcpStream};
 use std::option::Option::None;
@@ -64,7 +63,7 @@ fn handle_client(stream: TcpStream, tx: mpsc::SyncSender<Message>, rx: mpsc::Rec
 //     panic!("Invalid state");
 // }
 
-fn handle_main(msg: Message, player: &board::PlayerHandle, players: &Vec<board::PlayerHandle>, lobby: &mut HashMap<String, board::Player>) -> Option<Message> {
+fn handle_main(msg: Message, player: &mut board::PlayerHandle, player_names: &mut HashSet<String>, lobby: &mut HashMap<String, board::Player>) -> Option<Message> {
     match msg {
         Message::GetFeaturesRequest => {
             return Some(Message::FeaturesResponse {
@@ -85,12 +84,13 @@ fn handle_main(msg: Message, player: &board::PlayerHandle, players: &Vec<board::
                     game: None,
                 });
                 // Update player struct
-                *player.nickname.borrow_mut() = Some(username);
+                player.nickname = Some(username.clone());
+                player_names.insert(username);
                 return Some(Message::OkResponse);
             }
         },
         Message::ReadyRequest => {
-            if let Some(ref username) = *player.nickname.borrow() {
+            if let Some(ref username) = player.nickname {
                 if let Some(ref mut x) = lobby.get_mut(username) {
                     x.state = PlayerState::Ready;
                     return Some(Message::OkResponse);
@@ -101,7 +101,7 @@ fn handle_main(msg: Message, player: &board::PlayerHandle, players: &Vec<board::
         Message::NotReadyRequest => {
             // TODO: Check if client is part of a Game and if Game is running
             // return Some(Message::GameAlreadyStartedResponse);
-            if let Some(ref username) = *player.nickname.borrow() {
+            if let Some(ref username) = player.nickname {
                 if let Some(ref mut x) = lobby.get_mut(username) {
                     match x.game {
                         // TODO: initialize game
@@ -181,6 +181,7 @@ fn main() {
             .expect("Could not get local address.");
     println!("Started listening on port {} at address {}.", port, address);
     let mut players = Vec::new();
+    let mut player_names = HashSet::new();
     let mut lobby = HashMap::new();
 
     // channel for letting tcp_loop tell main loop about new players
@@ -198,7 +199,7 @@ fn main() {
             });
             tx_tcp_players.send(
                 board::PlayerHandle {
-                    nickname: RefCell::new(None),
+                    nickname: None,
                     from_child_endpoint: rx_main,
                     to_child_endpoint: tx_main,
                 }
@@ -215,11 +216,11 @@ fn main() {
             players.push(player);
         }
         // Receive Messages from child threads
-        for (i, player) in players.iter().enumerate() {
+        for (i, player) in players.iter_mut().enumerate() {
             if let Ok(msg) = player.from_child_endpoint.try_recv() {
                 print!("[Child {}] {:?}", i, msg);
                 // Handle Message received from child
-                let opt_response = handle_main(msg, &player, &players, &mut lobby);
+                let opt_response = handle_main(msg, player, &mut player_names, &mut lobby);
                 if let Some(response) = opt_response {
                     // handle_main generated a response -> send response Message back to child
                     println!(" -> {:?}", response);
