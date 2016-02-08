@@ -11,7 +11,7 @@ use argparse::{ArgumentParser, Print, Store};
 extern crate rusty_battleships;
 use rusty_battleships::message::{serialize_message, deserialize_message, Message, Reason};
 use rusty_battleships::board;
-use rusty_battleships::board::{Player, PlayerState};
+use rusty_battleships::board::{Game, Player, PlayerState};
 use rusty_battleships::serverstate;
 
 // http://stackoverflow.com/questions/35157399/how-to-concatenate-static-strings-in-rust/35159310
@@ -53,13 +53,13 @@ fn handle_client(stream: TcpStream, tx: mpsc::SyncSender<Message>, rx: mpsc::Rec
     }
 }
 
-fn handle_main(msg: Message, player: &mut board::PlayerHandle, player_names: &mut HashSet<String>, lobby: &mut HashMap<String, board::Player>) -> (Option<Message>, Option<(String, Message)>) {
+fn handle_main(msg: Message, player: &mut board::PlayerHandle, player_names: &mut HashSet<String>, lobby: &mut HashMap<String, board::Player>, games: &mut Vec<Game>) -> (Option<Message>, Option<(String, Message)>) {
     match msg {
         Message::GetFeaturesRequest => return (serverstate::handle_get_features_request(), None),
         Message::LoginRequest { username } => return (serverstate::handle_login_request(username, player, player_names, lobby), None), 
         Message::ReadyRequest => return (serverstate::handle_ready_request(player, player_names, lobby), None),
         Message::NotReadyRequest => return (serverstate::handle_not_ready_request(player, player_names, lobby), None),
-        Message::ChallengePlayerRequest { username } => return serverstate::handle_challenge_player_request(username, player, player_names, lobby),  
+        Message::ChallengePlayerRequest { username } => return serverstate::handle_challenge_player_request(username, player, player_names, lobby, games),  
         Message::SurrenderRequest => return (serverstate::handle_surrender_request(player, player_names, lobby), None),
         Message::ReportErrorRequest { errormessage } => return (serverstate::handle_report_error_request(errormessage, player, player_names, lobby), None),  
         Message::PlaceShipsRequest { placement } => {
@@ -151,6 +151,9 @@ fn main() {
 
     let tcp_thread = thread::spawn(tcp_loop);
     let mut message_store: HashMap<String, Vec<Message>> = HashMap::new();
+    let mut games: Vec<Game> = vec![];
+    // stores player name -> game
+    // let mut games: HashMap<String, &Game> = HashMap::new();
 
     // Main loop
     loop {
@@ -163,7 +166,7 @@ fn main() {
             if let Ok(msg) = player_handle.from_child_endpoint.try_recv() {
                 print!("[Child {}] {:?}", i, msg);
                 // Handle Message received from child
-                let (opt_response, opt_update) = handle_main(msg, player_handle, &mut player_names, &mut lobby);
+                let (opt_response, opt_update) = handle_main(msg, player_handle, &mut player_names, &mut lobby, &mut games);
                 if let Some(response) = opt_response {
                     // handle_main generated a response -> send response Message back to child
                     println!(" -> {:?}", response);

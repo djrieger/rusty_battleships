@@ -64,7 +64,7 @@ fn initialize_game(player1: &String, player2: &String) -> Game {
     };
 }
 
-pub fn handle_challenge_player_request(challenged_player_name: String, player: &mut PlayerHandle, player_names: &mut HashSet<String>, lobby: &mut HashMap<String, Player>) -> (Option<Message>, Option<(String, Message)>) {
+pub fn handle_challenge_player_request(challenged_player_name: String, player: &mut PlayerHandle, player_names: &mut HashSet<String>, lobby: &mut HashMap<String, Player>, games: &mut Vec<Game>) -> (Option<Message>, Option<(String, Message)>) {
     // DONE: Spiel starten!
     // DONE: Spielerstatus auf Playing setzen
     // DONE: check if other player exists and is ready
@@ -73,31 +73,37 @@ pub fn handle_challenge_player_request(challenged_player_name: String, player: &
     //TODO: Nicht?
     //Wartet der Spieler? => OkResponse
     //Nicht? => NOT_WAITING
-    return (Some(Message::OkResponse), None);
-    if let Some(ref challenger_name) = player.nickname {
-        if let Some(ref mut challenged_player) = lobby.get_mut(&challenged_player_name) {
-            match challenged_player.game {
-                Some(_) => return (Some(Message::NotWaitingResponse {nickname:challenged_player_name}), None),
-                None    => {
-                    match challenged_player.state {
-                        PlayerState::Ready => {
-                            challenged_player.state = PlayerState::Playing;
-                            // TODO: Cannot borrow lobby as mutable again, alternative?
-                            // lobby.get_mut(challenger_name).unwrap().state = PlayerState::Playing;
-                            initialize_game(challenger_name, &challenged_player_name);
-                            // TODO save game in some collection
-                            // Tell challenged player about game
-                            let update_message = Message::GameStartUpdate {nickname: (*challenger_name).clone() }; 
-                            return (Some(Message::OkResponse), Some((challenged_player_name, update_message)));
-                        },
-                        _ => return (Some(Message::NotWaitingResponse {nickname: challenged_player_name}), None),
-                    }
-                }
-            }
 
-        } else {
-            return (Some(Message::NoSuchPlayerResponse {nickname:challenged_player_name}), None);
+    let challenger_name = player.nickname.as_ref().expect("Invalid state, challenging player has no nickname");
+    let mut launch_game = false;
+
+    let not_waiting_result = (Some(Message::NotWaitingResponse {nickname: challenged_player_name.clone() }), None);
+
+    // Is there a player called challenged_player_name?
+    if let Some(ref mut challenged_player) = lobby.get_mut(&challenged_player_name) {
+        if let Some(_) = challenged_player.game {
+            // Challenged player is already in a game -> NotWaiting
+            return not_waiting_result;
         }
+        if let PlayerState::Ready = challenged_player.state  {
+            // Challenged player is not in a game and Ready
+            challenged_player.state = PlayerState::Playing;
+            launch_game = true;
+        } else {
+            return not_waiting_result;
+        }
+    } else {
+        return (Some(Message::NoSuchPlayerResponse {nickname:challenged_player_name}), None);
+    }
+
+    if launch_game {
+        // Create and save new game
+        games.push( initialize_game(challenger_name, &challenged_player_name));
+        lobby.get_mut(challenger_name).unwrap().state = PlayerState::Playing;
+        // Tell challenged player about game
+        let update_message = Message::GameStartUpdate {nickname: (*challenger_name).clone() }; 
+        // OkResponse for player who issued challenge
+        return (Some(Message::OkResponse), Some((challenged_player_name, update_message)));
     }
     panic!("Invalod state or request!");
 }
