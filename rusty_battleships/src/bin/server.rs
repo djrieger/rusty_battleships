@@ -12,6 +12,7 @@ extern crate rusty_battleships;
 use rusty_battleships::message::{serialize_message, deserialize_message, Message, Reason};
 use rusty_battleships::board;
 use rusty_battleships::board::{Player, PlayerState};
+use rusty_battleships::serverstate;
 
 // http://stackoverflow.com/questions/35157399/how-to-concatenate-static-strings-in-rust/35159310
 macro_rules! description {
@@ -52,137 +53,15 @@ fn handle_client(stream: TcpStream, tx: mpsc::SyncSender<Message>, rx: mpsc::Rec
     }
 }
 
-// FIXME: Lifetime trouble, untested due to failed compilation
-// fn retrieve_player_from_lobby(lobby: &mut HashMap<String, board::Player>, player: &board::PlayerHandle) -> &'static board::Player {
-//     if let Some(ref username) = *player.nickname.borrow() {
-//         if let Some(ref mut x) = lobby.get_mut(username) {
-//             return x;
-//         }
-//     }
-//     panic!("Invalid state");
-// }
-
 fn handle_main(msg: Message, player: &mut board::PlayerHandle, player_names: &mut HashSet<String>, lobby: &mut HashMap<String, board::Player>) -> Option<Message> {
     match msg {
-        Message::GetFeaturesRequest => {
-            return Some(Message::FeaturesResponse {
-                features: vec!["Awesomeness".to_owned()]
-            });
-        },
-        Message::LoginRequest { username } => {
-            if username.len() == 0 {
-                return Some(Message::InvalidRequestResponse);
-            }
-            // Determine if we already have a player with name 'username'
-            if lobby.contains_key(&username) {
-                return Some(Message::NameTakenResponse { nickname: username });
-            } else {
-                // Update lobby hashtable
-                lobby.insert(username.clone(), board::Player {
-                    state: board::PlayerState::Available,
-                    game: None,
-                });
-                // Update player struct
-                player.nickname = Some(username.clone());
-                player_names.insert(username);
-                return Some(Message::OkResponse);
-            }
-        },
-        Message::ReadyRequest => {
-            if let Some(ref username) = player.nickname {
-                if let Some(ref mut x) = lobby.get_mut(username) {
-                    x.state = PlayerState::Ready;
-                    return Some(Message::OkResponse);
-                }
-            }
-            panic!("Invalid state or request!");
-        },
-        Message::NotReadyRequest => {
-            // TODO: Check if client is part of a Game and if Game is running
-            // return Some(Message::GameAlreadyStartedResponse);
-            if let Some(ref username) = player.nickname {
-                if let Some(ref mut x) = lobby.get_mut(username) {
-                    match x.game {
-                        // TODO: initialize game
-                        Some(_) => return Some(Message::OkResponse),
-                        None    => return Some(Message::GameAlreadyStartedResponse)
-                    }
-                }
-            }
-            panic!("Invalid state or request!");
-        },
-        Message::ChallengePlayerRequest { username } => {
-            // TODO: Spiel starten!
-            // DONE: Spielerstatus auf Playing setzen
-            // DONE: check if other player exists and is ready
-            // DONE: return one of OK, NOT_WAITING, NO_SUCH_PLAYER
-            // STRUCTURE: Spieler schon im Spiel? => NOT_WAITING
-                        //TODO: Nicht?
-                            //Wartet der Spieler? => OkResponse
-                            //Nicht? => NOT_WAITING
-            return Some(Message::OkResponse);
-            if let Some(ref challenger_name) = player.nickname {
-                if let Some(ref mut challenged_player) = lobby.get_mut(&username) {
-                    match challenged_player.game {
-                        Some(_) => return Some(Message::NotWaitingResponse {nickname:username}),
-                        None    => {
-                            match challenged_player.state {
-                                PlayerState::Ready => {
-                                    challenged_player.state = PlayerState::Playing;
-                                    return Some(Message::OkResponse);
-                                },
-                                _ => return Some(Message::NotWaitingResponse {nickname:username}),
-                            }
-                        }
-                    }
-                        
-                } else {
-                    return Some(Message::NoSuchPlayerResponse {nickname:username});
-                }
-            }
-            panic!("Invalod state or request!");
-        },
-        Message::SurrenderRequest => {
-            // TODO: Tell other player!
-            // STRUCTURE: If playing, set available, return GameOverUpdate to both players!
-            if let Some(ref username) = player.nickname {
-                if let Some(ref mut x) = lobby.get_mut(username) {
-                    match x.state {
-                        PlayerState::Playing =>  {
-                            x.state = PlayerState::Available;
-                            // TODO: Tell other player!
-                            return Some(Message::GameOverUpdate {
-                                victorious:false,
-                                reason:Reason::Surrendered,
-                            });
-                        },
-                        _ => return Some(Message::InvalidRequestResponse),
-                    }
-                }
-            }
-            panic!("Invalod state or request!");
-        },
-        Message::ReportErrorRequest { errormessage } => {
-            // TODO: Tell other player!
-            // TODO: "Reset" players to available state.
-            if let Some(ref username) = player.nickname {
-                if let Some(ref mut x) = lobby.get_mut(username) {
-                    println!("{}", errormessage);
-                    // TODO: Add further debugging information!
-                    x.state = PlayerState::Available;
-                    if let Some(ref mut g) = x.game {
-                        if &(g.players.0) == username {
-                            // We're the left player
-                            // TODO: Send message to other player and set them to available
-                        } else {
-                            // We're the right player
-                            // TODO: Send message to other player and set them to available
-                        }
-                    }
-                }
-            }
-            panic!("Invalod state or request!");
-        },
+        Message::GetFeaturesRequest => return serverstate::handle_get_features_request(),
+        Message::LoginRequest { username } => return serverstate::handle_login_request(username, player, player_names, lobby), 
+        Message::ReadyRequest => return serverstate::handle_ready_request(player, player_names, lobby),
+        Message::NotReadyRequest => return serverstate::handle_not_ready_request(player, player_names, lobby),
+        Message::ChallengePlayerRequest { username } => return serverstate::handle_challenge_player_request(username, player, player_names, lobby),  
+        Message::SurrenderRequest => return serverstate::handle_surrender_request(player, player_names, lobby),
+        Message::ReportErrorRequest { errormessage } => return serverstate::handle_report_error_request(errormessage, player, player_names, lobby),  
         Message::PlaceShipsRequest { placement } => {
             // TODO: Fill me with life!
             /* TODO: Return OkResponse after saving the placement.
