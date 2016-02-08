@@ -16,6 +16,7 @@ macro_rules! hashmap {
 pub struct Result {
     pub response: Option<Message>,
     pub updates: HashMap<String, Vec<Message>>,
+    pub terminate_connection: bool,
 }
 
 impl Result {
@@ -27,6 +28,7 @@ impl Result {
         return Result {
             response: Some(response),
             updates: updates,
+            terminate_connection: false,
         }
     }
 }
@@ -164,9 +166,9 @@ pub fn handle_surrender_request(player: &mut PlayerHandle, player_names: &mut Ha
     return Result::respond_and_update_single(updatemsg, hashmap![(*opponent_name).clone() => vec![updatemsg2]]);
 }
 
+// if player is in a game with player2, send PlayerLeft(player), GameOver(victory, Disconnected) to
+// player2 and set player2 to available, removing game from games
 pub fn handle_report_error_request(errormessage: String, player: &mut PlayerHandle, player_names: &mut HashSet<String>, lobby: &mut HashMap<String, Player>) -> Result {
-    // TODO: Tell other player!
-    // TODO: "Reset" players to available state.
     let mut player_ingame = false;
     let errormsg;
     let mut opponent_name = String::from("");
@@ -181,7 +183,10 @@ pub fn handle_report_error_request(errormessage: String, player: &mut PlayerHand
         errormsg = format!("We received an error report from player {}.Therefore, this game ends now. The message was: {}", username,errormessage);
         
         if let Some(ref mut x) = lobby.get_mut(username) {
-            println!("{}", errormsg); // TODO: Add further debugging information!
+            println!("Client {} reported the following error: {}", username, errormessage);
+            // Terminate connection to client reporting ErrorRequest
+            return Result {
+                response: None,
             x.state = PlayerState::Available;
             if let Some(ref mut g) = x.game {
                 opponent_name = g.get_opponent_name(username).clone();

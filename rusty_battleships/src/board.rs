@@ -14,7 +14,9 @@ pub const SHIP_COUNT: usize = 2;
 pub struct PlayerHandle {
     pub nickname: Option<String>,
     pub from_child_endpoint: mpsc::Receiver<Message>,
-    pub to_child_endpoint: mpsc::Sender<Message>,
+    // Sending None to a child indicates that the server wishes to terminate the (TCP) connection
+    // with that child
+    pub to_child_endpoint: mpsc::Sender<Option<Message>>,
 }
 
 pub struct Player<'a> {
