@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use message::Message;
 use message::Reason;
-use board::{PlayerState, Player, PlayerHandle};
+use board::{Board, PlayerState, Player, PlayerHandle, Game};
 
 pub fn handle_get_features_request() -> Option<Message> {
     return Some(Message::FeaturesResponse {
@@ -41,12 +41,11 @@ pub fn handle_ready_request(player: &mut PlayerHandle, player_names: &mut HashSe
 }
 
 pub fn handle_not_ready_request(player: &mut PlayerHandle, player_names: &mut HashSet<String>, lobby: &mut HashMap<String, Player>) -> Option<Message> {
-    // TODO: Check if client is part of a Game and if Game is running
-    // return Some(Message::GameAlreadyStartedResponse);
     if let Some(ref username) = player.nickname {
         if let Some(ref mut x) = lobby.get_mut(username) {
             match x.game {
                 // TODO: initialize game
+                // TODO: Check if Game is running
                 Some(_) => return Some(Message::OkResponse),
                 None    => return Some(Message::GameAlreadyStartedResponse)
             }
@@ -55,8 +54,18 @@ pub fn handle_not_ready_request(player: &mut PlayerHandle, player_names: &mut Ha
     panic!("Invalid state or request!");
 }
 
-pub fn handle_challenge_player_request(username: String, player: &mut PlayerHandle, player_names: &mut HashSet<String>, lobby: &mut HashMap<String, Player>) -> Option<Message> {
-    // TODO: Spiel starten!
+fn initialize_game(player1: &String, player2: &String) -> Game {
+    let first_board = Board::new(vec![]);
+    let second_board = Board::new(vec![]);
+
+    return Game {
+        players: ((*player1).clone(), (*player2).clone()),
+        boards: (first_board, second_board),
+    };
+}
+
+pub fn handle_challenge_player_request(challenged_player_name: String, player: &mut PlayerHandle, player_names: &mut HashSet<String>, lobby: &mut HashMap<String, Player>) -> Option<Message> {
+    // DONE: Spiel starten!
     // DONE: Spielerstatus auf Playing setzen
     // DONE: check if other player exists and is ready
     // DONE: return one of OK, NOT_WAITING, NO_SUCH_PLAYER
@@ -66,22 +75,29 @@ pub fn handle_challenge_player_request(username: String, player: &mut PlayerHand
     //Nicht? => NOT_WAITING
     return Some(Message::OkResponse);
     if let Some(ref challenger_name) = player.nickname {
-        if let Some(ref mut challenged_player) = lobby.get_mut(&username) {
+        if let Some(ref mut challenged_player) = lobby.get_mut(&challenged_player_name) {
             match challenged_player.game {
-                Some(_) => return Some(Message::NotWaitingResponse {nickname:username}),
+                Some(_) => return Some(Message::NotWaitingResponse {nickname:challenged_player_name}),
                 None    => {
                     match challenged_player.state {
                         PlayerState::Ready => {
                             challenged_player.state = PlayerState::Playing;
+                            // TODO: Cannot borrow lobby as mutable again, alternative?
+                            // lobby.get_mut(challenger_name).unwrap().state = PlayerState::Playing;
+                            initialize_game(challenger_name, &challenged_player_name);
+                            // TODO save game in some collection
+                            // Tell challenged player about game
+                            // TODO: Need PlayerHandle for challenged player
+                            // challenged_player_handle.to_child_endpoint.send(Message::GameStartUpdate {nickname: challenger_name }); 
                             return Some(Message::OkResponse);
                         },
-                        _ => return Some(Message::NotWaitingResponse {nickname:username}),
+                        _ => return Some(Message::NotWaitingResponse {nickname: challenged_player_name}),
                     }
                 }
             }
 
         } else {
-            return Some(Message::NoSuchPlayerResponse {nickname:username});
+            return Some(Message::NoSuchPlayerResponse {nickname:challenged_player_name});
         }
     }
     panic!("Invalod state or request!");
