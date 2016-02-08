@@ -58,33 +58,50 @@ fn handle_client(stream: TcpStream, tx: mpsc::SyncSender<Message>, rx: mpsc::Rec
 }
 
 fn handle_main(msg: Message, player: &mut board::PlayerHandle, player_names: &mut HashSet<String>, lobby: &mut HashMap<String, board::Player>, games: &mut Vec<Game>) -> serverstate::Result {
-    return match msg {
-        Message::GetFeaturesRequest => serverstate::handle_get_features_request(),
-        Message::LoginRequest { username } => serverstate::handle_login_request(username, player, player_names, lobby), 
-        Message::ReadyRequest => serverstate::handle_ready_request(player, player_names, lobby),
-        Message::NotReadyRequest => serverstate::handle_not_ready_request(player, player_names, lobby),
-        Message::ChallengePlayerRequest { username } => serverstate::handle_challenge_player_request(username, player, player_names, lobby, games),  
-        Message::SurrenderRequest => serverstate::handle_surrender_request(player, player_names, lobby),
-        Message::ReportErrorRequest { errormessage } => serverstate::handle_report_error_request(errormessage, player, player_names, lobby),
-        // Message::PlaceShipsRequest { placement } => {
-        //     // TODO: Fill me with life!
-        //     #<{(| TODO: Return OkResponse after saving the placement.
-        //      * The RFC tells us to assume a correct placement. Nevertheless - for testing purposes - we should check it and return an INVALID_REQUEST.
-        //      |)}>#
-        //     return (Some(Message::InvalidRequestResponse), None);
-        // },
-        // Message::ShootRequest { x, y } => {
-        //     // TODO: Fill me with life!
-        //     // TODO: Return either one of HIT, MISS, DESTROYED, NOT_YOUR_TURN.
-        //     return (Some(Message::InvalidRequestResponse), None);
-        // },
-        // Message::MoveAndShootRequest { id, direction, x, y } => {
-        //     // TODO: Fill me with life!
-        //     // TODO: HIT, MISS, DESTROYED, NOT_YOUR_TURN
-        //     return (Some(Message::InvalidRequestResponse), None);
-        // },
-        _ => { panic!("Missing implementation for state"); },
-    };
+    // These requests can be handled without any restrictions
+    match msg {
+        Message::GetFeaturesRequest => return serverstate::handle_get_features_request(),
+        Message::ReportErrorRequest { errormessage } => return serverstate::handle_report_error_request(errormessage, player, player_names, lobby),
+        _ => {},
+    }
+
+    // Login requests on the other hand are only valid if the client is not already logged in, i.e.
+    // their nickname must be None
+    if player.nickname.is_none() {
+        if let Message::LoginRequest { username } = msg {
+            return serverstate::handle_login_request(username, player, player_names, lobby); 
+        }
+    } else {
+        // All other requests are only valid after logging in, i.e. with a user name
+        match msg {
+            Message::GetFeaturesRequest => return serverstate::handle_get_features_request(),
+            Message::LoginRequest { username } => return serverstate::handle_login_request(username, player, player_names, lobby), 
+            Message::ReadyRequest => return serverstate::handle_ready_request(player, player_names, lobby),
+            Message::NotReadyRequest => return serverstate::handle_not_ready_request(player, player_names, lobby),
+            Message::ChallengePlayerRequest { username } => return serverstate::handle_challenge_player_request(username, player, player_names, lobby, games),  
+            Message::SurrenderRequest => return serverstate::handle_surrender_request(player, player_names, lobby),
+            // TODO: further states
+            // Message::PlaceShipsRequest { placement } => {
+            //     // TODO: Fill me with life!
+            //     #<{(| TODO: Return OkResponse after saving the placement.
+            //      * The RFC tells us to assume a correct placement. Nevertheless - for testing purposes - we should check it and return an INVALID_REQUEST.
+            //      |)}>#
+            //     return (Some(Message::InvalidRequestResponse), None);
+            // },
+            // Message::ShootRequest { x, y } => {
+            //     // TODO: Fill me with life!
+            //     // TODO: Return either one of HIT, MISS, DESTROYED, NOT_YOUR_TURN.
+            //     return (Some(Message::InvalidRequestResponse), None);
+            // },
+            // Message::MoveAndShootRequest { id, direction, x, y } => {
+            //     // TODO: Fill me with life!
+            //     // TODO: HIT, MISS, DESTROYED, NOT_YOUR_TURN
+            //     return (Some(Message::InvalidRequestResponse), None);
+            // },
+            _ => {},
+        };
+    }
+    return serverstate::Result::respond(Message::InvalidRequestResponse);
 }
 
 fn main() {
