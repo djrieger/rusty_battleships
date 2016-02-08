@@ -122,7 +122,7 @@ fn main() {
     let address = listener.local_addr()
             .expect("Could not get local address.");
     println!("Started listening on port {} at address {}.", port, address);
-    let mut players = Vec::new();
+    let mut player_handles = Vec::new();
     let mut player_names = HashSet::new();
     let mut lobby = HashMap::new();
 
@@ -155,18 +155,18 @@ fn main() {
     loop {
         // Receive new players from tcp_loop
         if let Ok(player) = rx_main_players.try_recv() {
-            players.push(player);
+            player_handles.push(player);
         }
         // Receive Messages from child threads
-        for (i, player) in players.iter_mut().enumerate() {
-            if let Ok(msg) = player.from_child_endpoint.try_recv() {
+        for (i, player_handle) in player_handles.iter_mut().enumerate() {
+            if let Ok(msg) = player_handle.from_child_endpoint.try_recv() {
                 print!("[Child {}] {:?}", i, msg);
                 // Handle Message received from child
-                let opt_response = handle_main(msg, player, &mut player_names, &mut lobby);
+                let opt_response = handle_main(msg, player_handle, &mut player_names, &mut lobby);
                 if let Some(response) = opt_response {
                     // handle_main generated a response -> send response Message back to child
                     println!(" -> {:?}", response);
-                    player.to_child_endpoint.send(response);
+                    player_handle.to_child_endpoint.send(response);
                 }
             }
         }
