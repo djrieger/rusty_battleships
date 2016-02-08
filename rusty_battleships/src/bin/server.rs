@@ -53,34 +53,34 @@ fn handle_client(stream: TcpStream, tx: mpsc::SyncSender<Message>, rx: mpsc::Rec
     }
 }
 
-fn handle_main(msg: Message, player: &mut board::PlayerHandle, player_names: &mut HashSet<String>, lobby: &mut HashMap<String, board::Player>) -> Option<Message> {
+fn handle_main(msg: Message, player: &mut board::PlayerHandle, player_names: &mut HashSet<String>, lobby: &mut HashMap<String, board::Player>) -> (Option<Message>, Option<(String, Message)>) {
     match msg {
-        Message::GetFeaturesRequest => return serverstate::handle_get_features_request(),
-        Message::LoginRequest { username } => return serverstate::handle_login_request(username, player, player_names, lobby), 
-        Message::ReadyRequest => return serverstate::handle_ready_request(player, player_names, lobby),
-        Message::NotReadyRequest => return serverstate::handle_not_ready_request(player, player_names, lobby),
+        Message::GetFeaturesRequest => return (serverstate::handle_get_features_request(), None),
+        Message::LoginRequest { username } => return (serverstate::handle_login_request(username, player, player_names, lobby), None), 
+        Message::ReadyRequest => return (serverstate::handle_ready_request(player, player_names, lobby), None),
+        Message::NotReadyRequest => return (serverstate::handle_not_ready_request(player, player_names, lobby), None),
         Message::ChallengePlayerRequest { username } => return serverstate::handle_challenge_player_request(username, player, player_names, lobby),  
-        Message::SurrenderRequest => return serverstate::handle_surrender_request(player, player_names, lobby),
-        Message::ReportErrorRequest { errormessage } => return serverstate::handle_report_error_request(errormessage, player, player_names, lobby),  
+        Message::SurrenderRequest => return (serverstate::handle_surrender_request(player, player_names, lobby), None),
+        Message::ReportErrorRequest { errormessage } => return (serverstate::handle_report_error_request(errormessage, player, player_names, lobby), None),  
         Message::PlaceShipsRequest { placement } => {
             // TODO: Fill me with life!
             /* TODO: Return OkResponse after saving the placement.
              * The RFC tells us to assume a correct placement. Nevertheless - for testing purposes - we should check it and return an INVALID_REQUEST.
              */
-            return Some(Message::InvalidRequestResponse);
+            return (Some(Message::InvalidRequestResponse), None);
         },
         Message::ShootRequest { x, y } => {
             // TODO: Fill me with life!
             // TODO: Return either one of HIT, MISS, DESTROYED, NOT_YOUR_TURN.
-            return Some(Message::InvalidRequestResponse);
+            return (Some(Message::InvalidRequestResponse), None);
         },
         Message::MoveAndShootRequest { id, direction, x, y } => {
             // TODO: Fill me with life!
             // TODO: HIT, MISS, DESTROYED, NOT_YOUR_TURN
-            return Some(Message::InvalidRequestResponse);
-        }
-        _ => { return None; }
-    }
+            return (Some(Message::InvalidRequestResponse), None);
+        },
+        _ => { return (None, None); },
+    };
 }
 
 fn main() {
@@ -150,23 +150,45 @@ fn main() {
     };
 
     let tcp_thread = thread::spawn(tcp_loop);
+    let mut message_store: HashMap<String, Vec<Message>> = HashMap::new();
 
     // Main loop
     loop {
         // Receive new players from tcp_loop
-        if let Ok(player) = rx_main_players.try_recv() {
-            player_handles.push(player);
+        if let Ok(player_handle) = rx_main_players.try_recv() {
+            player_handles.push(player_handle);
         }
         // Receive Messages from child threads
         for (i, player_handle) in player_handles.iter_mut().enumerate() {
             if let Ok(msg) = player_handle.from_child_endpoint.try_recv() {
                 print!("[Child {}] {:?}", i, msg);
                 // Handle Message received from child
-                let opt_response = handle_main(msg, player_handle, &mut player_names, &mut lobby);
+                let (opt_response, opt_update) = handle_main(msg, player_handle, &mut player_names, &mut lobby);
                 if let Some(response) = opt_response {
                     // handle_main generated a response -> send response Message back to child
                     println!(" -> {:?}", response);
                     player_handle.to_child_endpoint.send(response);
+                }
+                if let Some(update) = opt_update {
+                    // handle_main generated an additional message (always update?) to be sent to
+                    // another player, store in message_store
+                    let (recipient_name, message) = update;
+                    if message_store.contains_key(&recipient_name) {
+                        let mut messages = message_store.get_mut(&recipient_name).unwrap();
+                        messages.push(message);
+                    } else {
+                        message_store.insert(recipient_name, vec![message]);
+                    }
+                }
+            }
+        }
+        // Send all messages saved in message_store
+        for (i, player_handle) in player_handles.iter_mut().enumerate() {
+            if let Some(ref name) = player_handle.nickname {
+                if message_store.contains_key(name) {
+                    for message in message_store.remove(name).unwrap() {
+                        player_handle.to_child_endpoint.send(message);
+                    }
                 }
             }
         }

@@ -64,7 +64,7 @@ fn initialize_game(player1: &String, player2: &String) -> Game {
     };
 }
 
-pub fn handle_challenge_player_request(challenged_player_name: String, player: &mut PlayerHandle, player_names: &mut HashSet<String>, lobby: &mut HashMap<String, Player>) -> Option<Message> {
+pub fn handle_challenge_player_request(challenged_player_name: String, player: &mut PlayerHandle, player_names: &mut HashSet<String>, lobby: &mut HashMap<String, Player>) -> (Option<Message>, Option<(String, Message)>) {
     // DONE: Spiel starten!
     // DONE: Spielerstatus auf Playing setzen
     // DONE: check if other player exists and is ready
@@ -73,11 +73,11 @@ pub fn handle_challenge_player_request(challenged_player_name: String, player: &
     //TODO: Nicht?
     //Wartet der Spieler? => OkResponse
     //Nicht? => NOT_WAITING
-    return Some(Message::OkResponse);
+    return (Some(Message::OkResponse), None);
     if let Some(ref challenger_name) = player.nickname {
         if let Some(ref mut challenged_player) = lobby.get_mut(&challenged_player_name) {
             match challenged_player.game {
-                Some(_) => return Some(Message::NotWaitingResponse {nickname:challenged_player_name}),
+                Some(_) => return (Some(Message::NotWaitingResponse {nickname:challenged_player_name}), None),
                 None    => {
                     match challenged_player.state {
                         PlayerState::Ready => {
@@ -87,17 +87,16 @@ pub fn handle_challenge_player_request(challenged_player_name: String, player: &
                             initialize_game(challenger_name, &challenged_player_name);
                             // TODO save game in some collection
                             // Tell challenged player about game
-                            // TODO: Need PlayerHandle for challenged player
-                            // challenged_player_handle.to_child_endpoint.send(Message::GameStartUpdate {nickname: challenger_name }); 
-                            return Some(Message::OkResponse);
+                            let update_message = Message::GameStartUpdate {nickname: (*challenger_name).clone() }; 
+                            return (Some(Message::OkResponse), Some((challenged_player_name, update_message)));
                         },
-                        _ => return Some(Message::NotWaitingResponse {nickname: challenged_player_name}),
+                        _ => return (Some(Message::NotWaitingResponse {nickname: challenged_player_name}), None),
                     }
                 }
             }
 
         } else {
-            return Some(Message::NoSuchPlayerResponse {nickname:challenged_player_name});
+            return (Some(Message::NoSuchPlayerResponse {nickname:challenged_player_name}), None);
         }
     }
     panic!("Invalod state or request!");
