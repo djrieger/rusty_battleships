@@ -36,6 +36,12 @@ pub struct Game {
     // active player
 }
 
+impl Game {
+    pub fn get_opponent_name(&self, player_name: &String) -> &String {
+        return if *self.players.0 == *player_name { &self.players.1 } else { &self.players.0 };
+    }
+}
+
 // list of games
 // hashmap nickname -> Player
 

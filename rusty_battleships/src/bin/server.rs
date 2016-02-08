@@ -60,7 +60,7 @@ fn handle_main(msg: Message, player: &mut board::PlayerHandle, player_names: &mu
         Message::ReadyRequest => return (serverstate::handle_ready_request(player, player_names, lobby), None),
         Message::NotReadyRequest => return (serverstate::handle_not_ready_request(player, player_names, lobby), None),
         Message::ChallengePlayerRequest { username } => return serverstate::handle_challenge_player_request(username, player, player_names, lobby, games),  
-        Message::SurrenderRequest => return (serverstate::handle_surrender_request(player, player_names, lobby), None),
+        Message::SurrenderRequest => return serverstate::handle_surrender_request(player, player_names, lobby),
         Message::ReportErrorRequest { errormessage } => return (serverstate::handle_report_error_request(errormessage, player, player_names, lobby), None),  
         Message::PlaceShipsRequest { placement } => {
             // TODO: Fill me with life!

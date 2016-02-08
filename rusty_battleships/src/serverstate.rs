@@ -108,25 +108,35 @@ pub fn handle_challenge_player_request(challenged_player_name: String, player: &
     panic!("Invalod state or request!");
 }
 
-pub fn handle_surrender_request(player: &mut PlayerHandle, player_names: &mut HashSet<String>, lobby: &mut HashMap<String, Player>) -> Option<Message> {
-    // TODO: Tell other player!
+pub fn handle_surrender_request(player: &mut PlayerHandle, player_names: &mut HashSet<String>, lobby: &mut HashMap<String, Player>) -> (Option<Message>, Option<(String, Message)>) {
     // STRUCTURE: If playing, set available, return GameOverUpdate to both players!
-    if let Some(ref username) = player.nickname {
-        if let Some(ref mut x) = lobby.get_mut(username) {
-            match x.state {
-                PlayerState::Playing =>  {
-                    x.state = PlayerState::Available;
-                    // TODO: Tell other player!
-                    return Some(Message::GameOverUpdate {
-                        victorious:false,
-                        reason:Reason::Surrendered,
-                    });
-                },
-                _ => return Some(Message::InvalidRequestResponse),
-            }
+    let username = player.nickname.as_ref().expect("Invalid state, player has no nickname");
+    let opponent_name;
+    {
+        let requesting_player = lobby.get_mut(username).expect("Invalid state, requesting player not in lobby");
+        match requesting_player.state {
+            PlayerState::Playing =>  {
+                requesting_player.state = PlayerState::Available;
+            },
+            _ => return (Some(Message::InvalidRequestResponse), None),
         }
+
+        opponent_name = requesting_player.game.unwrap().get_opponent_name(username);
+        requesting_player.game = None;
     }
-    panic!("Invalod state or request!");
+
+    let opponent = lobby.get_mut(opponent_name).expect("Invalid state, opponent not in lobby");
+    opponent.game = None;
+    // Send GameOver to player and opponent
+    let updatemsg = Message::GameOverUpdate {
+        victorious:false,
+        reason:Reason::Surrendered,
+    };
+    let updatemsg2 = Message::GameOverUpdate {
+        victorious:false,
+        reason:Reason::Surrendered,
+    };
+    return (Some(updatemsg), Some(((*opponent_name).clone(), updatemsg2)));
 }
 
 pub fn handle_report_error_request(errormessage: String, player: &mut PlayerHandle, player_names: &mut HashSet<String>, lobby: &mut HashMap<String, Player>) -> Option<Message> {
