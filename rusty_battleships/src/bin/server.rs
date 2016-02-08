@@ -9,10 +9,9 @@ extern crate argparse;
 use argparse::{ArgumentParser, Print, Store};
 
 extern crate rusty_battleships;
-use rusty_battleships::message::{serialize_message, deserialize_message, Message};
+use rusty_battleships::message::{serialize_message, deserialize_message, Message, Reason};
 use rusty_battleships::board;
-use rusty_battleships::board::Player;
-use rusty_battleships::board::PlayerState;
+use rusty_battleships::board::{Player, PlayerState};
 
 // http://stackoverflow.com/questions/35157399/how-to-concatenate-static-strings-in-rust/35159310
 macro_rules! description {
@@ -143,6 +142,64 @@ fn handle_main(msg: Message, player: &mut board::PlayerHandle, player_names: &mu
             }
             panic!("Invalod state or request!");
         },
+        Message::SurrenderRequest => {
+            // TODO: Tell other player!
+            // STRUCTURE: If playing, set available, return GameOverUpdate to both players!
+            if let Some(ref username) = player.nickname {
+                if let Some(ref mut x) = lobby.get_mut(username) {
+                    match x.state {
+                        PlayerState::Playing =>  {
+                            x.state = PlayerState::Available;
+                            // TODO: Tell other player!
+                            return Some(Message::GameOverUpdate {
+                                victorious:false,
+                                reason:Reason::Surrendered,
+                            });
+                        },
+                        _ => return Some(Message::InvalidRequestResponse),
+                    }
+                }
+            }
+            panic!("Invalod state or request!");
+        },
+        Message::ReportErrorRequest { errormessage } => {
+            // TODO: Tell other player!
+            // TODO: "Reset" players to available state.
+            if let Some(ref username) = player.nickname {
+                if let Some(ref mut x) = lobby.get_mut(username) {
+                    println!("{}", errormessage);
+                    // TODO: Add further debugging information!
+                    x.state = PlayerState::Available;
+                    if let Some(ref mut g) = x.game {
+                        if &(g.players.0) == username {
+                            // We're the left player
+                            // TODO: Send message to other player and set them to available
+                        } else {
+                            // We're the right player
+                            // TODO: Send message to other player and set them to available
+                        }
+                    }
+                }
+            }
+            panic!("Invalod state or request!");
+        },
+        Message::PlaceShipsRequest { placement } => {
+            // TODO: Fill me with life!
+            /* TODO: Return OkResponse after saving the placement.
+             * The RFC tells us to assume a correct placement. Nevertheless - for testing purposes - we should check it and return an INVALID_REQUEST.
+             */
+            return Some(Message::InvalidRequestResponse);
+        },
+        Message::ShootRequest { x, y } => {
+            // TODO: Fill me with life!
+            // TODO: Return either one of HIT, MISS, DESTROYED, NOT_YOUR_TURN.
+            return Some(Message::InvalidRequestResponse);
+        },
+        Message::MoveAndShootRequest { id, direction, x, y } => {
+            // TODO: Fill me with life!
+            // TODO: HIT, MISS, DESTROYED, NOT_YOUR_TURN
+            return Some(Message::InvalidRequestResponse);
+        }
         _ => { return None; }
     }
 }
