@@ -24,6 +24,20 @@ pub struct Player<'a> {
     pub game: Option<&'a Game>,
 }
 
+// impl <'a> Player<'a> {
+//     pub fn set_available(&mut self, my_name: String, lobby: &mut HashMap<String, Player>, updates: &mut HashMap<String, Vec<Message>>) {
+//         self.state = PlayerState::Available;
+//         let mut updates = HashMap::new();
+//         for (nickname, player) in &mut lobby {
+//             if nickname != my_name {
+//                 updates.insert(nickname, vec![Message::PlayerJoinedUpdate { nickname: nickname }]);
+//             }
+//         }
+//
+//         // TODO: PLAYER_READY
+//     }
+// }
+
 pub enum PlayerState {
     Available,
     Ready,
@@ -43,10 +57,6 @@ impl Game {
         return if *self.players.0 == *player_name { &self.players.1 } else { &self.players.0 };
     }
 }
-
-// list of games
-// hashmap nickname -> Player
-
 
 #[derive(Copy, Clone)]
 pub struct Ship {
