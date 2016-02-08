@@ -58,14 +58,20 @@ pub fn handle_login_request(username: String, player: &mut PlayerHandle, player_
     }
 }
 
-pub fn handle_ready_request(player: &mut PlayerHandle, player_names: &mut HashSet<String>, lobby: &mut HashMap<String, Player>) -> Result {
-    if let Some(ref username) = player.nickname {
-        if let Some(ref mut x) = lobby.get_mut(username) {
-            x.state = PlayerState::Ready;
-            return Result::respond(Message::OkResponse);
+macro_rules! get_player {
+    ($player:expr, $lobby:expr ) => {{
+        if $player.nickname.is_none() || !$lobby.contains_key($player.nickname.as_ref().unwrap()) {
+            panic!("Invalid state. User has no nickname or nickname not in lobby HashTable");
         }
-    }
-    panic!("Invalid state or request!");
+        let x = $lobby.get_mut($player.nickname.as_ref().unwrap()).unwrap();
+        x
+    }};
+}
+
+pub fn handle_ready_request(player: &mut PlayerHandle, player_names: &mut HashSet<String>, lobby: &mut HashMap<String, Player>) -> Result {
+    let x = get_player!(player, lobby);
+    x.state = PlayerState::Ready;
+    return Result::respond(Message::OkResponse);
 }
 
 pub fn handle_not_ready_request(player: &mut PlayerHandle, player_names: &mut HashSet<String>, lobby: &mut HashMap<String, Player>) -> Result {
