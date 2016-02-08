@@ -99,15 +99,6 @@ fn initialize_game(player1: &String, player2: &String) -> Game {
 }
 
 pub fn handle_challenge_player_request(challenged_player_name: String, player: &mut PlayerHandle, player_names: &mut HashSet<String>, lobby: &mut HashMap<String, Player>, games: &mut Vec<Game>) -> Result {
-    // DONE: Spiel starten!
-    // DONE: Spielerstatus auf Playing setzen
-    // DONE: check if other player exists and is ready
-    // DONE: return one of OK, NOT_WAITING, NO_SUCH_PLAYER
-    // STRUCTURE: Spieler schon im Spiel? => NOT_WAITING
-    //TODO: Nicht?
-    //Wartet der Spieler? => OkResponse
-    //Nicht? => NOT_WAITING
-
     let challenger_name = player.nickname.as_ref().expect("Invalid state, challenging player has no nickname");
     let mut launch_game = false;
 
@@ -176,21 +167,37 @@ pub fn handle_surrender_request(player: &mut PlayerHandle, player_names: &mut Ha
 pub fn handle_report_error_request(errormessage: String, player: &mut PlayerHandle, player_names: &mut HashSet<String>, lobby: &mut HashMap<String, Player>) -> Result {
     // TODO: Tell other player!
     // TODO: "Reset" players to available state.
+    let mut player_ingame = false;
+    let errormsg;
+    let mut opponent_name = String::from("");
+    let mut updates: HashMap<String, Vec<Message>> = HashMap::new();
+
+    let updatemessage = Message::ReportErrorRequest { errormessage:errormessage.clone()};
+    let updatemessage2 = Message::ReportErrorRequest { errormessage:errormessage.clone()};
+    let gameovermessage = Message::GameOverUpdate { victorious:false, reason:Reason::Disconnected};
+    let gameovermessage2 = Message::GameOverUpdate { victorious:false, reason:Reason::Disconnected};
+
     if let Some(ref username) = player.nickname {
+        errormsg = format!("We received an error report from player {}.Therefore, this game ends now. The message was: {}", username,errormessage);
+        
         if let Some(ref mut x) = lobby.get_mut(username) {
-            println!("{}", errormessage);
-            // TODO: Add further debugging information!
+            println!("{}", errormsg); // TODO: Add further debugging information!
             x.state = PlayerState::Available;
             if let Some(ref mut g) = x.game {
-                if &(g.players.0) == username {
-                    // We're the left player
-                    // TODO: Send message to other player and set them to available
-                } else {
-                    // We're the right player
-                    // TODO: Send message to other player and set them to available
-                }
+                opponent_name = g.get_opponent_name(username).clone();
+                player_ingame = true;
             }
+            x.game = None;
         }
-    }
-    panic!("Invalod state or request!");
+
+        if player_ingame {
+            let opponent = lobby.get_mut(&opponent_name).expect("Invalid state, requesting player not in lobby");
+            opponent.state = PlayerState::Available;
+            opponent.game = None;
+            updates.insert(opponent_name.clone(), vec![updatemessage2,gameovermessage2]);
+        }
+        updates.insert(username.clone(), vec![gameovermessage]);
+        return Result::respond_and_update_single(updatemessage, updates);
+        }
+    panic!("Invalid state or request!");
 }
