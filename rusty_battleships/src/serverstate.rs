@@ -16,6 +16,7 @@ macro_rules! hashmap {
 pub struct Result {
     pub response: Option<Message>,
     pub updates: HashMap<String, Vec<Message>>,
+    pub terminate_connection: bool,
 }
 
 impl Result {
@@ -27,6 +28,7 @@ impl Result {
         return Result {
             response: Some(response),
             updates: updates,
+            terminate_connection: false,
         }
     }
 }
@@ -173,23 +175,27 @@ pub fn handle_surrender_request(player: &mut PlayerHandle, player_names: &mut Ha
     return Result::respond_and_update_single(updatemsg, hashmap![(*opponent_name).clone() => vec![updatemsg2]]);
 }
 
+// if player is in a game with player2, send PlayerLeft(player), GameOver(victory, Disconnected) to
+// player2 and set player2 to available, removing game from games
 pub fn handle_report_error_request(errormessage: String, player: &mut PlayerHandle, player_names: &mut HashSet<String>, lobby: &mut HashMap<String, Player>) -> Result {
-    // TODO: Tell other player!
-    // TODO: "Reset" players to available state.
     if let Some(ref username) = player.nickname {
         if let Some(ref mut x) = lobby.get_mut(username) {
-            println!("{}", errormessage);
-            // TODO: Add further debugging information!
-            x.state = PlayerState::Available;
-            if let Some(ref mut g) = x.game {
-                if &(g.players.0) == username {
-                    // We're the left player
-                    // TODO: Send message to other player and set them to available
-                } else {
-                    // We're the right player
-                    // TODO: Send message to other player and set them to available
-                }
-            }
+            println!("Client {} reported the following error: {}", username, errormessage);
+            // Terminate connection to client reporting ErrorRequest
+            return Result {
+                response: None,
+                updates: hashmap![],
+                terminate_connection: true,
+            };
+            // if let Some(ref mut g) = x.game {
+            //     if &(g.players.0) == username {
+            //         // We're the left player
+            //         // TODO: Send message to other player and set them to available
+            //     } else {
+            //         // We're the right player
+            //         // TODO: Send message to other player and set them to available
+            //     }
+            // }
         }
     }
     panic!("Invalod state or request!");

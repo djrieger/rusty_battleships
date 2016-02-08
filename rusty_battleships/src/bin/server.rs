@@ -25,21 +25,25 @@ macro_rules! version_string {
     () => ( concat!(description!(), " v", version!()) )
 }
 
-fn handle_client(stream: TcpStream, tx: mpsc::SyncSender<Message>, rx: mpsc::Receiver<Message>) {
+fn handle_client(stream: TcpStream, tx: mpsc::SyncSender<Message>, rx: mpsc::Receiver<Option<Message>>) {
     println!("New incoming TCP stream");
 
     let response_stream = stream.try_clone().unwrap();
     let mut buff_reader = BufReader::new(stream);
     let mut buff_writer = BufWriter::new(response_stream);
     loop {
-        let msg = deserialize_message(&mut buff_reader);
+        let request = deserialize_message(&mut buff_reader);
         let response_msg;
-        match msg {
-            Ok(msg) => {
+        match request {
+            Ok(request_msg) => {
                 // Send parsed Message to main thread
-                tx.send(msg).expect("Main thread died, exiting.");
+                tx.send(request_msg).expect("Main thread died, exiting.");
                 // Wait for response Message
-                response_msg = rx.recv().expect("Main thread died before answering, exiting.");
+                let response = rx.recv().expect("Main thread died before answering, exiting.");
+                match response {
+                    Some(msg) => response_msg = msg,
+                    None => break, // server wants to terminate this client
+                }
             },
             Err(e) => {
                 response_msg = Message::InvalidRequestResponse;
@@ -170,7 +174,11 @@ fn main() {
                 if let Some(response) = result.response {
                     // handle_main generated a response -> send response Message back to child
                     println!(" -> {:?}", response);
-                    player_handle.to_child_endpoint.send(response);
+                    player_handle.to_child_endpoint.send(Some(response));
+                }
+                if result.terminate_connection {
+                    print!("-- Closing connection to child {}", i);
+                    player_handle.to_child_endpoint.send(None);
                 }
                 if !result.updates.is_empty() {
                     message_store = result.updates;
@@ -183,7 +191,7 @@ fn main() {
             if let Some(ref name) = player_handle.nickname {
                 if message_store.contains_key(name) {
                     for message in message_store.remove(name).unwrap() {
-                        player_handle.to_child_endpoint.send(message);
+                        player_handle.to_child_endpoint.send(Some(message));
                     }
                 }
             }
