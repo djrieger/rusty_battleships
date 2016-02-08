@@ -49,19 +49,15 @@ pub struct Ship {
     pub health_points: usize,
 }
 
-#[derive(Copy, Clone)]
+// #[derive(Copy, Clone)]
 pub struct Board {
-    pub top: usize,
-    pub left: usize,
-    pub ships: [Ship; SHIP_COUNT],
+    pub ships: Vec<Ship>,
     pub state: [[usize; H]; W],
 }
 
 impl Board {
-    pub fn new(top: usize, left: usize, ships: [Ship; SHIP_COUNT]) -> Board {
+    pub fn new(ships: Vec<Ship>) -> Board {
         Board {
-            top: top,
-            left: left,
             state: [[0; H]; W],
             ships: ships,
         }

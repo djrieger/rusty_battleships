@@ -100,26 +100,6 @@ fn main() {
 
     let first_ship = board::Ship { x: 1, y: 2, length: 4, horizontal: true, health_points: 4 };
     let second_ship = board::Ship { x: 5, y: 2, length: 2, horizontal: false, health_points: 2 };
-    let first_board = board::Board::new(5, 8, [ first_ship, second_ship ]);
-    let second_board = first_board.clone();
-
-    let game = board::Game {
-        players: (String::from(name_alice), String::from(name_bob)),
-        boards: (first_board, second_board),
-    };
-
-    // let alice_entry = map.entry(name_alice);
-    // let alice = board::RegisteredPlayer {
-    //     nickname: name_alice,
-    //     map_entry: alice_entry,
-    // };
-    // next: Game, Boards
-
-
-
-
-
-
 
 
     let mut port:u16 = 5000;
