@@ -175,28 +175,46 @@ pub fn handle_surrender_request(player: &mut PlayerHandle, player_names: &mut Ha
     return Result::respond_and_update_single(updatemsg, hashmap![(*opponent_name).clone() => vec![updatemsg2]]);
 }
 
-// if player is in a game with player2, send PlayerLeft(player), GameOver(victory, Disconnected) to
-// player2 and set player2 to available, removing game from games
+fn terminate_player() {
+    // TODO: What to do here?
+    // Remove from lobby HashTable
+    // What else?
+}
+
 pub fn handle_report_error_request(errormessage: String, player: &mut PlayerHandle, player_names: &mut HashSet<String>, lobby: &mut HashMap<String, Player>) -> Result {
+    let mut termination_result: Result = return Result {
+        response: None,
+        updates: HashMap::new(), 
+        terminate_connection: true,
+    };
+
+    // For registered players we need to terminate a running game, if any
     if let Some(ref username) = player.nickname {
-        if let Some(ref mut x) = lobby.get_mut(username) {
+        let mut player2_name : Option<String> = None;
+        {
+            let mut user = lobby.get_mut(username).expect("Invalid state, requesting player not in lobby");
             println!("Client {} reported the following error: {}", username, errormessage);
-            // Terminate connection to client reporting ErrorRequest
-            return Result {
-                response: None,
-                updates: hashmap![],
-                terminate_connection: true,
-            };
-            // if let Some(ref mut g) = x.game {
-            //     if &(g.players.0) == username {
-            //         // We're the left player
-            //         // TODO: Send message to other player and set them to available
-            //     } else {
-            //         // We're the right player
-            //         // TODO: Send message to other player and set them to available
-            //     }
-            // }
+            // player in game with player2?
+            if let Some(game) = user.game {
+                let player2_name = Some(game.get_opponent_name(username));
+                let player_left_update = Message::PlayerLeftUpdate { nickname: (*username).clone() };
+                let game_over_update = Message::GameOverUpdate {
+                    victorious: false,
+                    reason: Reason::Disconnected,
+                };
+                termination_result.updates.insert( (*player2_name.unwrap()).clone(), vec![player_left_update, game_over_update]);
+
+                // TODO: remove game from games
+            }
+        } 
+        if let Some(ref name) = player2_name {
+            let player2 = lobby.get_mut(name).expect("Invalid state, opponent name not in lobby");
+            // TODO: change this to player2.set_available(...), only partly implemented in board.rs so
+            // far, not tested
+            player2.state = PlayerState::Available;
         }
     }
-    panic!("Invalod state or request!");
+
+    // Terminate connection to client reporting ErrorRequest
+    return termination_result;
 }
