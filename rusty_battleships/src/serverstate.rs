@@ -20,15 +20,15 @@ pub struct Result {
 }
 
 impl Result {
-    pub fn respond(response: Message) -> Result {
-        return Result::respond_and_update_single(response, HashMap::new());
+    pub fn respond(response: Message, terminate_connection: bool) -> Result {
+        return Result::respond_and_update_single(response, HashMap::new(), false);
     }
 
-    pub fn respond_and_update_single(response: Message, updates: HashMap<String, Vec<Message>>) -> Result {
+    pub fn respond_and_update_single(response: Message, updates: HashMap<String, Vec<Message>>, terminate_connection: bool) -> Result {
         return Result {
             response: Some(response),
             updates: updates,
-            terminate_connection: false,
+            terminate_connection: terminate_connection,
         }
     }
 }
@@ -37,16 +37,16 @@ impl Result {
 pub fn handle_get_features_request() -> Result {
     return Result::respond(Message::FeaturesResponse {
         features: vec!["Awesomeness".to_owned()]
-    });
+    }, false);
 }
 
 pub fn handle_login_request(username: String, player: &mut PlayerHandle, player_names: &mut HashSet<String>, lobby: &mut HashMap<String, Player>) -> Result {
     if username.len() == 0 {
-        return Result::respond(Message::InvalidRequestResponse);
+        return Result::respond(Message::InvalidRequestResponse, false);
     }
     // Determine if we already have a player with name 'username'
     if lobby.contains_key(&username) {
-        return Result::respond(Message::NameTakenResponse { nickname: username });
+        return Result::respond(Message::NameTakenResponse { nickname: username }, false);
     } else {
         // Update lobby hashtable
         lobby.insert(username.clone(), Player {
@@ -56,7 +56,7 @@ pub fn handle_login_request(username: String, player: &mut PlayerHandle, player_
         // Update player struct
         player.nickname = Some(username.clone());
         player_names.insert(username);
-        return Result::respond(Message::OkResponse);
+        return Result::respond(Message::OkResponse, false);
     }
 }
 
@@ -73,7 +73,7 @@ macro_rules! get_player {
 pub fn handle_ready_request(player: &mut PlayerHandle, player_names: &mut HashSet<String>, lobby: &mut HashMap<String, Player>) -> Result {
     let x = get_player!(player, lobby);
     x.state = PlayerState::Ready;
-    return Result::respond(Message::OkResponse);
+    return Result::respond(Message::OkResponse, false);
 }
 
 pub fn handle_not_ready_request(player: &mut PlayerHandle, player_names: &mut HashSet<String>, lobby: &mut HashMap<String, Player>) -> Result {
@@ -82,8 +82,8 @@ pub fn handle_not_ready_request(player: &mut PlayerHandle, player_names: &mut Ha
             match x.game {
                 // TODO: initialize game
                 // TODO: Check if Game is running
-                Some(_) => return Result::respond(Message::OkResponse),
-                None    => return Result::respond(Message::GameAlreadyStartedResponse)
+                Some(_) => return Result::respond(Message::OkResponse, false),
+                None    => return Result::respond(Message::GameAlreadyStartedResponse, false)
             }
         }
     }
@@ -101,19 +101,10 @@ fn initialize_game(player1: &String, player2: &String) -> Game {
 }
 
 pub fn handle_challenge_player_request(challenged_player_name: String, player: &mut PlayerHandle, player_names: &mut HashSet<String>, lobby: &mut HashMap<String, Player>, games: &mut Vec<Game>) -> Result {
-    // DONE: Spiel starten!
-    // DONE: Spielerstatus auf Playing setzen
-    // DONE: check if other player exists and is ready
-    // DONE: return one of OK, NOT_WAITING, NO_SUCH_PLAYER
-    // STRUCTURE: Spieler schon im Spiel? => NOT_WAITING
-    //TODO: Nicht?
-    //Wartet der Spieler? => OkResponse
-    //Nicht? => NOT_WAITING
-
     let challenger_name = player.nickname.as_ref().expect("Invalid state, challenging player has no nickname");
     let mut launch_game = false;
 
-    let not_waiting_result = Result::respond(Message::NotWaitingResponse {nickname: challenged_player_name.clone() });
+    let not_waiting_result = Result::respond(Message::NotWaitingResponse {nickname: challenged_player_name.clone() }, false);
 
     // Is there a player called challenged_player_name?
     if let Some(ref mut challenged_player) = lobby.get_mut(&challenged_player_name) {
@@ -129,7 +120,7 @@ pub fn handle_challenge_player_request(challenged_player_name: String, player: &
             return not_waiting_result;
         }
     } else {
-        return Result::respond(Message::NoSuchPlayerResponse {nickname:challenged_player_name});
+        return Result::respond(Message::NoSuchPlayerResponse {nickname:challenged_player_name}, false);
     }
 
     if launch_game {
@@ -139,7 +130,7 @@ pub fn handle_challenge_player_request(challenged_player_name: String, player: &
         // Tell challenged player about game
         let update_message = Message::GameStartUpdate {nickname: (*challenger_name).clone() }; 
         // OkResponse for player who issued challenge
-        return Result::respond_and_update_single(Message::OkResponse, hashmap![challenged_player_name => vec![update_message]]);
+        return Result::respond_and_update_single(Message::OkResponse, hashmap![challenged_player_name => vec![update_message]], false);
     }
     panic!("Invalod state or request!");
 }
@@ -154,7 +145,7 @@ pub fn handle_surrender_request(player: &mut PlayerHandle, player_names: &mut Ha
             PlayerState::Playing =>  {
                 requesting_player.state = PlayerState::Available;
             },
-            _ => return Result::respond(Message::InvalidRequestResponse),
+            _ => return Result::respond(Message::InvalidRequestResponse, false),
         }
 
         opponent_name = requesting_player.game.unwrap().get_opponent_name(username);
@@ -172,7 +163,7 @@ pub fn handle_surrender_request(player: &mut PlayerHandle, player_names: &mut Ha
         victorious:false,
         reason:Reason::Surrendered,
     };
-    return Result::respond_and_update_single(updatemsg, hashmap![(*opponent_name).clone() => vec![updatemsg2]]);
+    return Result::respond_and_update_single(updatemsg, hashmap![(*opponent_name).clone() => vec![updatemsg2]], false);
 }
 
 fn terminate_player() {
@@ -203,7 +194,6 @@ pub fn handle_report_error_request(errormessage: String, player: &mut PlayerHand
                     reason: Reason::Disconnected,
                 };
                 termination_result.updates.insert( (*player2_name.unwrap()).clone(), vec![player_left_update, game_over_update]);
-
                 // TODO: remove game from games
             }
         } 

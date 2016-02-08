@@ -101,7 +101,7 @@ fn handle_main(msg: Message, player: &mut board::PlayerHandle, player_names: &mu
             _ => {},
         };
     }
-    return serverstate::Result::respond(Message::InvalidRequestResponse);
+    return serverstate::Result::respond(Message::InvalidRequestResponse, false);
 }
 
 fn main() {
