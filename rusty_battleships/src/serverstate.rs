@@ -184,9 +184,6 @@ pub fn handle_report_error_request(errormessage: String, player: &mut PlayerHand
         
         if let Some(ref mut x) = lobby.get_mut(username) {
             println!("Client {} reported the following error: {}", username, errormessage);
-            // Terminate connection to client reporting ErrorRequest
-            return Result {
-                response: None,
             x.state = PlayerState::Available;
             if let Some(ref mut g) = x.game {
                 opponent_name = g.get_opponent_name(username).clone();
