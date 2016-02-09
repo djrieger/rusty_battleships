@@ -9,7 +9,7 @@ extern crate argparse;
 use argparse::{ArgumentParser, Print, Store};
 
 extern crate rusty_battleships;
-use rusty_battleships::message::{serialize_message, deserialize_message, Message, Reason};
+use rusty_battleships::message::{serialize_message, deserialize_message, Message, Reason, ShipPlacement};
 use rusty_battleships::board;
 use rusty_battleships::board::{Game, Player, PlayerState};
 use rusty_battleships::serverstate;
@@ -80,24 +80,9 @@ fn handle_main(msg: Message, player: &mut board::PlayerHandle, player_names: &mu
             Message::NotReadyRequest => return serverstate::handle_not_ready_request(player, player_names, lobby),
             Message::ChallengePlayerRequest { username } => return serverstate::handle_challenge_player_request(username, player, player_names, lobby, games),  
             Message::SurrenderRequest => return serverstate::handle_surrender_request(player, player_names, lobby),
-            // TODO: further states
-            // Message::PlaceShipsRequest { placement } => {
-            //     // TODO: Fill me with life!
-            //     #<{(| TODO: Return OkResponse after saving the placement.
-            //      * The RFC tells us to assume a correct placement. Nevertheless - for testing purposes - we should check it and return an INVALID_REQUEST.
-            //      |)}>#
-            //     return (Some(Message::InvalidRequestResponse), None);
-            // },
-            // Message::ShootRequest { x, y } => {
-            //     // TODO: Fill me with life!
-            //     // TODO: Return either one of HIT, MISS, DESTROYED, NOT_YOUR_TURN.
-            //     return (Some(Message::InvalidRequestResponse), None);
-            // },
-            // Message::MoveAndShootRequest { id, direction, x, y } => {
-            //     // TODO: Fill me with life!
-            //     // TODO: HIT, MISS, DESTROYED, NOT_YOUR_TURN
-            //     return (Some(Message::InvalidRequestResponse), None);
-            // },
+            Message::PlaceShipsRequest { placement } => return serverstate::handle_place_ships_request(placement, player, player_names, lobby),
+            Message::ShootRequest { x, y } => return serverstate::handle_move_shoot_request((x, y), None, player, player_names, lobby),
+            Message::MoveAndShootRequest { id, direction, x, y } => return serverstate::handle_move_shoot_request((x, y), Some((id, direction)), player, player_names, lobby),
             _ => {},
         };
     }

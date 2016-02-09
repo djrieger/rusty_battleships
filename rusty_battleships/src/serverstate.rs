@@ -1,6 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use message::Message;
+use message::{ShipPlacement, Direction};
 use message::Reason;
 use board::{Board, PlayerState, Player, PlayerHandle, Game};
 
@@ -207,4 +208,17 @@ pub fn handle_report_error_request(errormessage: String, player: &mut PlayerHand
 
     // Terminate connection to client reporting ErrorRequest
     return termination_result;
+}
+
+pub fn handle_place_ships_request(placement: [ShipPlacement; 5], player: &mut PlayerHandle, player_names: &mut HashSet<String>, lobby: &mut HashMap<String, Player>) -> Result {
+    // TODO: Fill me with life!
+    /* TODO: Return OkResponse after saving the placement.  The RFC tells us to assume a correct placement. Nevertheless - for testing purposes - we should check it and return an INVALID_REQUEST.
+    */
+    return Result::respond(Message::OkResponse, false);
+}
+
+pub fn handle_move_shoot_request(target_coords: (u8, u8), ship_movement: Option<(u8, Direction)>, player: &mut PlayerHandle, player_names: &mut HashSet<String>, lobby: &mut HashMap<String, Player>) -> Result {
+    // TODO: Fill me with life!
+    // TODO: HIT, MISS, DESTROYED, NOT_YOUR_TURN
+    return Result::respond(Message::OkResponse, false);
 }
