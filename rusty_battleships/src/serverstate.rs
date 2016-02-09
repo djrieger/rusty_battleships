@@ -3,7 +3,7 @@ use std::collections::{HashMap, HashSet};
 use message::Message;
 use message::{ShipPlacement, Direction};
 use message::Reason;
-use board::{Board, PlayerState, Player, PlayerHandle, Game};
+use board::{Board, PlayerState, Player, PlayerHandle, Game, Ship};
 
 // From http://stackoverflow.com/a/28392068
 macro_rules! hashmap {
@@ -67,7 +67,7 @@ macro_rules! get_player {
             panic!("Invalid state. User has no nickname or nickname not in lobby HashTable");
         }
         let name = $player.nickname.as_ref().unwrap();
-        let player = $lobby.get_mut(name).unwrap();
+        let mut player = $lobby.get_mut(name).unwrap();
         (player, name)
     }};
 }
@@ -211,11 +211,42 @@ pub fn handle_report_error_request(errormessage: String, player: &mut PlayerHand
     return termination_result;
 }
 
-pub fn handle_place_ships_request(placement: [ShipPlacement; 5], player: &mut PlayerHandle, player_names: &mut HashSet<String>, lobby: &mut HashMap<String, Player>) -> Result {
+pub fn handle_place_ships_request(placement: [ShipPlacement; 5], player_handle: &mut PlayerHandle, player_names: &mut HashSet<String>, lobby: &mut HashMap<String, Player>) -> Result {
     // TODO: Fill me with life!
     /* TODO: Return OkResponse after saving the placement.  The RFC tells us to assume a correct placement. Nevertheless - for testing purposes - we should check it and return an INVALID_REQUEST.
     */
-    return Result::respond(Message::OkResponse, false);
+    // TODO Check that current state allows placing ships
+    // let (player, nickname) = get_player!(player_handle, lobby);
+    if player_handle.nickname.is_none() || !lobby.contains_key(player_handle.nickname.as_ref().unwrap()) {
+        panic!("Invalid state. User has no nickname or nickname not in lobby HashTable");
+    }
+    let nickname = player_handle.nickname.as_ref().unwrap();
+    let mut player = lobby.get_mut(nickname).unwrap();
+
+    if let Some(ref mut game) = player.game {
+        let mut ships = vec![];
+        for ship_placement in &placement {
+            let &ShipPlacement { x, y, direction } = ship_placement;
+            let ship = Ship {
+                x: x as isize,
+                y: y as isize,
+                horizontal: direction == Direction::West || direction == Direction::East,
+                length: 5, // FIXME
+                health_points: 5 // FIXME
+            };
+            ships.push(ship);
+        }
+        let ref mut board = if *game.players.0 == *nickname { &game.boards.1 } else { &game.boards.0 };
+        // let board = game.get_board(nickname);
+        // board.ships = ships;
+        // if !board.compute_state() {
+        //     return Result::respond(Message::InvalidRequestResponse, false);
+        // } else {
+        //     return Result::respond(Message::OkResponse, false);
+        // }
+    }
+
+    return Result::respond(Message::InvalidRequestResponse, false);
 }
 
 pub fn handle_move_shoot_request(target_coords: (u8, u8), ship_movement: Option<(u8, Direction)>, player: &mut PlayerHandle, player_names: &mut HashSet<String>, lobby: &mut HashMap<String, Player>) -> Result {
