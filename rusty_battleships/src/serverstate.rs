@@ -66,14 +66,15 @@ macro_rules! get_player {
         if $player.nickname.is_none() || !$lobby.contains_key($player.nickname.as_ref().unwrap()) {
             panic!("Invalid state. User has no nickname or nickname not in lobby HashTable");
         }
-        let x = $lobby.get_mut($player.nickname.as_ref().unwrap()).unwrap();
-        x
+        let name = $player.nickname.as_ref().unwrap();
+        let player = $lobby.get_mut(name).unwrap();
+        (player, name)
     }};
 }
 
 pub fn handle_ready_request(player: &mut PlayerHandle, player_names: &mut HashSet<String>, lobby: &mut HashMap<String, Player>) -> Result {
-    let x = get_player!(player, lobby);
-    x.state = PlayerState::Ready;
+    let (player, _) = get_player!(player, lobby);
+    player.state = PlayerState::Ready;
     return Result::respond(Message::OkResponse, false);
 }
 
