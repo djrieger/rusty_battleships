@@ -21,7 +21,7 @@ pub struct PlayerHandle {
 
 pub struct Player<'a> {
     pub state: PlayerState,
-    pub game: Option<&'a Game>,
+    pub game: Option<&'a mut Game>,
 }
 
 // impl <'a> Player<'a> {
@@ -46,15 +46,21 @@ pub enum PlayerState {
 }
 
 pub struct Game {
-    pub boards: (Board, Board),
-    pub players: (String, String),
+    pub board1: Board,
+    pub board2: Board,
+    pub player1: String,
+    pub player2: String,
     // time elapsed / round
     // active player
 }
 
 impl Game {
     pub fn get_opponent_name(&self, player_name: &String) -> &String {
-        return if *self.players.0 == *player_name { &self.players.1 } else { &self.players.0 };
+        return if *self.player1 == *player_name { &self.player2 } else { &self.player1 };
+    }
+
+    pub fn get_board(&mut self, player_name: &String) -> &mut Board {
+        return if *self.player1 == *player_name { &mut self.board2 } else { &mut self.board1 };
     }
 }
 

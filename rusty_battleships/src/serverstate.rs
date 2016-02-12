@@ -97,8 +97,10 @@ fn initialize_game(player1: &String, player2: &String) -> Game {
     let second_board = Board::new(vec![]);
 
     return Game {
-        players: ((*player1).clone(), (*player2).clone()),
-        boards: (first_board, second_board),
+        player1: (*player1).clone(), 
+        player2: (*player2).clone(),
+        board1: first_board,
+        board2: second_board,
     };
 }
 
@@ -150,11 +152,11 @@ pub fn handle_surrender_request(player: &mut PlayerHandle, player_names: &mut Ha
             _ => return Result::respond(Message::InvalidRequestResponse, false),
         }
 
-        opponent_name = requesting_player.game.unwrap().get_opponent_name(username);
+        opponent_name = requesting_player.game.unwrap().get_opponent_name(username).clone();
         requesting_player.game = None;
     }
 
-    let opponent = lobby.get_mut(opponent_name).expect("Invalid state, opponent not in lobby");
+    let opponent = lobby.get_mut(&opponent_name).expect("Invalid state, opponent not in lobby");
     opponent.game = None;
     // Send GameOver to player and opponent
     let updatemsg = Message::GameOverUpdate {
@@ -165,7 +167,7 @@ pub fn handle_surrender_request(player: &mut PlayerHandle, player_names: &mut Ha
         victorious:false,
         reason:Reason::Surrendered,
     };
-    return Result::respond_and_update_single(updatemsg, hashmap![(*opponent_name).clone() => vec![updatemsg2]], false);
+    return Result::respond_and_update_single(updatemsg, hashmap![opponent_name => vec![updatemsg2]], false);
 }
 
 fn terminate_player() {
@@ -221,31 +223,42 @@ pub fn handle_place_ships_request(placement: [ShipPlacement; 5], player_handle: 
         panic!("Invalid state. User has no nickname or nickname not in lobby HashTable");
     }
     let nickname = player_handle.nickname.as_ref().unwrap();
-    let mut player = lobby.get_mut(nickname).unwrap();
+    let player = lobby.get_mut(nickname).unwrap();
 
-    if let Some(ref mut game) = player.game {
-        let mut ships = vec![];
-        for ship_placement in &placement {
-            let &ShipPlacement { x, y, direction } = ship_placement;
-            let ship = Ship {
-                x: x as isize,
-                y: y as isize,
-                horizontal: direction == Direction::West || direction == Direction::East,
-                length: 5, // FIXME
-                health_points: 5 // FIXME
-            };
-            ships.push(ship);
-        }
-        let ref mut board = if *game.players.0 == *nickname { &game.boards.1 } else { &game.boards.0 };
-        // let board = game.get_board(nickname);
-        // board.ships = ships;
-        // if !board.compute_state() {
-        //     return Result::respond(Message::InvalidRequestResponse, false);
-        // } else {
-        //     return Result::respond(Message::OkResponse, false);
-        // }
-    }
-
+    // player.state = PlayerState::Available;
+    let ref mut foo = player.game.as_mut().unwrap();
+    foo.player1 = "asd".to_owned();
+    // if let Some(game) = player.game {
+    //     let mut ships = vec![];
+    //     for ship_placement in &placement {
+    //         let &ShipPlacement { x, y, direction } = ship_placement;
+    //         let ship = Ship {
+    //             x: x as isize,
+    //             y: y as isize,
+    //             horizontal: direction == Direction::West || direction == Direction::East,
+    //             length: 5, // FIXME
+    //             health_points: 5 // FIXME
+    //         };
+    //         ships.push(ship);
+    //     }
+    //     // let ref mut boards = game.boards;
+    //     // let (ref mut board1, ref mut board2) = game.boards;
+    //     // let ref mut board;
+    //     // if *game.players.0 == *nickname {
+    //     //     board = board1;
+    //     // } else {
+    //     //     board = board2;
+    //     // };
+    //     // let ref mut board = if *game.player1 == *nickname { &mut game.board2 } else { &mut game.board1 };
+    //     // let board = game.get_board(nickname);
+    //     // board.ships = ships;
+    //     // if !board.compute_state() {
+    //     //     return Result::respond(Message::InvalidRequestResponse, false);
+    //     // } else {
+    //     //     return Result::respond(Message::OkResponse, false);
+    //     // }
+    // }
+    //
     return Result::respond(Message::InvalidRequestResponse, false);
 }
 
