@@ -214,51 +214,42 @@ pub fn handle_report_error_request(errormessage: String, player: &mut PlayerHand
 }
 
 pub fn handle_place_ships_request(placement: [ShipPlacement; 5], player_handle: &mut PlayerHandle, player_names: &mut HashSet<String>, lobby: &mut HashMap<String, Player>) -> Result {
-    // TODO: Fill me with life!
     /* TODO: Return OkResponse after saving the placement.  The RFC tells us to assume a correct placement. Nevertheless - for testing purposes - we should check it and return an INVALID_REQUEST.
     */
     // TODO Check that current state allows placing ships
-    // let (player, nickname) = get_player!(player_handle, lobby);
     if player_handle.nickname.is_none() || !lobby.contains_key(player_handle.nickname.as_ref().unwrap()) {
         panic!("Invalid state. User has no nickname or nickname not in lobby HashTable");
     }
-    let nickname = player_handle.nickname.as_ref().unwrap();
-    let player = lobby.get_mut(nickname).unwrap();
+    let player_name = player_handle.nickname.as_ref().unwrap();
+    let player = lobby.get_mut(player_name).unwrap();
 
     // player.state = PlayerState::Available;
-    let ref mut foo = player.game.as_mut().unwrap();
-    foo.player1 = "asd".to_owned();
-    // if let Some(game) = player.game {
-    //     let mut ships = vec![];
-    //     for ship_placement in &placement {
-    //         let &ShipPlacement { x, y, direction } = ship_placement;
-    //         let ship = Ship {
-    //             x: x as isize,
-    //             y: y as isize,
-    //             horizontal: direction == Direction::West || direction == Direction::East,
-    //             length: 5, // FIXME
-    //             health_points: 5 // FIXME
-    //         };
-    //         ships.push(ship);
-    //     }
-    //     // let ref mut boards = game.boards;
-    //     // let (ref mut board1, ref mut board2) = game.boards;
-    //     // let ref mut board;
-    //     // if *game.players.0 == *nickname {
-    //     //     board = board1;
-    //     // } else {
-    //     //     board = board2;
-    //     // };
-    //     // let ref mut board = if *game.player1 == *nickname { &mut game.board2 } else { &mut game.board1 };
-    //     // let board = game.get_board(nickname);
-    //     // board.ships = ships;
-    //     // if !board.compute_state() {
-    //     //     return Result::respond(Message::InvalidRequestResponse, false);
-    //     // } else {
-    //     //     return Result::respond(Message::OkResponse, false);
-    //     // }
-    // }
-    //
+    // Make sure player has a game
+    if let Some(ref mut game) = player.game {
+        // Translate placement to ships vector
+        let mut ships = vec![];
+        for ship_placement in &placement {
+            let &ShipPlacement { x, y, direction } = ship_placement;
+            let ship = Ship {
+                x: x as isize,
+                y: y as isize,
+                horizontal: direction == Direction::West || direction == Direction::East, // FIXME?
+                length: 5, // FIXME
+                health_points: 5 // FIXME
+            };
+            ships.push(ship);
+        }
+        // Get board for current player
+        let ref mut board = if *game.player1 == *player_name { &mut game.board2 } else { &mut game.board1 };
+        board.ships = ships;
+        // Check if new state is valid
+        if !board.compute_state() {
+            return Result::respond(Message::InvalidRequestResponse, false);
+        } else {
+            return Result::respond(Message::OkResponse, false);
+        }
+    }
+
     return Result::respond(Message::InvalidRequestResponse, false);
 }
 
