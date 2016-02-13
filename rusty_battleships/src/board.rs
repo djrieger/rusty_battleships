@@ -79,6 +79,12 @@ pub struct Board {
     pub state: [[usize; H]; W],
 }
 
+pub enum HitResult {
+    Hit,
+    Miss,
+    Destroyed
+}
+
 impl Board {
     pub fn new(ships: Vec<Ship>) -> Board {
         Board {
@@ -91,12 +97,18 @@ impl Board {
         self.state = [[0; H]; W];
     }
 
-    pub fn hit(&mut self, x: usize, y: usize) -> bool {
-       match self.state[x][y] {
-           0 => {},
-           ship_index => self.ships[ship_index - 1].health_points -= 1,
+    pub fn hit(&mut self, x: usize, y: usize) -> HitResult {
+       return match self.state[x][y] {
+           0 => HitResult::Miss,
+           ship_index => {
+               let ref mut ship = self.ships[ship_index - 1];
+               ship.health_points -= 1;
+               match ship.health_points {
+                   0 => HitResult::Destroyed,
+                   _ => HitResult::Hit
+               }
+           }
        }
-       true
     }
 
     /**
@@ -109,6 +121,9 @@ impl Board {
         let mut dest;
         for (ship_index, ship) in self.ships.iter().enumerate() {
             for i in 0..ship.length  {
+                if ship.health_points == 0 {
+                    continue;
+                }
                 if ship.horizontal {
                     dest = (ship.x + (i as isize), ship.y);
                 } else {
