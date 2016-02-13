@@ -152,7 +152,7 @@ pub fn handle_surrender_request(player: &mut PlayerHandle, player_names: &mut Ha
             _ => return Result::respond(Message::InvalidRequestResponse, false),
         }
 
-        opponent_name = requesting_player.game.unwrap().get_opponent_name(username).clone();
+        opponent_name = requesting_player.game.as_ref().unwrap().get_opponent_name(username).clone();
         requesting_player.game = None;
     }
 
@@ -190,7 +190,7 @@ pub fn handle_report_error_request(errormessage: String, player: &mut PlayerHand
             let mut user = lobby.get_mut(username).expect("Invalid state, requesting player not in lobby");
             println!("Client {} reported the following error: {}", username, errormessage);
             // player in game with player2?
-            if let Some(game) = user.game {
+            if let Some(ref game) = user.game {
                 let player2_name = Some(game.get_opponent_name(username));
                 let player_left_update = Message::PlayerLeftUpdate { nickname: (*username).clone() };
                 let game_over_update = Message::GameOverUpdate {
