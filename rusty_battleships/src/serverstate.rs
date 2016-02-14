@@ -256,7 +256,6 @@ pub fn handle_place_ships_request(placement: [ShipPlacement; 5], player_handle: 
 }
 
 pub fn handle_move_shoot_request(target_coords: (u8, u8), ship_movement: Option<(usize, Direction)>, player_handle: &mut PlayerHandle, player_names: &mut HashSet<String>, lobby: &mut HashMap<String, Player>) -> Result {
-    return Result::respond(Message::OkResponse, false);
     if player_handle.nickname.is_none() || !lobby.contains_key(player_handle.nickname.as_ref().unwrap()) {
         panic!("Invalid state. User has no nickname or nickname not in lobby HashTable");
     }

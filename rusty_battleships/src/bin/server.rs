@@ -9,9 +9,9 @@ extern crate argparse;
 use argparse::{ArgumentParser, Print, Store};
 
 extern crate rusty_battleships;
-use rusty_battleships::message::{serialize_message, deserialize_message, Message, Reason, ShipPlacement};
+use rusty_battleships::message::{serialize_message, deserialize_message, Message};
 use rusty_battleships::board;
-use rusty_battleships::board::{Game, Player, PlayerState};
+use rusty_battleships::board::{Game, Player};
 use rusty_battleships::serverstate;
 
 // http://stackoverflow.com/questions/35157399/how-to-concatenate-static-strings-in-rust/35159310
@@ -104,10 +104,6 @@ fn main() {
     map.insert(name_bob, player_bob);
     map.insert(name_alice, player_alice);
 
-    let first_ship = board::Ship { x: 1, y: 2, length: 4, horizontal: true, health_points: 4 };
-    let second_ship = board::Ship { x: 5, y: 2, length: 2, horizontal: false, health_points: 2 };
-
-
     let mut port:u16 = 5000;
     let mut ip = Ipv4Addr::new(127, 0, 0, 1);
 
@@ -142,7 +138,7 @@ fn main() {
             // channel main --> child
             let (tx_main, rx_child) = mpsc::channel();
 
-            let child = thread::spawn(move || {
+            thread::spawn(move || {
                 handle_client(stream.unwrap(), tx_child, rx_child);
             });
             tx_tcp_players.send(
@@ -155,7 +151,7 @@ fn main() {
         }
     };
 
-    let tcp_thread = thread::spawn(tcp_loop);
+    thread::spawn(tcp_loop);
     let mut message_store: HashMap<String, Vec<Message>> = HashMap::new();
     let mut games: Vec<Game> = vec![];
     // stores player name -> game
