@@ -297,16 +297,21 @@ pub fn handle_move_shoot_request(target_coords: (u8, u8), ship_movement: Option<
                     x: target_x,
                     y: target_y,
                 }, false),
+                // UPDATE: ENEMY_HIT
                 HitResult::Miss => return Result::respond(Message::MissResponse {
                     x: target_x,
                     y: target_y,
                 }, false),
+                // UPDATE: ENEMY_MISS
                 HitResult::Destroyed => return Result::respond(Message::DestroyedResponse {
                     x: target_x,
                     y: target_y,
                 }, false),
+                // UPDATE: ENEMY_HIT
             }
         }
+
+        // UPDATE: YOUR_TURN, ENEMY_TURN
     }
 
     return Result::respond(Message::InvalidRequestResponse, false);
