@@ -143,12 +143,7 @@ impl Board {
     }
 
     pub fn is_dead(&self) -> bool {
-        for ship in &self.ships {
-            if !ship.is_dead() {
-                return false;
-            }
-        }
-        return true;
+        self.ships.iter().all(|ship| ship.is_dead())
     }
 }
 
