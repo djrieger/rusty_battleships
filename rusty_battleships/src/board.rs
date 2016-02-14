@@ -142,6 +142,14 @@ impl Board {
         return true;
     }
 
+    pub fn is_dead(&self) -> bool {
+        for ship in &self.ships {
+            if !ship.is_dead() {
+                return false;
+            }
+        }
+        return true;
+    }
 }
 
 impl Ship {
@@ -157,5 +165,9 @@ impl Ship {
             Direction::West => self.x -= 1,
         }
         return true;
+    }
+
+    pub fn is_dead(&self) -> bool {
+        self.health_points == 0
     }
 }
