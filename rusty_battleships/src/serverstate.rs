@@ -1,4 +1,6 @@
 use std::collections::{HashMap, HashSet};
+use std::time::Duration;
+use std::thread;
 
 use message::Message;
 use message::{ShipPlacement, Direction};
@@ -312,6 +314,11 @@ pub fn handle_move_shoot_request(target_coords: (u8, u8), ship_movement: Option<
         }
 
         // UPDATE: YOUR_TURN, ENEMY_TURN
+
+        thread::spawn(move || {
+            thread::sleep(Duration::from_millis(60000));
+            println!("60 seconds are over");
+        });
     }
 
     return Result::respond(Message::InvalidRequestResponse, false);
