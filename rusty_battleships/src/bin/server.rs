@@ -74,7 +74,6 @@ fn handle_main(msg: Message, player: &mut board::PlayerHandle, player_names: &mu
     } else {
         // All other requests are only valid after logging in, i.e. with a user name
         match msg {
-            Message::GetFeaturesRequest => return serverstate::handle_get_features_request(),
             Message::LoginRequest { username } => return serverstate::handle_login_request(username, player, player_names, lobby), 
             Message::ReadyRequest => return serverstate::handle_ready_request(player, player_names, lobby),
             Message::NotReadyRequest => return serverstate::handle_not_ready_request(player, player_names, lobby),
