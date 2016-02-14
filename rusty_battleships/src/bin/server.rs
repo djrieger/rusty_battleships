@@ -82,7 +82,7 @@ fn handle_main(msg: Message, player: &mut board::PlayerHandle, player_names: &mu
             Message::SurrenderRequest => return serverstate::handle_surrender_request(player, player_names, lobby),
             Message::PlaceShipsRequest { placement } => return serverstate::handle_place_ships_request(placement, player, player_names, lobby),
             Message::ShootRequest { x, y } => return serverstate::handle_move_shoot_request((x, y), None, player, player_names, lobby),
-            Message::MoveAndShootRequest { id, direction, x, y } => return serverstate::handle_move_shoot_request((x, y), Some((id, direction)), player, player_names, lobby),
+            Message::MoveAndShootRequest { id, direction, x, y } => return serverstate::handle_move_shoot_request((x, y), Some((id as usize, direction)), player, player_names, lobby),
             _ => {},
         };
     }

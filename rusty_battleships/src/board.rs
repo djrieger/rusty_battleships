@@ -3,7 +3,7 @@ use std::collections::hash_map::OccupiedEntry;
 use std::sync::mpsc;
 
 // extern crate rusty_battleships;
-use message::{serialize_message, deserialize_message, Message};
+use message::{serialize_message, deserialize_message, Message, Direction};
 
 const BLOCK: char = '\u{25AA}';
 
@@ -98,17 +98,20 @@ impl Board {
     }
 
     pub fn hit(&mut self, x: usize, y: usize) -> HitResult {
-       return match self.state[x][y] {
-           0 => HitResult::Miss,
-           ship_index => {
-               let ref mut ship = self.ships[ship_index - 1];
-               ship.health_points -= 1;
-               match ship.health_points {
-                   0 => HitResult::Destroyed,
-                   _ => HitResult::Hit
-               }
-           }
-       }
+        if x >= W || y >= H {
+            return HitResult::Miss;
+        }
+        return match self.state[x][y] {
+            0 => HitResult::Miss,
+            ship_index => {
+                let ref mut ship = self.ships[ship_index - 1];
+                ship.health_points -= 1;
+                match ship.health_points {
+                    0 => HitResult::Destroyed,
+                    _ => HitResult::Hit
+                }
+            }
+        }
     }
 
     /**
@@ -142,31 +145,17 @@ impl Board {
 }
 
 impl Ship {
-    fn move_me(val: isize, offset: isize, limit: usize) -> isize {
-        return val + offset;
-    }
-
-    pub fn move_left(& mut self) -> () {
-        self.x = Ship::move_me(self.x , -1, 0) ;
-    }
-
-    pub fn move_right(& mut self) -> () {
-        let mut max = W - 1;
-        if self.horizontal {
-            max -= self.length;
+    pub fn move_me(&mut self, direction: Direction) -> bool {
+        // cannot move destroyed ship
+        if self.health_points == 0 {
+            return false;
         }
-        self.x = Ship::move_me(self.x , 1, max) ;
-    }
-
-    pub fn move_up(& mut self) -> () {
-        self.y = Ship::move_me(self.y , -1, 0) ;
-    }
-
-    pub fn move_down(& mut self) -> () {
-        let mut max = H - 1;
-        if !self.horizontal {
-            max -= self.length;
+        match direction {
+            Direction::North => self.y -= 1,
+            Direction::East => self.x = 1,
+            Direction::South => self.y = 1,
+            Direction::West => self.x -= 1,
         }
-        self.y = Ship::move_me(self.y , 1, max) ;
+        return true;
     }
 }

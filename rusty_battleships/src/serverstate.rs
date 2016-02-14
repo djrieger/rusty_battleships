@@ -3,7 +3,7 @@ use std::collections::{HashMap, HashSet};
 use message::Message;
 use message::{ShipPlacement, Direction};
 use message::Reason;
-use board::{Board, PlayerState, Player, PlayerHandle, Game, Ship};
+use board::{Board, PlayerState, Player, PlayerHandle, Game, Ship, HitResult};
 
 // From http://stackoverflow.com/a/28392068
 macro_rules! hashmap {
@@ -253,8 +253,61 @@ pub fn handle_place_ships_request(placement: [ShipPlacement; 5], player_handle: 
     return Result::respond(Message::InvalidRequestResponse, false);
 }
 
-pub fn handle_move_shoot_request(target_coords: (u8, u8), ship_movement: Option<(u8, Direction)>, player: &mut PlayerHandle, player_names: &mut HashSet<String>, lobby: &mut HashMap<String, Player>) -> Result {
-    // TODO: Fill me with life!
-    // TODO: HIT, MISS, DESTROYED, NOT_YOUR_TURN
+pub fn handle_move_shoot_request(target_coords: (u8, u8), ship_movement: Option<(usize, Direction)>, player_handle: &mut PlayerHandle, player_names: &mut HashSet<String>, lobby: &mut HashMap<String, Player>) -> Result {
     return Result::respond(Message::OkResponse, false);
+    if player_handle.nickname.is_none() || !lobby.contains_key(player_handle.nickname.as_ref().unwrap()) {
+        panic!("Invalid state. User has no nickname or nickname not in lobby HashTable");
+    }
+    let player_name = player_handle.nickname.as_ref().unwrap();
+    let player = lobby.get_mut(player_name).unwrap();
+
+    // TODO move first correct? or shoot first?
+    // TODO update state, update other player, game over, afk, NOT_YOUR_TURN, ...
+
+    // Make sure player has a game
+    if let Some(ref mut game) = player.game {
+        {
+            // move if requested
+            if let Some(movement) = ship_movement {
+                let (ship_index, direction) = movement;
+                if ship_index < 1 || ship_index > 5 {
+                    // ship index is out of bounds
+                    return Result::respond(Message::InvalidRequestResponse, false);
+                }
+
+                let mut movement_allowed = true;
+                let ref mut my_board = if *game.player1 == *player_name { &mut game.board2 } else { &mut game.board1 };
+                {
+                    let ref mut my_ship = my_board.ships[ship_index - 1];
+                    movement_allowed = my_ship.move_me(direction);
+                }
+
+                if !movement_allowed || !my_board.compute_state() {
+                    return Result::respond(Message::InvalidRequestResponse, false);
+                }
+            }
+        }
+
+        {
+            let ref mut opponent_board = if *game.player1 != *player_name { &mut game.board2 } else { &mut game.board1 };
+            // shoot
+            let (target_x, target_y) = (target_coords.0 as u8, target_coords.1 as u8);
+            match opponent_board.hit(target_x as usize, target_y as usize) {
+                HitResult::Hit => return Result::respond(Message::HitResponse {
+                    x: target_x,
+                    y: target_y,
+                }, false),
+                HitResult::Miss => return Result::respond(Message::MissResponse {
+                    x: target_x,
+                    y: target_y,
+                }, false),
+                HitResult::Destroyed => return Result::respond(Message::DestroyedResponse {
+                    x: target_x,
+                    y: target_y,
+                }, false),
+            }
+        }
+    }
+
+    return Result::respond(Message::InvalidRequestResponse, false);
 }
