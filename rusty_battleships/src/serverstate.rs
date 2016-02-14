@@ -305,10 +305,17 @@ pub fn handle_move_shoot_request(target_coords: (u8, u8), ship_movement: Option<
                     y: target_y,
                 }, false),
                 // UPDATE: ENEMY_MISS
-                HitResult::Destroyed => return Result::respond(Message::DestroyedResponse {
-                    x: target_x,
-                    y: target_y,
-                }, false),
+                HitResult::Destroyed => {
+                    if opponent_board.is_dead() {
+                        // TODO
+                        // UPDATE GameOverUpdate
+                    } else {
+                        return Result::respond(Message::DestroyedResponse {
+                            x: target_x,
+                            y: target_y,
+                        }, false);
+                    }
+                },
                 // UPDATE: ENEMY_HIT
             }
         }
