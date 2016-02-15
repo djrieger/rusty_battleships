@@ -163,10 +163,7 @@ pub fn handle_surrender_request(player: &mut PlayerHandle, player_names: &mut Ha
         victorious:false,
         reason:Reason::Surrendered,
     };
-    let updatemsg2 = Message::GameOverUpdate {
-        victorious:false,
-        reason:Reason::Surrendered,
-    };
+    let updatemsg2 = updatemsg.clone();
     return Result::respond_and_update_single(updatemsg, hashmap![opponent_name => vec![updatemsg2]], false);
 }
 

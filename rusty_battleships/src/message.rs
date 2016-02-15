@@ -1,7 +1,7 @@
 use std::io::{BufReader, Error, ErrorKind, Read, Result, Write};
 use std::net::TcpStream;
 
-#[derive(Debug, Hash, Eq, PartialEq)]
+#[derive(Debug, Hash, Eq, PartialEq, Clone)]
 pub enum Message {
     // Requests
     GetFeaturesRequest,
@@ -222,7 +222,7 @@ pub struct ShipPlacement {
     pub direction:Direction
 }
 
-#[derive(Debug, Hash, Eq, PartialEq)]
+#[derive(Debug, Hash, Eq, PartialEq, Copy, Clone)]
 pub enum Reason {
     Obliterated = 0,
     Disconnected = 1,
