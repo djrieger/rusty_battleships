@@ -61,7 +61,7 @@ fn handle_main(msg: Message, player: &mut board::PlayerHandle, player_names: &mu
     // These requests can be handled without any restrictions
     match msg {
         Message::GetFeaturesRequest => return serverstate::handle_get_features_request(),
-        Message::ReportErrorRequest { errormessage } => return serverstate::handle_report_error_request(errormessage, player, player_names, lobby),
+        Message::ReportErrorRequest { errormessage } => return serverstate::handle_report_error_request(errormessage, player, player_names, lobby, games),
         _ => {},
     }
 

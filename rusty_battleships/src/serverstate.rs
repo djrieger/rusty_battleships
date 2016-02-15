@@ -173,7 +173,7 @@ fn terminate_player() {
     // What else?
 }
 
-pub fn handle_report_error_request(errormessage: String, player: &mut PlayerHandle, player_names: &mut HashSet<String>, lobby: &mut HashMap<String, Player>) -> Result {
+pub fn handle_report_error_request(errormessage: String, player: &mut PlayerHandle, player_names: &mut HashSet<String>, lobby: &mut HashMap<String, Player>, games: &mut Vec<Game>) -> Result {
     let mut termination_result: Result = return Result {
         response: None,
         updates: HashMap::new(), 
@@ -195,7 +195,12 @@ pub fn handle_report_error_request(errormessage: String, player: &mut PlayerHand
                     reason: Reason::Disconnected,
                 };
                 termination_result.updates.insert( (*player2_name.unwrap()).clone(), vec![player_left_update, game_over_update]);
-                // TODO: remove game from games
+                // remove game from games
+                games
+                    .iter()
+                    .by_ref()
+                    .position(|ref x| x == game)
+                    .map(|e| games.remove(e));
             }
         } 
         if let Some(ref name) = player2_name {

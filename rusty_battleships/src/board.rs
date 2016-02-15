@@ -54,6 +54,16 @@ pub struct Game {
     // active player
 }
 
+impl PartialEq for Game {
+    fn eq(&self, Rhs: &Game) -> bool {
+        return true;
+    }
+
+    fn ne(&self, Rhs: &Game) -> bool {
+        return true;
+    }
+}
+
 impl Game {
     pub fn get_opponent_name(&self, player_name: &String) -> &String {
         return if *self.player1 == *player_name { &self.player2 } else { &self.player1 };
