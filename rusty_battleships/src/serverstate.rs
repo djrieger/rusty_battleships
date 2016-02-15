@@ -80,16 +80,14 @@ pub fn handle_ready_request(player: &mut PlayerHandle, player_names: &mut HashSe
     return Result::respond(Message::OkResponse, false);
 }
 
-pub fn handle_not_ready_request(player: &mut PlayerHandle, player_names: &mut HashSet<String>, lobby: &mut HashMap<String, Player>) -> Result {
-    if let Some(ref username) = player.nickname {
-        if let Some(ref mut x) = lobby.get_mut(username) {
-            match x.game {
-                // TODO: initialize game
-                // TODO: Check if Game is running
-                Some(_) => return Result::respond(Message::OkResponse, false),
-                None    => return Result::respond(Message::GameAlreadyStartedResponse, false)
-            }
-        }
+pub fn handle_not_ready_request(player_handle: &mut PlayerHandle, player_names: &mut HashSet<String>, lobby: &mut HashMap<String, Player>) -> Result {
+    let (player, _) = get_player!(player_handle, lobby);
+    match player.game {
+        Some(_) => {
+            player.state = PlayerState::Available;
+            return Result::respond(Message::OkResponse, false);
+        },
+        None  => return Result::respond(Message::GameAlreadyStartedResponse, false),
     }
     panic!("Invalid state or request!");
 }
