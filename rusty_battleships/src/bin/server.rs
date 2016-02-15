@@ -89,20 +89,6 @@ fn handle_main(msg: Message, player: &mut board::PlayerHandle, player_names: &mu
 }
 
 fn main() {
-    let mut map = HashMap::new();
-    let player_bob = board::Player {
-        state: board::PlayerState::Available,
-        game: None,
-    };
-    let player_alice = board::Player {
-        state: board::PlayerState::Ready,
-        game: None,
-    };
-    let name_bob = "Bob";
-    let name_alice = "Alice";
-    map.insert(name_bob, player_bob);
-    map.insert(name_alice, player_alice);
-
     let mut port:u16 = 5000;
     let mut ip = Ipv4Addr::new(127, 0, 0, 1);
 
@@ -184,6 +170,12 @@ fn main() {
             }
         }
         // Send all messages saved in message_store
+        // TODO: Does not work yet (compiler complains about moving out of borrowed context)
+        // let player_names_iter = player_handles
+        //     .iter()
+        //     .by_ref()
+        //     .filter_map(|player_handle| player_handle.nickname);
+
         for (i, player_handle) in player_handles.iter_mut().enumerate() {
             if let Some(ref name) = player_handle.nickname {
                 if message_store.contains_key(name) {
