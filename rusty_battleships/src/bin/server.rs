@@ -25,7 +25,14 @@ macro_rules! version_string {
     () => ( concat!(description!(), " v", version!()) )
 }
 
-fn handle_client(stream: TcpStream, tx: mpsc::SyncSender<Message>, rx: mpsc::Receiver<Option<Message>>) {
+// Tell server to perform propert shutdown, like removing player from their game, informing
+// opponent etc.
+fn shutdown_player(tx: &mpsc::SyncSender<Option<Message>>, rx: &mpsc::Receiver<Option<Message>>) {
+    tx.send(None).expect("Main thread died, exiting.");
+    rx.recv().expect("Main thread died before answering, exiting.");
+}
+
+fn handle_client(stream: TcpStream, tx: mpsc::SyncSender<Option<Message>>, rx: mpsc::Receiver<Option<Message>>) {
     println!("New incoming TCP stream");
 
     let response_stream = stream.try_clone().unwrap();
@@ -37,23 +44,41 @@ fn handle_client(stream: TcpStream, tx: mpsc::SyncSender<Message>, rx: mpsc::Rec
         match request {
             Ok(request_msg) => {
                 // Send parsed Message to main thread
-                tx.send(request_msg).expect("Main thread died, exiting.");
+                tx.send(Some(request_msg)).expect("Main thread died, exiting.");
                 // Wait for response Message
                 let response = rx.recv().expect("Main thread died before answering, exiting.");
                 match response {
-                    Some(msg) => response_msg = msg,
-                    None => break, // server wants to terminate this client
+                    Some(msg) => {
+                        response_msg = msg;
+                        if response_msg == Message::InvalidRequestResponse {
+                            shutdown_player(&tx, &rx);
+                        }
+                    },
+                    None => return, // server wants to terminate this client
                 }
             },
+            // Normal connection termination
+            Err(ref e) if e.kind() == std::io::ErrorKind::UnexpectedEof => {
+                shutdown_player(&tx, &rx);
+                println!("Client terminated connection");
+                // Client terminated TCP connection, exit
+                return;
+            },
+            // Malformed message received
             Err(e) => {
+                shutdown_player(&tx, &rx);
+                println!("Received malformed message, terminating client");
                 response_msg = Message::InvalidRequestResponse;
-                println!("Received invalid request: {}", e);
             }
         }
         // Serialize, send response and flush
+        let clone_response = response_msg.clone();
         let serialized_msg = serialize_message(response_msg);
         buff_writer.write(&serialized_msg[..]).expect("Could not write to TCP steam, exiting.");
         buff_writer.flush().expect("Could not write to TCP steam, exiting.");
+        if clone_response == Message::InvalidRequestResponse {
+            return;
+        }
     }
 }
 
@@ -150,22 +175,30 @@ fn main() {
         }
         // Receive Messages from child threads
         for (i, player_handle) in player_handles.iter_mut().enumerate() {
-            if let Ok(msg) = player_handle.from_child_endpoint.try_recv() {
-                print!("[Child {}] {:?}", i, msg);
-                // Handle Message received from child
-                let result = handle_main(msg, player_handle, &mut player_names, &mut lobby, &mut games);
-                if let Some(response) = result.response {
-                    // handle_main generated a response -> send response Message back to child
-                    println!(" -> {:?}", response);
-                    player_handle.to_child_endpoint.send(Some(response));
-                }
-                if result.terminate_connection {
-                    print!("-- Closing connection to child {}", i);
-                    player_handle.to_child_endpoint.send(None);
-                }
-                if !result.updates.is_empty() {
-                    message_store = result.updates;
-                    break;
+            if let Ok(maybe_msg) = player_handle.from_child_endpoint.try_recv() {
+                match maybe_msg {
+                    Some(msg) => {
+                        print!("[Child {}] {:?}", i, msg);
+                        // Handle Message received from child
+                        let result = handle_main(msg, player_handle, &mut player_names, &mut lobby, &mut games);
+                        if let Some(response) = result.response {
+                            // handle_main generated a response -> send response Message back to child
+                            println!(" -> {:?}", response);
+                            player_handle.to_child_endpoint.send(Some(response));
+                        }
+                        if result.terminate_connection {
+                            print!("-- Closing connection to child {}", i);
+                            player_handle.to_child_endpoint.send(None);
+                        }
+                        if !result.updates.is_empty() {
+                            message_store = result.updates;
+                            break;
+                        }
+                    },
+                    None => {
+                        // TODO handle player termination here
+                            player_handle.to_child_endpoint.send(None);
+                    }
                 }
             }
         }
