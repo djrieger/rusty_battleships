@@ -307,8 +307,9 @@ pub fn handle_move_shoot_request(target_coords: (u8, u8), ship_movement: Option<
                 HitResult::Destroyed => {
                     if opponent_board.is_dead() {
                         // TODO
-                        // UPDATE GameOverUpdate
+                        // TODO: terminate_game(won)
                     } else {
+                        // CHECK: return Destroyed to client in any case?
                         return Result::respond(Message::DestroyedResponse {
                             x: target_x,
                             y: target_y,
