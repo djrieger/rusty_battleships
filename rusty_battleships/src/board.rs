@@ -45,13 +45,22 @@ pub enum PlayerState {
     Playing
 }
 
+pub enum GameState {
+    Placing,
+    Running,
+    ShuttingDown
+}
+
 pub struct Game {
     pub board1: Board,
     pub board2: Board,
     pub player1: String,
     pub player2: String,
-    // time elapsed / round
-    // active player
+    pub last_turn_started_at: u64,
+    pub player1_active: bool,
+    pub player1_afk_count: u8,
+    pub player2_afk_count: u8,
+    pub state: GameState,
 }
 
 impl PartialEq for Game {
@@ -65,6 +74,20 @@ impl PartialEq for Game {
 }
 
 impl Game {
+    pub fn New(board1: Board, board2: Board, player1: String, player2: String) -> Game {
+        Game {
+            board1: board1,
+            board2: board2,
+            player1: player1,
+            player2: player2,
+            last_turn_started_at: 0,
+            player1_active: true,
+            player1_afk_count: 0,
+            player2_afk_count: 0,
+            state: GameState::Placing,
+        }
+    }
+
     pub fn get_opponent_name(&self, player_name: &String) -> &String {
         return if *self.player1 == *player_name { &self.player2 } else { &self.player1 };
     }

@@ -96,12 +96,7 @@ fn initialize_game(player1: &String, player2: &String) -> Game {
     let first_board = Board::new(vec![]);
     let second_board = Board::new(vec![]);
 
-    return Game {
-        player1: (*player1).clone(), 
-        player2: (*player2).clone(),
-        board1: first_board,
-        board2: second_board,
-    };
+    return Game::New(first_board, second_board, (*player1).clone(), (*player1).clone());
 }
 
 pub fn handle_challenge_player_request(challenged_player_name: String, player: &mut PlayerHandle, player_names: &mut HashSet<String>, lobby: &mut HashMap<String, Player>, games: &mut Vec<Game>) -> Result {
