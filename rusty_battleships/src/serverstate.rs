@@ -220,8 +220,6 @@ pub fn handle_report_error_request(errormessage: String, player: &mut PlayerHand
         } 
         if let Some(ref name) = player2_name {
             let player2 = lobby.get_mut(name).expect("Invalid state, opponent name not in lobby");
-            // TODO: change this to player2.set_available(...), only partly implemented in board.rs so
-            // far, not tested
             player2.state = PlayerState::Available;
         }
     }
@@ -291,34 +289,36 @@ fn handle_move(game: &mut Game, player_name: &String, movement: (usize, Directio
     None
 }
 
-fn handle_shoot(game: &mut Game, player_name: &String, target_coords: (u8, u8)) -> Result {
-    let ref mut opponent_board = if *game.player1 != *player_name { &mut game.board2 } else { &mut game.board1 };
-    // shoot
-    let (target_x, target_y) = (target_coords.0 as u8, target_coords.1 as u8);
-    match opponent_board.hit(target_x as usize, target_y as usize) {
-        HitResult::Hit => return Result::respond(Message::HitResponse {
-            x: target_x,
-            y: target_y,
-        }, false),
-        // UPDATE: ENEMY_HIT
-        HitResult::Miss => return Result::respond(Message::MissResponse {
-            x: target_x,
-            y: target_y,
-        }, false),
-        // UPDATE: ENEMY_MISS
-        HitResult::Destroyed => {
-            if opponent_board.is_dead() {
-                // TODO
-                // TODO: terminate_game(won)
-            } 
-            // CHECK: return Destroyed to client in any case?
-            return Result::respond(Message::DestroyedResponse {
-                x: target_x,
-                y: target_y,
-            }, false);
-        },
-        // UPDATE: ENEMY_HIT
+fn handle_shoot(game: &mut Game, player_name: &String, target_x: u8, target_y: u8) -> Result {
+    let opponent_name = game.get_opponent_name(player_name).to_owned();
+    let response_msg;
+    let mut updates = hashmap![];
+    {
+        let ref mut opponent_board = if *game.player1 != *player_name { &mut game.board2 } else { &mut game.board1 };
+        match opponent_board.hit(target_x as usize, target_y as usize) {
+            HitResult::Hit => {
+                response_msg = Message::HitResponse { x: target_x, y: target_y };
+                updates = hashmap![opponent_name.clone() => vec![Message::EnemyHitUpdate { x: target_x, y: target_y }]];
+            },
+            HitResult::Miss => {
+                response_msg = Message::MissResponse { x: target_x, y: target_y };
+                updates = hashmap![opponent_name.clone() => vec![Message::EnemyMissUpdate { x: target_x, y: target_y }]];
+            },
+            HitResult::Destroyed => {
+                if opponent_board.is_dead() {
+                    // TODO: terminate_game(won) with appropriate updates
+                } 
+                response_msg = Message::DestroyedResponse { x: target_x, y: target_y };
+                // TODO which update for enemy?
+            },
+        }
     }
+
+    // make turn switch
+    game.switch_turns();
+    updates.get_mut(&opponent_name).unwrap().push(Message::YourTurnUpdate);
+    updates.insert((*player_name).clone(), vec![Message::EnemyTurnUpdate]);
+    return Result::respond_and_update_single(response_msg, updates, false);
 }
 
 pub fn handle_move_shoot_request(target_coords: (u8, u8), ship_movement: Option<(usize, Direction)>, player_handle: &mut PlayerHandle, lobby: &mut HashMap<String, Player>) -> Result {
@@ -328,7 +328,7 @@ pub fn handle_move_shoot_request(target_coords: (u8, u8), ship_movement: Option<
     let player_name = player_handle.nickname.as_ref().unwrap();
     let player = lobby.get_mut(player_name).unwrap();
 
-    // TODO update state, update other player, game over, afk, NOT_YOUR_TURN, ...
+    // TODO update state, update other player, game over, afk, 
 
     // Make sure player has a running game
     if let Some(ref mut game) = player.game {
@@ -341,8 +341,8 @@ pub fn handle_move_shoot_request(target_coords: (u8, u8), ship_movement: Option<
                     }
                 }
 
-                return handle_shoot(game, player_name, target_coords);
-                // UPDATE: YOUR_TURN, ENEMY_TURN
+                let (target_x, target_y) = (target_coords.0 as u8, target_coords.1 as u8);
+                return handle_shoot(game, player_name, target_x, target_y);
             } else {
                 return Result::respond(Message::NotYourTurnResponse, false);
             }

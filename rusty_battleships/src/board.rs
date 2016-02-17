@@ -72,7 +72,7 @@ pub struct Game {
     pub player2: String,
     pub last_turn_started_at: Option<u64>,
     pub shutdown_started_at: Option<u64>,
-    pub player1_active: bool,
+    player1_active: bool,
     pub player1_afk_count: u8,
     pub player2_afk_count: u8,
     pub state: GameState,
@@ -127,6 +127,11 @@ impl Game {
 
     pub fn my_turn(&self, player_name: &String) -> bool {
         return if *self.player1 == *player_name { self.player1_active } else { !self.player1_active };
+    }
+
+    pub fn switch_turns(&mut self) {
+        self.player1_active = !self.player1_active;
+        self.last_turn_started_at = Some(time::precise_time_ns());
     }
 }
 
