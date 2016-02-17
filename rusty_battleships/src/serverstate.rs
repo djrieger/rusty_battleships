@@ -82,11 +82,11 @@ pub fn handle_ready_request(player: &mut PlayerHandle, lobby: &mut HashMap<Strin
 pub fn handle_not_ready_request(player_handle: &mut PlayerHandle, lobby: &mut HashMap<String, Player>) -> Result {
     let (player, _) = get_player!(player_handle, lobby);
     match player.game {
-        Some(_) => {
+        None => {
             player.state = PlayerState::Available;
             return Result::respond(Message::OkResponse, false);
         },
-        None  => return Result::respond(Message::GameAlreadyStartedResponse, false),
+        Some(_) => return Result::respond(Message::GameAlreadyStartedResponse, false),
     }
     panic!("Invalid state or request!");
 }
