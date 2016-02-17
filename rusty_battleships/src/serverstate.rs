@@ -291,6 +291,36 @@ fn handle_move(game: &mut Game, player_name: &String, movement: (usize, Directio
     None
 }
 
+fn handle_shoot(game: &mut Game, player_name: &String, target_coords: (u8, u8)) -> Result {
+    let ref mut opponent_board = if *game.player1 != *player_name { &mut game.board2 } else { &mut game.board1 };
+    // shoot
+    let (target_x, target_y) = (target_coords.0 as u8, target_coords.1 as u8);
+    match opponent_board.hit(target_x as usize, target_y as usize) {
+        HitResult::Hit => return Result::respond(Message::HitResponse {
+            x: target_x,
+            y: target_y,
+        }, false),
+        // UPDATE: ENEMY_HIT
+        HitResult::Miss => return Result::respond(Message::MissResponse {
+            x: target_x,
+            y: target_y,
+        }, false),
+        // UPDATE: ENEMY_MISS
+        HitResult::Destroyed => {
+            if opponent_board.is_dead() {
+                // TODO
+                // TODO: terminate_game(won)
+            } 
+            // CHECK: return Destroyed to client in any case?
+            return Result::respond(Message::DestroyedResponse {
+                x: target_x,
+                y: target_y,
+            }, false);
+        },
+        // UPDATE: ENEMY_HIT
+    }
+}
+
 pub fn handle_move_shoot_request(target_coords: (u8, u8), ship_movement: Option<(usize, Direction)>, player_handle: &mut PlayerHandle, lobby: &mut HashMap<String, Player>) -> Result {
     if player_handle.nickname.is_none() || !lobby.contains_key(player_handle.nickname.as_ref().unwrap()) {
         panic!("Invalid state. User has no nickname or nickname not in lobby HashTable");
@@ -304,48 +334,17 @@ pub fn handle_move_shoot_request(target_coords: (u8, u8), ship_movement: Option<
     if let Some(ref mut game) = player.game {
         if let GameState::Running = game.state {
             if game.my_turn(player_name) {
-                {
-                    // move if requested
-                    if let Some(movement) = ship_movement {
-                        if let Some(result) = handle_move( game, player_name, movement) {
-                            return result;
-                        }
+                // move if requested
+                if let Some(movement) = ship_movement {
+                    if let Some(result) = handle_move( game, player_name, movement) {
+                        return result;
                     }
                 }
 
-                {
-                    let ref mut opponent_board = if *game.player1 != *player_name { &mut game.board2 } else { &mut game.board1 };
-                    // shoot
-                    let (target_x, target_y) = (target_coords.0 as u8, target_coords.1 as u8);
-                    match opponent_board.hit(target_x as usize, target_y as usize) {
-                        HitResult::Hit => return Result::respond(Message::HitResponse {
-                            x: target_x,
-                            y: target_y,
-                        }, false),
-                        // UPDATE: ENEMY_HIT
-                        HitResult::Miss => return Result::respond(Message::MissResponse {
-                            x: target_x,
-                            y: target_y,
-                        }, false),
-                        // UPDATE: ENEMY_MISS
-                        HitResult::Destroyed => {
-                            if opponent_board.is_dead() {
-                                // TODO
-                                // TODO: terminate_game(won)
-                            } else {
-                                // CHECK: return Destroyed to client in any case?
-                                return Result::respond(Message::DestroyedResponse {
-                                    x: target_x,
-                                    y: target_y,
-                                }, false);
-                            }
-                        },
-                        // UPDATE: ENEMY_HIT
-                    }
-                }
-
+                return handle_shoot(game, player_name, target_coords);
                 // UPDATE: YOUR_TURN, ENEMY_TURN
-
+            } else {
+                return Result::respond(Message::NotYourTurnResponse, false);
             }
         }
     }
