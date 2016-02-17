@@ -5,5 +5,6 @@ authors = ["Moritz Baumann <moritz.baumann@student.kit.edu>", "David Rieger <dav
 
 [dependencies]
 argparse = "0.2.1"
+time = "0.1"
 qmlrs = { git = "git://github.com/Landkeks/qmlrs.git" }
 #rustty = "0.1.9"

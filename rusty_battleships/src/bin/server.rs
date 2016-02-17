@@ -5,6 +5,8 @@ use std::option::Option::None;
 use std::sync::mpsc;
 use std::thread;
 
+extern crate time;
+
 extern crate argparse;
 use argparse::{ArgumentParser, Print, Store};
 

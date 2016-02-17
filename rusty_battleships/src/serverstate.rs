@@ -56,18 +56,10 @@ pub fn terminate_player(player_handle: &mut PlayerHandle, lobby: &mut HashMap<St
         let mut player = lobby.get_mut(&name).unwrap();
 
         if player.has_non_finished_game() {
-            terminate_game(name.clone(), player.game.as_ref().unwrap(), player_handle, games);
+            // player.game.as_ref().unwrap().shutdown(name.clone(), player_handle, games);
         }
     }
     lobby.remove(&name);
-}
-
-pub fn terminate_game(terminating_player_name: String, game: &Game, player_handle: &mut PlayerHandle, games: &mut Vec<Game>) {
-    // check if game is already shutting down
-    // else:
-        // inform opponent
-        // state = ShuttingDown
-        // set end timer for shutdown process
 }
 
 // This is called after a game has shut down

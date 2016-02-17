@@ -2,6 +2,8 @@ use std::collections::hash_map::Entry;
 use std::collections::hash_map::OccupiedEntry;
 use std::sync::mpsc;
 
+extern crate time;
+
 // extern crate rusty_battleships;
 use message::{serialize_message, deserialize_message, Message, Direction};
 
@@ -68,7 +70,8 @@ pub struct Game {
     pub board2: Board,
     pub player1: String,
     pub player2: String,
-    pub last_turn_started_at: u64,
+    pub last_turn_started_at: Option<u64>,
+    pub shutdown_started_at: Option<u64>,
     pub player1_active: bool,
     pub player1_afk_count: u8,
     pub player2_afk_count: u8,
@@ -77,10 +80,12 @@ pub struct Game {
 
 impl PartialEq for Game {
     fn eq(&self, Rhs: &Game) -> bool {
+        // TODO implement!
         return true;
     }
 
     fn ne(&self, Rhs: &Game) -> bool {
+        // TODO implement!
         return true;
     }
 }
@@ -92,7 +97,8 @@ impl Game {
             board2: board2,
             player1: player1,
             player2: player2,
-            last_turn_started_at: 0,
+            last_turn_started_at: None,
+            shutdown_started_at: None,
             player1_active: true,
             player1_afk_count: 0,
             player2_afk_count: 0,
@@ -106,6 +112,17 @@ impl Game {
 
     pub fn get_board(&mut self, player_name: &String) -> &mut Board {
         return if *self.player1 == *player_name { &mut self.board2 } else { &mut self.board1 };
+    }
+
+    // TODO reason for shutdown
+    pub fn shutdown(&mut self) {
+        // shut down already initiated? 
+        if let GameState::ShuttingDown = self.state {
+            return;
+        }
+        self.state = GameState::ShuttingDown;
+        self.shutdown_started_at = Some(time::precise_time_ns());
+        // TODO inform opponent
     }
 }
 
