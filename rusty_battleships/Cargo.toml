@@ -4,6 +4,7 @@ version = "0.0.1"
 authors = ["Moritz Baumann <moritz.baumann@student.kit.edu>", "David Rieger <david.rieger@student.kit.edu>"]
 
 [dependencies]
+time = "0.1"
 argparse = "0.2.1"
 qmlrs = { git = "git://github.com/Landkeks/qmlrs.git" }
 #rustty = "0.1.9"

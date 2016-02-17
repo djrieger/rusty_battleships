@@ -1,6 +1,11 @@
+#![feature(time2)]
 use std::collections::hash_map::Entry;
 use std::collections::hash_map::OccupiedEntry;
 use std::sync::mpsc;
+
+use std::time::Duration;
+use std::time::Instant;
+// extern crate time;
 
 // extern crate rusty_battleships;
 use message::{serialize_message, deserialize_message, Message, Direction};
@@ -58,7 +63,7 @@ pub struct Game {
     pub board2: Board,
     pub player1: String,
     pub player2: String,
-    pub last_turn_started_at: u64,
+    pub last_turn_started_at: Option<::std::time::Instant>,
     pub player1_active: bool,
     pub player1_afk_count: u8,
     pub player2_afk_count: u8,
@@ -82,7 +87,7 @@ impl Game {
             board2: board2,
             player1: player1,
             player2: player2,
-            last_turn_started_at: 0,
+            last_turn_started_at: None,
             player1_active: true,
             player1_afk_count: 0,
             player2_afk_count: 0,

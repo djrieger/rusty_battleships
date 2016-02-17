@@ -1,9 +1,14 @@
+#![feature(time2)]
+
 use std::collections::{HashMap, HashSet};
 use std::io::{BufReader, BufWriter, Write};
 use std::net::{Ipv4Addr, TcpListener, TcpStream};
 use std::option::Option::None;
 use std::sync::mpsc;
 use std::thread;
+
+
+extern crate time;
 
 extern crate argparse;
 use argparse::{ArgumentParser, Print, Store};
@@ -213,6 +218,11 @@ fn main() {
             }
         }
         message_store.clear();
+
+        games.iter().filter(|game| game.state == GameState::Playing && game.last_turn_started_at.is_some()).filter(|game| { 
+            let time_passed_secs = Instant::now().duration_from_earlier(game.last_turn_started_at.unwrap()).num_seconds;
+            return time_passed_secs >= 60;
+        });
     }
     // tcp_thread.join();
 }
