@@ -47,7 +47,7 @@ impl Result {
     }
 }
 
-pub fn terminate_player(player_handle: &mut PlayerHandle, lobby: &mut HashMap<String, Player>, games: &mut Vec<Game>) {
+pub fn terminate_player(player_handle: &PlayerHandle, lobby: &mut HashMap<String, Player>, games: &mut Vec<Game>) {
     if player_handle.nickname.is_none() || !lobby.contains_key(player_handle.nickname.as_ref().unwrap()) {
         panic!("Invalid state. User has no nickname or nickname not in lobby HashTable");
     }

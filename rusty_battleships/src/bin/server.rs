@@ -197,7 +197,7 @@ fn main() {
                         }
                     },
                     None => {
-                        // TODO handle: player_handle needs to cleaned up
+                        serverstate::terminate_player(player_handle, &mut lobby, &mut games);
                         player_handle.to_child_endpoint.send(None);
                     }
                 }
