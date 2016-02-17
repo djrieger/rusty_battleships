@@ -5,7 +5,7 @@ use std::thread;
 use message::Message;
 use message::{ShipPlacement, Direction};
 use message::Reason;
-use board::{Board, PlayerState, Player, PlayerHandle, Game, Ship, HitResult};
+use board::{Board, PlayerState, GameState, Player, PlayerHandle, Game, Ship, HitResult};
 
 // From http://stackoverflow.com/a/28392068
 macro_rules! hashmap {
@@ -73,8 +73,16 @@ macro_rules! get_player {
     }};
 }
 
+// TODO Please validate
 pub fn handle_ready_request(player: &mut PlayerHandle, lobby: &mut HashMap<String, Player>) -> Result {
     let (player, _) = get_player!(player, lobby);
+    if let Some(ref game) = player.game {
+        match game.state {
+            GameState::ShuttingDown => {},
+            _ => return Result::respond(Message::InvalidRequestResponse, false), // invalid if there is a non-ended game
+        }
+    }
+    // No game
     player.state = PlayerState::Ready;
     return Result::respond(Message::OkResponse, false);
 }
