@@ -43,7 +43,7 @@ pub fn handle_get_features_request() -> Result {
     }, false);
 }
 
-pub fn handle_login_request(username: String, player: &mut PlayerHandle, player_names: &mut HashSet<String>, lobby: &mut HashMap<String, Player>) -> Result {
+pub fn handle_login_request(username: String, player: &mut PlayerHandle, lobby: &mut HashMap<String, Player>) -> Result {
     if username.len() == 0 {
         return Result::respond(Message::InvalidRequestResponse, false);
     }
@@ -58,7 +58,6 @@ pub fn handle_login_request(username: String, player: &mut PlayerHandle, player_
         });
         // Update player struct
         player.nickname = Some(username.clone());
-        player_names.insert(username);
         return Result::respond(Message::OkResponse, false);
     }
 }
@@ -74,13 +73,13 @@ macro_rules! get_player {
     }};
 }
 
-pub fn handle_ready_request(player: &mut PlayerHandle, player_names: &mut HashSet<String>, lobby: &mut HashMap<String, Player>) -> Result {
+pub fn handle_ready_request(player: &mut PlayerHandle, lobby: &mut HashMap<String, Player>) -> Result {
     let (player, _) = get_player!(player, lobby);
     player.state = PlayerState::Ready;
     return Result::respond(Message::OkResponse, false);
 }
 
-pub fn handle_not_ready_request(player_handle: &mut PlayerHandle, player_names: &mut HashSet<String>, lobby: &mut HashMap<String, Player>) -> Result {
+pub fn handle_not_ready_request(player_handle: &mut PlayerHandle, lobby: &mut HashMap<String, Player>) -> Result {
     let (player, _) = get_player!(player_handle, lobby);
     match player.game {
         Some(_) => {
@@ -99,7 +98,7 @@ fn initialize_game(player1: &String, player2: &String) -> Game {
     return Game::New(first_board, second_board, (*player1).clone(), (*player1).clone());
 }
 
-pub fn handle_challenge_player_request(challenged_player_name: String, player: &mut PlayerHandle, player_names: &mut HashSet<String>, lobby: &mut HashMap<String, Player>, games: &mut Vec<Game>) -> Result {
+pub fn handle_challenge_player_request(challenged_player_name: String, player: &mut PlayerHandle, lobby: &mut HashMap<String, Player>, games: &mut Vec<Game>) -> Result {
     let challenger_name = player.nickname.as_ref().expect("Invalid state, challenging player has no nickname");
     let mut launch_game = false;
 
@@ -134,7 +133,7 @@ pub fn handle_challenge_player_request(challenged_player_name: String, player: &
     panic!("Invalod state or request!");
 }
 
-pub fn handle_surrender_request(player: &mut PlayerHandle, player_names: &mut HashSet<String>, lobby: &mut HashMap<String, Player>) -> Result {
+pub fn handle_surrender_request(player: &mut PlayerHandle, lobby: &mut HashMap<String, Player>) -> Result {
     // STRUCTURE: If playing, set available, return GameOverUpdate to both players!
     let username = player.nickname.as_ref().expect("Invalid state, player has no nickname");
     let opponent_name;
@@ -168,7 +167,7 @@ fn terminate_player() {
     // What else?
 }
 
-pub fn handle_report_error_request(errormessage: String, player: &mut PlayerHandle, player_names: &mut HashSet<String>, lobby: &mut HashMap<String, Player>, games: &mut Vec<Game>) -> Result {
+pub fn handle_report_error_request(errormessage: String, player: &mut PlayerHandle, lobby: &mut HashMap<String, Player>, games: &mut Vec<Game>) -> Result {
     let mut termination_result: Result = return Result {
         response: None,
         updates: HashMap::new(), 
@@ -210,7 +209,7 @@ pub fn handle_report_error_request(errormessage: String, player: &mut PlayerHand
     return termination_result;
 }
 
-pub fn handle_place_ships_request(placement: [ShipPlacement; 5], player_handle: &mut PlayerHandle, player_names: &mut HashSet<String>, lobby: &mut HashMap<String, Player>) -> Result {
+pub fn handle_place_ships_request(placement: [ShipPlacement; 5], player_handle: &mut PlayerHandle, lobby: &mut HashMap<String, Player>) -> Result {
     /* TODO: Return OkResponse after saving the placement.  The RFC tells us to assume a correct placement. Nevertheless - for testing purposes - we should check it and return an INVALID_REQUEST.
     */
     // TODO Check that current state allows placing ships
@@ -250,7 +249,7 @@ pub fn handle_place_ships_request(placement: [ShipPlacement; 5], player_handle: 
     return Result::respond(Message::InvalidRequestResponse, false);
 }
 
-pub fn handle_move_shoot_request(target_coords: (u8, u8), ship_movement: Option<(usize, Direction)>, player_handle: &mut PlayerHandle, player_names: &mut HashSet<String>, lobby: &mut HashMap<String, Player>) -> Result {
+pub fn handle_move_shoot_request(target_coords: (u8, u8), ship_movement: Option<(usize, Direction)>, player_handle: &mut PlayerHandle, lobby: &mut HashMap<String, Player>) -> Result {
     if player_handle.nickname.is_none() || !lobby.contains_key(player_handle.nickname.as_ref().unwrap()) {
         panic!("Invalid state. User has no nickname or nickname not in lobby HashTable");
     }

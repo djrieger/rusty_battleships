@@ -82,11 +82,11 @@ fn handle_client(stream: TcpStream, tx: mpsc::SyncSender<Option<Message>>, rx: m
     }
 }
 
-fn handle_main(msg: Message, player: &mut board::PlayerHandle, player_names: &mut HashSet<String>, lobby: &mut HashMap<String, board::Player>, games: &mut Vec<Game>) -> serverstate::Result {
+fn handle_main(msg: Message, player: &mut board::PlayerHandle, lobby: &mut HashMap<String, board::Player>, games: &mut Vec<Game>) -> serverstate::Result {
     // These requests can be handled without any restrictions
     match msg {
         Message::GetFeaturesRequest => return serverstate::handle_get_features_request(),
-        Message::ReportErrorRequest { errormessage } => return serverstate::handle_report_error_request(errormessage, player, player_names, lobby, games),
+        Message::ReportErrorRequest { errormessage } => return serverstate::handle_report_error_request(errormessage, player, lobby, games),
         _ => {},
     }
 
@@ -94,19 +94,19 @@ fn handle_main(msg: Message, player: &mut board::PlayerHandle, player_names: &mu
     // their nickname must be None
     if player.nickname.is_none() {
         if let Message::LoginRequest { username } = msg {
-            return serverstate::handle_login_request(username, player, player_names, lobby); 
+            return serverstate::handle_login_request(username, player, lobby); 
         }
     } else {
         // All other requests are only valid after logging in, i.e. with a user name
         match msg {
-            Message::LoginRequest { username } => return serverstate::handle_login_request(username, player, player_names, lobby), 
-            Message::ReadyRequest => return serverstate::handle_ready_request(player, player_names, lobby),
-            Message::NotReadyRequest => return serverstate::handle_not_ready_request(player, player_names, lobby),
-            Message::ChallengePlayerRequest { username } => return serverstate::handle_challenge_player_request(username, player, player_names, lobby, games),  
-            Message::SurrenderRequest => return serverstate::handle_surrender_request(player, player_names, lobby),
-            Message::PlaceShipsRequest { placement } => return serverstate::handle_place_ships_request(placement, player, player_names, lobby),
-            Message::ShootRequest { x, y } => return serverstate::handle_move_shoot_request((x, y), None, player, player_names, lobby),
-            Message::MoveAndShootRequest { id, direction, x, y } => return serverstate::handle_move_shoot_request((x, y), Some((id as usize, direction)), player, player_names, lobby),
+            Message::LoginRequest { username } => return serverstate::handle_login_request(username, player, lobby), 
+            Message::ReadyRequest => return serverstate::handle_ready_request(player, lobby),
+            Message::NotReadyRequest => return serverstate::handle_not_ready_request(player, lobby),
+            Message::ChallengePlayerRequest { username } => return serverstate::handle_challenge_player_request(username, player, lobby, games),  
+            Message::SurrenderRequest => return serverstate::handle_surrender_request(player, lobby),
+            Message::PlaceShipsRequest { placement } => return serverstate::handle_place_ships_request(placement, player, lobby),
+            Message::ShootRequest { x, y } => return serverstate::handle_move_shoot_request((x, y), None, player, lobby),
+            Message::MoveAndShootRequest { id, direction, x, y } => return serverstate::handle_move_shoot_request((x, y), Some((id as usize, direction)), player, lobby),
             _ => {},
         };
     }
@@ -135,7 +135,6 @@ fn main() {
             .expect("Could not get local address.");
     println!("Started listening on port {} at address {}.", port, address);
     let mut player_handles = Vec::new();
-    let mut player_names = HashSet::new();
     let mut lobby = HashMap::new();
 
     // channel for letting tcp_loop tell main loop about new players
@@ -180,7 +179,7 @@ fn main() {
                     Some(msg) => {
                         print!("[Child {}] {:?}", i, msg);
                         // Handle Message received from child
-                        let result = handle_main(msg, player_handle, &mut player_names, &mut lobby, &mut games);
+                        let result = handle_main(msg, player_handle, &mut &mut lobby, &mut games);
                         if let Some(response) = result.response {
                             // handle_main generated a response -> send response Message back to child
                             println!(" -> {:?}", response);
