@@ -26,7 +26,17 @@ pub struct Player<'a> {
     pub game: Option<&'a mut Game>,
 }
 
-// impl <'a> Player<'a> {
+impl <'a> Player<'a> {
+    pub fn has_non_finished_game(&self) -> bool {
+        if let Some(ref game) = self.game {
+            match game.state {
+                GameState::ShuttingDown => {},
+                _ => return true,
+            }
+        }
+        return false;
+    }
+
 //     pub fn set_available(&mut self, my_name: String, lobby: &mut HashMap<String, Player>, updates: &mut HashMap<String, Vec<Message>>) {
 //         self.state = PlayerState::Available;
 //         let mut updates = HashMap::new();
@@ -38,7 +48,7 @@ pub struct Player<'a> {
 //
 //         // TODO: PLAYER_READY
 //     }
-// }
+}
 
 pub enum PlayerState {
     Available,

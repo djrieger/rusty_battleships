@@ -73,18 +73,14 @@ macro_rules! get_player {
     }};
 }
 
-// TODO Please validate
 pub fn handle_ready_request(player: &mut PlayerHandle, lobby: &mut HashMap<String, Player>) -> Result {
     let (player, _) = get_player!(player, lobby);
-    if let Some(ref game) = player.game {
-        match game.state {
-            GameState::ShuttingDown => {},
-            _ => return Result::respond(Message::InvalidRequestResponse, false), // invalid if there is a non-ended game
-        }
+    if player.has_non_finished_game() {
+        return Result::respond(Message::InvalidRequestResponse, false);
+    } else {
+        player.state = PlayerState::Ready;
+        return Result::respond(Message::OkResponse, false);
     }
-    // No game
-    player.state = PlayerState::Ready;
-    return Result::respond(Message::OkResponse, false);
 }
 
 pub fn handle_not_ready_request(player_handle: &mut PlayerHandle, lobby: &mut HashMap<String, Player>) -> Result {
