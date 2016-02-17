@@ -16,6 +16,17 @@ macro_rules! hashmap {
     }}
 }
 
+macro_rules! get_player {
+    ($player:expr, $lobby:expr ) => {{
+        if $player.nickname.is_none() || !$lobby.contains_key($player.nickname.as_ref().unwrap()) {
+            panic!("Invalid state. User has no nickname or nickname not in lobby HashTable");
+        }
+        let name = $player.nickname.as_ref().unwrap();
+        let mut player = $lobby.get_mut(name).unwrap();
+        (player, name)
+    }};
+}
+
 pub struct Result {
     pub response: Option<Message>,
     pub updates: HashMap<String, Vec<Message>>,
@@ -36,6 +47,30 @@ impl Result {
     }
 }
 
+pub fn terminate_player(player_handle: &mut PlayerHandle, lobby: &mut HashMap<String, Player>, games: &mut Vec<Game>) {
+    if player_handle.nickname.is_none() || !lobby.contains_key(player_handle.nickname.as_ref().unwrap()) {
+        panic!("Invalid state. User has no nickname or nickname not in lobby HashTable");
+    }
+    let name = player_handle.nickname.as_ref().unwrap().clone(); 
+    {
+        let mut player = lobby.get_mut(&name).unwrap();
+
+        if player.has_non_finished_game() {
+            terminate_game(name.clone(), player.game.as_ref().unwrap(), player_handle, games);
+        }
+    }
+    lobby.remove(&name);
+}
+
+pub fn terminate_game(terminating_player_name: String, game: &Game, player_handle: &mut PlayerHandle, games: &mut Vec<Game>) {
+    // inform opponent
+    // state = Ended
+    // set end time for end timer
+}
+
+// This is called after a game has shut down
+pub fn purge_game() {
+}
 
 pub fn handle_get_features_request() -> Result {
     return Result::respond(Message::FeaturesResponse {
@@ -62,16 +97,6 @@ pub fn handle_login_request(username: String, player: &mut PlayerHandle, lobby: 
     }
 }
 
-macro_rules! get_player {
-    ($player:expr, $lobby:expr ) => {{
-        if $player.nickname.is_none() || !$lobby.contains_key($player.nickname.as_ref().unwrap()) {
-            panic!("Invalid state. User has no nickname or nickname not in lobby HashTable");
-        }
-        let name = $player.nickname.as_ref().unwrap();
-        let mut player = $lobby.get_mut(name).unwrap();
-        (player, name)
-    }};
-}
 
 pub fn handle_ready_request(player: &mut PlayerHandle, lobby: &mut HashMap<String, Player>) -> Result {
     let (player, _) = get_player!(player, lobby);
@@ -166,12 +191,6 @@ pub fn handle_surrender_request(player: &mut PlayerHandle, lobby: &mut HashMap<S
     };
     let updatemsg2 = updatemsg.clone();
     return Result::respond_and_update_single(updatemsg, hashmap![opponent_name => vec![updatemsg2]], false);
-}
-
-fn terminate_player() {
-    // TODO: What to do here?
-    // Remove from lobby HashTable
-    // What else?
 }
 
 pub fn handle_report_error_request(errormessage: String, player: &mut PlayerHandle, lobby: &mut HashMap<String, Player>, games: &mut Vec<Game>) -> Result {
