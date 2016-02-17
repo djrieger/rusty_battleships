@@ -63,13 +63,16 @@ pub fn terminate_player(player_handle: &mut PlayerHandle, lobby: &mut HashMap<St
 }
 
 pub fn terminate_game(terminating_player_name: String, game: &Game, player_handle: &mut PlayerHandle, games: &mut Vec<Game>) {
-    // inform opponent
-    // state = Ended
-    // set end time for end timer
+    // check if game is already shutting down
+    // else:
+        // inform opponent
+        // state = ShuttingDown
+        // set end timer for shutdown process
 }
 
 // This is called after a game has shut down
 pub fn purge_game() {
+    // Remove game from games
 }
 
 pub fn handle_get_features_request() -> Result {
