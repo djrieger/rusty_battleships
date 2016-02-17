@@ -110,7 +110,7 @@ pub fn handle_challenge_player_request(challenged_player_name: String, player: &
 
     // Is there a player called challenged_player_name?
     if let Some(ref mut challenged_player) = lobby.get_mut(&challenged_player_name) {
-        if let Some(_) = challenged_player.game {
+        if challenged_player.has_non_finished_game() {
             // Challenged player is already in a game -> NotWaiting
             return not_waiting_result;
         }
@@ -127,8 +127,11 @@ pub fn handle_challenge_player_request(challenged_player_name: String, player: &
 
     if launch_game {
         // Create and save new game
-        games.push( initialize_game(challenger_name, &challenged_player_name));
+        let new_game = initialize_game(challenger_name, &challenged_player_name);
         lobby.get_mut(challenger_name).unwrap().state = PlayerState::Playing;
+        // TODO: Set game reference for both players!!!
+        // lobby.get_mut(challenger_name).unwrap().game = Some(&mut new_game);
+        games.push(new_game);
         // Tell challenged player about game
         let update_message = Message::GameStartUpdate {nickname: (*challenger_name).clone() }; 
         // OkResponse for player who issued challenge
