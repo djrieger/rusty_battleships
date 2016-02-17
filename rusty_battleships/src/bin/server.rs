@@ -11,7 +11,7 @@ use argparse::{ArgumentParser, Print, Store};
 extern crate rusty_battleships;
 use rusty_battleships::message::{serialize_message, deserialize_message, Message};
 use rusty_battleships::board;
-use rusty_battleships::board::{Game, Player};
+use rusty_battleships::board::{Game, Player, GameState};
 use rusty_battleships::serverstate;
 
 // http://stackoverflow.com/questions/35157399/how-to-concatenate-static-strings-in-rust/35159310
@@ -196,8 +196,8 @@ fn main() {
                         }
                     },
                     None => {
-                        // TODO handle player termination here
-                            player_handle.to_child_endpoint.send(None);
+                        // TODO handle: player_handle needs to cleaned up
+                        player_handle.to_child_endpoint.send(None);
                     }
                 }
             }
