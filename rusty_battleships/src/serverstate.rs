@@ -270,6 +270,27 @@ pub fn handle_place_ships_request(placement: [ShipPlacement; 5], player_handle: 
     return Result::respond(Message::InvalidRequestResponse, false);
 }
 
+fn handle_move(game: &mut Game, player_name: &String, movement: (usize, Direction)) -> Option<Result> {
+    let (ship_index, direction) = movement;
+    if ship_index < 1 || ship_index > 5 {
+        // ship index is out of bounds
+        return Some(Result::respond(Message::InvalidRequestResponse, false));
+    }
+
+    let mut movement_allowed = true;
+    let ref mut my_board = if *game.player1 == *player_name { &mut game.board2 } else { &mut game.board1 };
+    {
+        let ref mut my_ship = my_board.ships[ship_index - 1];
+        movement_allowed = my_ship.move_me(direction);
+    }
+
+    if !movement_allowed || !my_board.compute_state() {
+        return Some(Result::respond(Message::InvalidRequestResponse, false));
+    }
+
+    None
+}
+
 pub fn handle_move_shoot_request(target_coords: (u8, u8), ship_movement: Option<(usize, Direction)>, player_handle: &mut PlayerHandle, lobby: &mut HashMap<String, Player>) -> Result {
     if player_handle.nickname.is_none() || !lobby.contains_key(player_handle.nickname.as_ref().unwrap()) {
         panic!("Invalid state. User has no nickname or nickname not in lobby HashTable");
@@ -277,70 +298,56 @@ pub fn handle_move_shoot_request(target_coords: (u8, u8), ship_movement: Option<
     let player_name = player_handle.nickname.as_ref().unwrap();
     let player = lobby.get_mut(player_name).unwrap();
 
-    // TODO move first correct? or shoot first?
     // TODO update state, update other player, game over, afk, NOT_YOUR_TURN, ...
 
-    // Make sure player has a game
+    // Make sure player has a running game
     if let Some(ref mut game) = player.game {
-        {
-            // move if requested
-            if let Some(movement) = ship_movement {
-                let (ship_index, direction) = movement;
-                if ship_index < 1 || ship_index > 5 {
-                    // ship index is out of bounds
-                    return Result::respond(Message::InvalidRequestResponse, false);
-                }
-
-                let mut movement_allowed = true;
-                let ref mut my_board = if *game.player1 == *player_name { &mut game.board2 } else { &mut game.board1 };
+        if let GameState::Running = game.state {
+            if game.my_turn(player_name) {
                 {
-                    let ref mut my_ship = my_board.ships[ship_index - 1];
-                    movement_allowed = my_ship.move_me(direction);
+                    // move if requested
+                    if let Some(movement) = ship_movement {
+                        if let Some(result) = handle_move( game, player_name, movement) {
+                            return result;
+                        }
+                    }
                 }
 
-                if !movement_allowed || !my_board.compute_state() {
-                    return Result::respond(Message::InvalidRequestResponse, false);
-                }
-            }
-        }
-
-        {
-            let ref mut opponent_board = if *game.player1 != *player_name { &mut game.board2 } else { &mut game.board1 };
-            // shoot
-            let (target_x, target_y) = (target_coords.0 as u8, target_coords.1 as u8);
-            match opponent_board.hit(target_x as usize, target_y as usize) {
-                HitResult::Hit => return Result::respond(Message::HitResponse {
-                    x: target_x,
-                    y: target_y,
-                }, false),
-                // UPDATE: ENEMY_HIT
-                HitResult::Miss => return Result::respond(Message::MissResponse {
-                    x: target_x,
-                    y: target_y,
-                }, false),
-                // UPDATE: ENEMY_MISS
-                HitResult::Destroyed => {
-                    if opponent_board.is_dead() {
-                        // TODO
-                        // TODO: terminate_game(won)
-                    } else {
-                        // CHECK: return Destroyed to client in any case?
-                        return Result::respond(Message::DestroyedResponse {
+                {
+                    let ref mut opponent_board = if *game.player1 != *player_name { &mut game.board2 } else { &mut game.board1 };
+                    // shoot
+                    let (target_x, target_y) = (target_coords.0 as u8, target_coords.1 as u8);
+                    match opponent_board.hit(target_x as usize, target_y as usize) {
+                        HitResult::Hit => return Result::respond(Message::HitResponse {
                             x: target_x,
                             y: target_y,
-                        }, false);
+                        }, false),
+                        // UPDATE: ENEMY_HIT
+                        HitResult::Miss => return Result::respond(Message::MissResponse {
+                            x: target_x,
+                            y: target_y,
+                        }, false),
+                        // UPDATE: ENEMY_MISS
+                        HitResult::Destroyed => {
+                            if opponent_board.is_dead() {
+                                // TODO
+                                // TODO: terminate_game(won)
+                            } else {
+                                // CHECK: return Destroyed to client in any case?
+                                return Result::respond(Message::DestroyedResponse {
+                                    x: target_x,
+                                    y: target_y,
+                                }, false);
+                            }
+                        },
+                        // UPDATE: ENEMY_HIT
                     }
-                },
-                // UPDATE: ENEMY_HIT
+                }
+
+                // UPDATE: YOUR_TURN, ENEMY_TURN
+
             }
         }
-
-        // UPDATE: YOUR_TURN, ENEMY_TURN
-
-        thread::spawn(move || {
-            thread::sleep(Duration::from_millis(60000));
-            println!("60 seconds are over");
-        });
     }
 
     return Result::respond(Message::InvalidRequestResponse, false);

@@ -124,6 +124,10 @@ impl Game {
         self.shutdown_started_at = Some(time::precise_time_ns());
         // TODO inform opponent
     }
+
+    pub fn my_turn(&self, player_name: &String) -> bool {
+        return if *self.player1 == *player_name { self.player1_active } else { !self.player1_active };
+    }
 }
 
 #[derive(Copy, Clone)]
