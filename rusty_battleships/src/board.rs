@@ -78,8 +78,8 @@ pub struct Game {
     pub board2: Board,
     pub player1: String,
     pub player2: String,
-    pub last_turn_started_at: Option<u64>,
-    pub shutdown_started_at: Option<u64>,
+    last_turn_started_at: Option<time::PreciseTime>,
+    pub shutdown_started_at: Option<time::PreciseTime>,
     player1_active: bool,
     pub player1_afk_count: u8,
     pub player2_afk_count: u8,
@@ -129,7 +129,7 @@ impl Game {
             return;
         }
         self.state = GameState::ShuttingDown;
-        self.shutdown_started_at = Some(time::precise_time_ns());
+        self.shutdown_started_at = Some(time::PreciseTime::now());
         // TODO inform opponent
     }
 
@@ -139,7 +139,21 @@ impl Game {
 
     pub fn switch_turns(&mut self) {
         self.player1_active = !self.player1_active;
-        self.last_turn_started_at = Some(time::precise_time_ns());
+        self.last_turn_started_at = Some(time::PreciseTime::now());
+    }
+
+    pub fn turn_time_exceeded(&self) -> bool {
+        return match self.last_turn_started_at {
+            None => false,
+            Some(start_time) => start_time.to(time::PreciseTime::now()) < time::Duration::seconds(60),
+        }
+    }
+
+    pub fn is_running(&self) -> bool {
+        if let GameState::Running = self.state {
+            return true;
+        }
+        false
     }
 }
 
