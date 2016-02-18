@@ -13,14 +13,22 @@ pub const W: usize = 16;
 pub const H: usize = 10;
 pub const SHIP_COUNT: usize = 2;
 
+pub enum ToChildCommand {
+    Message(Message),
+    TerminateConnection
+}
+
+pub enum ToMainThreadCommand {
+    Message(Message),
+    TerminatePlayer,
+}
+
 pub struct PlayerHandle {
     pub nickname: Option<String>,
     // Sending None to the main thread indicates that the client will be terminated and requests
     // cleanup operations such as terminating a running game for that client
-    pub from_child_endpoint: mpsc::Receiver<Option<Message>>,
-    // Sending None to a child indicates that the server wishes to terminate the (TCP) connection
-    // with that child
-    pub to_child_endpoint: mpsc::Sender<Option<Message>>,
+    pub from_child_endpoint: mpsc::Receiver<ToMainThreadCommand>,
+    pub to_child_endpoint: mpsc::Sender<ToChildCommand>,
 }
 
 pub struct Player<'a> {

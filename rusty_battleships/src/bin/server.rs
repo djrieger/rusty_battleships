@@ -13,7 +13,7 @@ use argparse::{ArgumentParser, Print, Store};
 extern crate rusty_battleships;
 use rusty_battleships::message::{serialize_message, deserialize_message, Message};
 use rusty_battleships::board;
-use rusty_battleships::board::{Game, Player, GameState};
+use rusty_battleships::board::{Game, Player, GameState, ToMainThreadCommand, ToChildCommand};
 use rusty_battleships::serverstate;
 
 // http://stackoverflow.com/questions/35157399/how-to-concatenate-static-strings-in-rust/35159310
@@ -29,12 +29,12 @@ macro_rules! version_string {
 
 // Tell server to perform propert shutdown, like removing player from their game, informing
 // opponent etc.
-fn shutdown_player(tx: &mpsc::SyncSender<Option<Message>>, rx: &mpsc::Receiver<Option<Message>>) {
-    tx.send(None).expect("Main thread died, exiting.");
+fn shutdown_player(tx: &mpsc::SyncSender<ToMainThreadCommand>, rx: &mpsc::Receiver<ToChildCommand>) {
+    tx.send(ToMainThreadCommand::TerminatePlayer).expect("Main thread died, exiting.");
     rx.recv().expect("Main thread died before answering, exiting.");
 }
 
-fn handle_client(stream: TcpStream, tx: mpsc::SyncSender<Option<Message>>, rx: mpsc::Receiver<Option<Message>>) {
+fn handle_client(stream: TcpStream, tx: mpsc::SyncSender<ToMainThreadCommand>, rx: mpsc::Receiver<ToChildCommand>) {
     println!("New incoming TCP stream");
 
     let response_stream = stream.try_clone().unwrap();
@@ -46,17 +46,17 @@ fn handle_client(stream: TcpStream, tx: mpsc::SyncSender<Option<Message>>, rx: m
         match request {
             Ok(request_msg) => {
                 // Send parsed Message to main thread
-                tx.send(Some(request_msg)).expect("Main thread died, exiting.");
+                tx.send(ToMainThreadCommand::Message(request_msg)).expect("Main thread died, exiting.");
                 // Wait for response Message
                 let response = rx.recv().expect("Main thread died before answering, exiting.");
                 match response {
-                    Some(msg) => {
+                    ToChildCommand::Message(msg) => {
                         response_msg = msg;
                         if response_msg == Message::InvalidRequestResponse {
                             shutdown_player(&tx, &rx);
                         }
                     },
-                    None => return, // server wants to terminate this client
+                    ToChildCommand::TerminateConnection => return, 
                 }
             },
             // Normal connection termination
@@ -178,27 +178,27 @@ fn main() {
         for (i, player_handle) in player_handles.iter_mut().enumerate() {
             if let Ok(maybe_msg) = player_handle.from_child_endpoint.try_recv() {
                 match maybe_msg {
-                    Some(msg) => {
+                    ToMainThreadCommand::Message(msg) => {
                         print!("[Child {}] {:?}", i, msg);
                         // Handle Message received from child
                         let result = handle_main(msg, player_handle, &mut &mut lobby, &mut games);
                         if let Some(response) = result.response {
                             // handle_main generated a response -> send response Message back to child
                             println!(" -> {:?}", response);
-                            player_handle.to_child_endpoint.send(Some(response));
+                            player_handle.to_child_endpoint.send(ToChildCommand::Message(response));
                         }
                         if result.terminate_connection {
                             print!("-- Closing connection to child {}", i);
-                            player_handle.to_child_endpoint.send(None);
+                            player_handle.to_child_endpoint.send(ToChildCommand::TerminateConnection);
                         }
                         if !result.updates.is_empty() {
                             message_store = result.updates;
                             break;
                         }
                     },
-                    None => {
+                    ToMainThreadCommand::TerminatePlayer => {
                         serverstate::terminate_player(player_handle, &mut lobby, &mut games);
-                        player_handle.to_child_endpoint.send(None);
+                        player_handle.to_child_endpoint.send(ToChildCommand::TerminateConnection);
                     }
                 }
             }
@@ -208,7 +208,7 @@ fn main() {
             if let Some(ref name) = player_handle.nickname {
                 if message_store.contains_key(name) {
                     for message in message_store.remove(name).unwrap() {
-                        player_handle.to_child_endpoint.send(Some(message));
+                        player_handle.to_child_endpoint.send(ToChildCommand::Message(message));
                     }
                 }
             }
