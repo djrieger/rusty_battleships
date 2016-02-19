@@ -3,7 +3,6 @@ use std::io::{BufReader, BufWriter, Write};
 use std::net::{Ipv4Addr, TcpListener, TcpStream};
 use std::option::Option::None;
 use std::sync::mpsc;
-use std::time::Duration;
 use std::thread;
 
 extern crate time;
@@ -16,6 +15,7 @@ use rusty_battleships::message::{serialize_message, deserialize_message, Message
 use rusty_battleships::board;
 use rusty_battleships::board::{Player, ToMainThreadCommand, ToChildCommand};
 use rusty_battleships::game::Game;
+use rusty_battleships::timer::timer_periodic;
 use rusty_battleships::serverstate;
 
 // http://stackoverflow.com/questions/35157399/how-to-concatenate-static-strings-in-rust/35159310
@@ -31,20 +31,6 @@ macro_rules! version_string {
 
 const TICK_DURATION_MS: u64 = 250;
 
-
-fn timer_periodic(ms: u64) -> mpsc::Receiver<()> {
-    let (tx, rx) = mpsc::channel();
-    let duration = Duration::from_millis(ms);
-    std::thread::spawn(move || {
-        loop {
-            std::thread::sleep(duration);
-            if tx.send(()).is_err() {
-                break;
-            }
-        }
-    });
-    rx
-}
 
 // Tell server to perform propert shutdown, like removing player from their game, informing
 // opponent etc.
@@ -240,7 +226,7 @@ fn main() {
         let exceeded_turn_games = games.iter().filter(|game| game.is_running() && game.turn_time_exceeded());
         // TODO Handle afk state somehow
 
-        
+
         tick.recv().expect("Timer thread died unexpectedly."); // wait for next tick
     }
 }
