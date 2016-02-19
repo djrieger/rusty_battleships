@@ -188,8 +188,8 @@ fn main() {
     let mut message_store: HashMap<String, Vec<Message>> = HashMap::new();
     let mut games: Vec<Game> = vec![];
     // stores player name -> game
-    // let mut games: HashMap<String, &Game> = HashMap::new();
 
+    let tick = timer_periodic(TICK_DURATION_MS);
     // Main loop
     loop {
         // Receive new players from tcp_loop
@@ -239,5 +239,8 @@ fn main() {
 
         let exceeded_turn_games = games.iter().filter(|game| game.is_running() && game.turn_time_exceeded());
         // TODO Handle afk state somehow
+
+        
+        tick.recv().expect("Timer thread died unexpectedly."); // wait for next tick
     }
 }
