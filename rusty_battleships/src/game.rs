@@ -34,7 +34,7 @@ impl PartialEq for Game {
 }
 
 impl Game {
-    pub fn New(board1: Board, board2: Board, player1: String, player2: String) -> Game {
+    pub fn new(board1: Board, board2: Board, player1: String, player2: String) -> Game {
         Game {
             board1: board1,
             board2: board2,

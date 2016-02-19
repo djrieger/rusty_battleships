@@ -19,11 +19,9 @@ macro_rules! hashmap {
 
 macro_rules! get_player {
     ($player:expr, $lobby:expr ) => {{
-        if $player.nickname.is_none() || !$lobby.contains_key($player.nickname.as_ref().unwrap()) {
-            panic!("Invalid state. User has no nickname or nickname not in lobby HashTable");
-        }
+        assert!($player.nickname.is_some() || $lobby.contains_key($player.nickname.as_ref().unwrap()));
         let name = $player.nickname.as_ref().unwrap();
-        let mut player = $lobby.get_mut(name).unwrap();
+        let player = $lobby.get_mut(name).unwrap();
         (player, name)
     }};
 }
@@ -49,10 +47,8 @@ impl Result {
 }
 
 pub fn terminate_player(player_handle: &PlayerHandle, lobby: &mut HashMap<String, Player>, games: &mut Vec<Game>) -> Option<Message> {
-    if player_handle.nickname.is_none() || !lobby.contains_key(player_handle.nickname.as_ref().unwrap()) {
-        panic!("Invalid state. User has no nickname or nickname not in lobby HashTable");
-    }
-    let name = player_handle.nickname.as_ref().unwrap().clone(); 
+    assert!(player_handle.nickname.is_some() || lobby.contains_key(player_handle.nickname.as_ref().unwrap()));
+    let name = player_handle.nickname.as_ref().unwrap().clone();
     {
         let mut player = lobby.get_mut(&name).unwrap();
         if player.game.is_some() {
@@ -115,7 +111,7 @@ fn initialize_game(player1: &String, player2: &String) -> Game {
     let first_board = Board::new(vec![]);
     let second_board = Board::new(vec![]);
 
-    return Game::New(first_board, second_board, (*player1).clone(), (*player1).clone());
+    return Game::new(first_board, second_board, (*player1).clone(), (*player1).clone());
 }
 
 pub fn handle_challenge_player_request(challenged_player_name: String, player: &mut PlayerHandle, lobby: &mut HashMap<String, Player>, games: &mut Vec<Game>) -> Result {
@@ -149,11 +145,11 @@ pub fn handle_challenge_player_request(challenged_player_name: String, player: &
         // lobby.get_mut(challenger_name).unwrap().game = Some(&mut new_game);
         games.push(new_game);
         // Tell challenged player about game
-        let update_message = Message::GameStartUpdate {nickname: (*challenger_name).clone() }; 
+        let update_message = Message::GameStartUpdate {nickname: (*challenger_name).clone() };
         // OkResponse for player who issued challenge
         return Result::respond_and_update_single(Message::OkResponse, hashmap![challenged_player_name => vec![update_message]], false);
     }
-    panic!("Invalod state or request!");
+    panic!("Invalid state or request!");
 }
 
 pub fn handle_surrender_request(player: &mut PlayerHandle, lobby: &mut HashMap<String, Player>) -> Result {
@@ -187,7 +183,7 @@ pub fn handle_surrender_request(player: &mut PlayerHandle, lobby: &mut HashMap<S
 pub fn handle_report_error_request(errormessage: String, player: &mut PlayerHandle, lobby: &mut HashMap<String, Player>, games: &mut Vec<Game>) -> Result {
     let mut termination_result: Result = return Result {
         response: None,
-        updates: HashMap::new(), 
+        updates: HashMap::new(),
         terminate_connection: true,
     };
 
@@ -211,7 +207,7 @@ pub fn handle_report_error_request(errormessage: String, player: &mut PlayerHand
                 let mut updates = vec![player_left_update, game_over_update];
                 termination_result.updates.insert( player2_name, updates);
             }
-        } 
+        }
         if let Some(ref name) = player2_name {
             let player2 = lobby.get_mut(name).expect("Invalid state, opponent name not in lobby");
             player2.state = PlayerState::Available;
@@ -223,12 +219,9 @@ pub fn handle_report_error_request(errormessage: String, player: &mut PlayerHand
 }
 
 pub fn handle_place_ships_request(placement: [ShipPlacement; 5], player_handle: &mut PlayerHandle, lobby: &mut HashMap<String, Player>) -> Result {
-    /* TODO: Return OkResponse after saving the placement.  The RFC tells us to assume a correct placement. Nevertheless - for testing purposes - we should check it and return an INVALID_REQUEST.
+    /* TODO: Return OkResponse after saving the placement. Nevertheless - for testing purposes - we should check it and return an INVALID_REQUEST.
     */
     // TODO Check that current state allows placing ships
-    if player_handle.nickname.is_none() || !lobby.contains_key(player_handle.nickname.as_ref().unwrap()) {
-        panic!("Invalid state. User has no nickname or nickname not in lobby HashTable");
-    }
     let player_name = player_handle.nickname.as_ref().unwrap();
     let player = lobby.get_mut(player_name).unwrap();
 
@@ -301,7 +294,7 @@ fn handle_shoot(game: &mut Game, player_name: &String, target_x: u8, target_y: u
             HitResult::Destroyed => {
                 if opponent_board.is_dead() {
                     // TODO: terminate_game(won) with appropriate updates
-                } 
+                }
                 response_msg = Message::DestroyedResponse { x: target_x, y: target_y };
                 // TODO which update for enemy?
             },
@@ -316,13 +309,10 @@ fn handle_shoot(game: &mut Game, player_name: &String, target_x: u8, target_y: u
 }
 
 pub fn handle_move_shoot_request(target_coords: (u8, u8), ship_movement: Option<(usize, Direction)>, player_handle: &mut PlayerHandle, lobby: &mut HashMap<String, Player>) -> Result {
-    if player_handle.nickname.is_none() || !lobby.contains_key(player_handle.nickname.as_ref().unwrap()) {
-        panic!("Invalid state. User has no nickname or nickname not in lobby HashTable");
-    }
     let player_name = player_handle.nickname.as_ref().unwrap();
     let player = lobby.get_mut(player_name).unwrap();
 
-    // TODO update state, update other player, game over, afk, 
+    // TODO update state, update other player, game over, afk,
 
     // Make sure player has a running game
     if let Some(ref mut game) = player.game {

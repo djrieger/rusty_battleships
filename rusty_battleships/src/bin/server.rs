@@ -108,6 +108,8 @@ fn handle_main(msg: Message, player: &mut board::PlayerHandle, lobby: &mut HashM
         }
     } else {
         // All other requests are only valid after logging in, i.e. with a user name
+        assert!(lobby.contains_key(player.nickname.as_ref().unwrap()), "Invalid state: nickname not in lobby.");
+
         match msg {
             Message::LoginRequest { username } => return serverstate::handle_login_request(username, player, lobby),
             Message::ReadyRequest => return serverstate::handle_ready_request(player, lobby),
