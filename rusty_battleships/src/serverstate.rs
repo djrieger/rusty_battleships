@@ -229,14 +229,15 @@ pub fn handle_place_ships_request(placement: [ShipPlacement; 5], player_handle: 
 
         // Translate placement to ships vector
         let mut ships = vec![];
-        for ship_placement in &placement {
-            let &ShipPlacement { x, y, direction } = ship_placement;
+        let lengths_and_hp = vec![5, 4, 3, 2, 2];
+        for (&ship_placement, &length_and_hp) in placement.iter().zip(lengths_and_hp.iter()) {
+            let ShipPlacement { x, y, direction } = ship_placement;
             let ship = Ship {
                 x: x as isize,
                 y: y as isize,
                 horizontal: direction == Direction::West || direction == Direction::East, // FIXME?
-                length: 5, // FIXME
-                health_points: 5 // FIXME
+                length: length_and_hp,
+                health_points: length_and_hp,
             };
             ships.push(ship);
         }
