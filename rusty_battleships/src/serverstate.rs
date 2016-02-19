@@ -242,13 +242,24 @@ pub fn handle_place_ships_request(placement: [ShipPlacement; 5], player_handle: 
             ships.push(ship);
         }
         // Get board for current player
-        let ref mut board = if *game.player1 == *player_name { &mut game.board2 } else { &mut game.board1 };
-        board.ships = ships;
+        let new_board_valid;
+        let opponent_ready;
+        {
+            let (ref mut board, ref mut opponent_board) = if *game.player1 == *player_name { (&mut game.board2, &mut game.board1) } else { (&mut game.board1, &mut game.board2) };
+            board.ships = ships;
+            new_board_valid = board.compute_state();
+            opponent_ready = opponent_board.ships.len() > 0;
+        }
+
         // Check if new state is valid
-        if !board.compute_state() {
+        if new_board_valid {
             return Result::respond(Message::InvalidRequestResponse, false);
         } else {
-            return Result::respond(Message::OkResponse, false);
+            // opponent also done placing ships?
+            if opponent_ready {
+                game.state = GameState::Running;
+            }
+            return Result::respond_and_update_single(Message::OkResponse, game.switch_turns(), false);
         }
     }
 
@@ -301,10 +312,14 @@ fn handle_shoot(game: &mut Game, player_name: &String, target_x: u8, target_y: u
         }
     }
 
-    // make turn switch
-    game.switch_turns();
-    updates.get_mut(&opponent_name).unwrap().push(Message::YourTurnUpdate);
-    updates.insert((*player_name).clone(), vec![Message::EnemyTurnUpdate]);
+    let mut turn_updates = game.switch_turns();
+    for (receiver_name, update_vec) in turn_updates.drain() {
+        if !updates.contains_key(&receiver_name) {
+            updates.insert(receiver_name, update_vec);
+        } else {
+            updates.get_mut(&receiver_name).as_mut().unwrap().extend(update_vec);
+        }
+    }
     return Result::respond_and_update_single(response_msg, updates, false);
 }
 

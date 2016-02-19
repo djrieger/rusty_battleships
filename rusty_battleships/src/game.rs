@@ -1,5 +1,6 @@
 extern crate time;
 
+use std::collections::{HashMap, HashSet};
 use board::{Board};
 use message::{Message, Reason};
 
@@ -66,9 +67,15 @@ impl Game {
         return if *self.player1 == *player_name { self.player1_active } else { !self.player1_active };
     }
 
-    pub fn switch_turns(&mut self) {
+    pub fn switch_turns(&mut self) -> HashMap<String, Vec<Message>> {
         self.player1_active = !self.player1_active;
         self.last_turn_started_at = Some(time::PreciseTime::now());
+
+        let (active_player, waiting_player) = if self.player1_active { (self.player1.clone(), self.player2.clone()) } else { (self.player2.clone(), self.player1.clone()) };
+        let mut updates = HashMap::new();
+        updates.insert(active_player, vec![Message::YourTurnUpdate]);
+        updates.insert(waiting_player, vec![Message::EnemyTurnUpdate]);
+        return updates;
     }
 
     fn time_exceeded(time: Option<time::PreciseTime>, limit_seconds: u64) -> bool {
