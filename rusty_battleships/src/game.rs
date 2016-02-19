@@ -1,6 +1,7 @@
 extern crate time;
 
 use board::{Board};
+use message::{Message, Reason};
 
 pub enum GameState {
     Placing,
@@ -57,15 +58,17 @@ impl Game {
         return if *self.player1 == *player_name { &mut self.board2 } else { &mut self.board1 };
     }
 
-    // TODO reason for shutdown
-    pub fn shutdown(&mut self) {
+    // returns GameOverUpdate message to be sent to opponent
+    pub fn shutdown(&mut self, initiator_name: String, victorious: bool, reason: Reason) -> Option<Message> {
         // shut down already initiated? 
         if let GameState::ShuttingDown = self.state {
-            return;
+            return None;
         }
         self.state = GameState::ShuttingDown;
         self.shutdown_started_at = Some(time::PreciseTime::now());
-        // TODO inform opponent
+
+        // inform opponent
+        return Some(Message::GameOverUpdate { victorious: !victorious, reason: reason });
     }
 
     pub fn my_turn(&self, player_name: &String) -> bool {
