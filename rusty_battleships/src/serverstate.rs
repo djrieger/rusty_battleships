@@ -1,4 +1,6 @@
+use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
+use std::rc::Rc;
 use std::time::Duration;
 use std::thread;
 
@@ -46,7 +48,7 @@ impl Result {
     }
 }
 
-pub fn terminate_player(player_handle: &PlayerHandle, lobby: &mut HashMap<String, Player>, games: &mut Vec<Game>) -> Option<Message> {
+pub fn terminate_player(player_handle: &PlayerHandle, lobby: &mut HashMap<String, Player>, games: &mut Vec<Rc<RefCell<Game>>>) -> Option<Message> {
     assert!(player_handle.nickname.is_some() || lobby.contains_key(player_handle.nickname.as_ref().unwrap()));
     let name = player_handle.nickname.as_ref().unwrap().clone();
     {
@@ -107,14 +109,14 @@ pub fn handle_not_ready_request(player_handle: &mut PlayerHandle, lobby: &mut Ha
     panic!("Invalid state or request!");
 }
 
-fn initialize_game(player1: &String, player2: &String) -> Game {
+fn initialize_game(player1: &String, player2: &String) -> Rc<RefCell<Game>> {
     let first_board = Board::new(vec![]);
     let second_board = Board::new(vec![]);
 
-    return Game::new(first_board, second_board, (*player1).clone(), (*player1).clone());
+    return Rc::new(RefCell::new(Game::new(first_board, second_board, (*player1).clone(), (*player1).clone())));
 }
 
-pub fn handle_challenge_player_request(challenged_player_name: String, player: &mut PlayerHandle, lobby: &mut HashMap<String, Player>, games: &mut Vec<Game>) -> Result {
+pub fn handle_challenge_player_request(challenged_player_name: String, player: &mut PlayerHandle, lobby: &mut HashMap<String, Player>, games: &mut Vec<Rc<RefCell<Game>>>) -> Result {
     let challenger_name = player.nickname.as_ref().expect("Invalid state, challenging player has no nickname");
     let mut launch_game = false;
 
@@ -141,10 +143,11 @@ pub fn handle_challenge_player_request(challenged_player_name: String, player: &
         // Create and save new game
         let new_game = initialize_game(challenger_name, &challenged_player_name);
         lobby.get_mut(challenger_name).unwrap().state = PlayerState::Playing;
-        // TODO: Set game reference for both players!!!
-        // lobby.get_mut(challenger_name).unwrap().game = Some(&mut new_game);
+        // Set game reference for both players
+        lobby.get_mut(challenger_name).unwrap().game = Some(new_game.clone());
+        lobby.get_mut(&challenged_player_name).unwrap().game = Some(new_game.clone());
         games.push(new_game);
-        // Tell challenged player about game
+        // tell challenged player about the game
         let update_message = Message::GameStartUpdate {nickname: (*challenger_name).clone() };
         // OkResponse for player who issued challenge
         return Result::respond_and_update_single(Message::OkResponse, hashmap![challenged_player_name => vec![update_message]], false);
@@ -165,7 +168,9 @@ pub fn handle_surrender_request(player: &mut PlayerHandle, lobby: &mut HashMap<S
             _ => return Result::respond(Message::InvalidRequestResponse, false),
         }
 
-        opponent_name = requesting_player.game.as_ref().unwrap().get_opponent_name(username).clone();
+        assert!(requesting_player.game.is_some());
+
+        opponent_name = (*requesting_player.game.as_ref().unwrap()).borrow().get_opponent_name(username).clone();
         requesting_player.game = None;
     }
 
@@ -180,7 +185,7 @@ pub fn handle_surrender_request(player: &mut PlayerHandle, lobby: &mut HashMap<S
     return Result::respond_and_update_single(updatemsg, hashmap![opponent_name => vec![updatemsg2]], false);
 }
 
-pub fn handle_report_error_request(errormessage: String, player: &mut PlayerHandle, lobby: &mut HashMap<String, Player>, games: &mut Vec<Game>) -> Result {
+pub fn handle_report_error_request(errormessage: String, player: &mut PlayerHandle, lobby: &mut HashMap<String, Player>, games: &mut Vec<Rc<RefCell<Game>>>) -> Result {
     let mut termination_result: Result = return Result {
         response: None,
         updates: HashMap::new(),
@@ -194,10 +199,10 @@ pub fn handle_report_error_request(errormessage: String, player: &mut PlayerHand
             let mut user = lobby.get_mut(username).expect("Invalid state, requesting player not in lobby");
             println!("Client {} reported the following error: {}", username, errormessage);
             // player in game with player2?
-            if let Some(ref mut game) = user.game {
+            if let Some(ref game) = user.game {
                 let player2_name;
                 {
-                    player2_name = game.get_opponent_name(username).clone();
+                    player2_name = (*game).borrow().get_opponent_name(username).clone();
                 }
                 let player_left_update = Message::PlayerLeftUpdate { nickname: (*username).clone() };
                 let game_over_update = Message::GameOverUpdate {
@@ -222,8 +227,8 @@ pub fn handle_place_ships_request(placement: [ShipPlacement; 5], player_handle: 
     let player_name = player_handle.nickname.as_ref().unwrap();
     let player = lobby.get_mut(player_name).unwrap();
 
-    if let Some(ref mut game) = player.game {
-        if let GameState::Running = game.state {
+    if let Some(ref game) = player.game {
+        if let GameState::Running = (*game).borrow().state {
             return Result::respond(Message::InvalidRequestResponse, false);
         }
 
@@ -241,25 +246,32 @@ pub fn handle_place_ships_request(placement: [ShipPlacement; 5], player_handle: 
             };
             ships.push(ship);
         }
-        // Get board for current player
+
         let new_board_valid;
         let opponent_ready;
         {
-            let (ref mut board, ref mut opponent_board) = if *game.player1 == *player_name { (&mut game.board2, &mut game.board1) } else { (&mut game.board1, &mut game.board2) };
-            board.ships = ships;
-            new_board_valid = board.compute_state();
-            opponent_ready = opponent_board.ships.len() > 0;
+            let mut game_ref = (*game).borrow_mut();
+            if game_ref.player1 == *player_name {
+                game_ref.board1.ships = ships;
+                new_board_valid = game_ref.board1.compute_state();
+                opponent_ready = game_ref.board2.ships.len() > 0;
+            } else {
+                game_ref.board2.ships = ships;
+                new_board_valid = game_ref.board2.compute_state();
+                opponent_ready = game_ref.board1.ships.len() > 0;
+            };
         }
 
         // Check if new state is valid
         if new_board_valid {
             return Result::respond(Message::InvalidRequestResponse, false);
         } else {
+            let mut game_ref = (*game).borrow_mut();
             // opponent also done placing ships?
             if opponent_ready {
-                game.state = GameState::Running;
+                game_ref.state = GameState::Running;
             }
-            return Result::respond_and_update_single(Message::OkResponse, game.switch_turns(), false);
+            return Result::respond_and_update_single(Message::OkResponse, game_ref.switch_turns(), false);
         }
     }
 
@@ -330,18 +342,19 @@ pub fn handle_move_shoot_request(target_coords: (u8, u8), ship_movement: Option<
     // TODO update state, update other player, game over, afk,
 
     // Make sure player has a running game
-    if let Some(ref mut game) = player.game {
-        if let GameState::Running = game.state {
-            if game.my_turn(player_name) {
+    if let Some(ref game) = player.game {
+        let mut game_ref = (*game).borrow_mut();
+        if let GameState::Running = game_ref.state {
+            if game_ref.my_turn(player_name) {
                 // move if requested
                 if let Some(movement) = ship_movement {
-                    if let Some(result) = handle_move( game, player_name, movement) {
+                    if let Some(result) = handle_move(&mut game_ref, player_name, movement) {
                         return result;
                     }
                 }
 
                 let (target_x, target_y) = (target_coords.0 as u8, target_coords.1 as u8);
-                return handle_shoot(game, player_name, target_x, target_y);
+                return handle_shoot(&mut game_ref, player_name, target_x, target_y);
             } else {
                 return Result::respond(Message::NotYourTurnResponse, false);
             }

@@ -1,7 +1,9 @@
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::io::{BufReader, BufWriter, Write};
 use std::net::{Ipv4Addr, TcpListener, TcpStream};
 use std::option::Option::None;
+use std::rc::Rc;
 use std::sync::mpsc;
 use std::thread;
 
@@ -92,7 +94,7 @@ fn handle_client(stream: TcpStream, tx: mpsc::SyncSender<ToMainThreadCommand>, r
     }
 }
 
-fn handle_main(msg: Message, player: &mut board::PlayerHandle, lobby: &mut HashMap<String, board::Player>, games: &mut Vec<Game>) -> serverstate::Result {
+fn handle_main(msg: Message, player: &mut board::PlayerHandle, lobby: &mut HashMap<String, board::Player>, games: &mut Vec<Rc<RefCell<Game>>>) -> serverstate::Result {
     // These requests can be handled without any restrictions
     match msg {
         Message::GetFeaturesRequest => return serverstate::handle_get_features_request(),
@@ -174,7 +176,7 @@ fn main() {
 
     thread::spawn(tcp_loop);
     let mut message_store: HashMap<String, Vec<Message>> = HashMap::new();
-    let mut games: Vec<Game> = vec![];
+    let mut games: Vec<Rc<RefCell<Game>>> = vec![];
     // stores player name -> game
 
     let tick = timer_periodic(TICK_DURATION_MS);

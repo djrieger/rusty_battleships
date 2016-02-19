@@ -1,5 +1,7 @@
+use std::cell::RefCell;
 use std::collections::hash_map::Entry;
 use std::collections::hash_map::OccupiedEntry;
+use std::rc::Rc;
 use std::sync::mpsc;
 
 extern crate time;
@@ -32,12 +34,12 @@ pub struct PlayerHandle {
     pub to_child_endpoint: mpsc::Sender<ToChildCommand>,
 }
 
-pub struct Player<'a> {
+pub struct Player {
     pub state: PlayerState,
-    pub game: Option<&'a mut Game>,
+    pub game: Option<Rc<RefCell<Game>>>,
 }
 
-impl <'a> Player<'a> {
+impl Player {
 //     pub fn set_available(&mut self, my_name: String, lobby: &mut HashMap<String, Player>, updates: &mut HashMap<String, Vec<Message>>) {
 //         self.state = PlayerState::Available;
 //         let mut updates = HashMap::new();
