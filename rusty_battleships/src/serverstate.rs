@@ -64,8 +64,13 @@ pub fn terminate_player(player_handle: &PlayerHandle, lobby: &mut HashMap<String
 }
 
 // This is called after a game has shut down
-pub fn purge_game() {
+pub fn purge_game(game: &Game, games: &mut Vec<Game>) {
     // Remove game from games
+    games
+        .iter()
+        .by_ref()
+        .position(|ref x| x == &game)
+        .map(|e| games.remove(e));
 }
 
 pub fn handle_get_features_request() -> Result {
@@ -212,11 +217,7 @@ pub fn handle_report_error_request(errormessage: String, player: &mut PlayerHand
                 };
                 termination_result.updates.insert( (*player2_name.unwrap()).clone(), vec![player_left_update, game_over_update]);
                 // remove game from games
-                games
-                    .iter()
-                    .by_ref()
-                    .position(|ref x| x == game)
-                    .map(|e| games.remove(e));
+                // TODO terminate_game ??
             }
         } 
         if let Some(ref name) = player2_name {

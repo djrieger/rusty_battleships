@@ -80,15 +80,30 @@ impl Game {
         self.last_turn_started_at = Some(time::PreciseTime::now());
     }
 
-    pub fn turn_time_exceeded(&self) -> bool {
-        return match self.last_turn_started_at {
+    fn time_exceeded(time: Option<time::PreciseTime>, limit_seconds: u64) -> bool {
+        return match time {
             None => false,
-            Some(start_time) => start_time.to(time::PreciseTime::now()) < time::Duration::seconds(60),
+            Some(start_time) => start_time.to(time::PreciseTime::now()) < time::Duration::seconds(limit_seconds as i64),
         }
+    }
+
+    pub fn turn_time_exceeded(&self) -> bool {
+        return Game::time_exceeded(self.last_turn_started_at, 60);
+    }
+
+    pub fn shutdown_time_exceeded(&self) -> bool {
+        return Game::time_exceeded(self.last_turn_started_at, 1);
     }
 
     pub fn is_running(&self) -> bool {
         if let GameState::Running = self.state {
+            return true;
+        }
+        false
+    }
+
+    pub fn is_shutting_down(&self) -> bool {
+        if let GameState::ShuttingDown = self.state {
             return true;
         }
         false
