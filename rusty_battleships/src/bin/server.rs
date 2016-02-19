@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::io::{BufReader, BufWriter, Write};
 use std::net::{Ipv4Addr, TcpListener, TcpStream};
 use std::option::Option::None;
@@ -14,7 +14,8 @@ extern crate rusty_battleships;
 use rusty_battleships::message::{serialize_message, deserialize_message, Message};
 use rusty_battleships::board;
 use rusty_battleships::board::{Player, ToMainThreadCommand, ToChildCommand};
-use rusty_battleships::game::{Game, GameState};
+use rusty_battleships::game::Game;
+use rusty_battleships::timer::timer_periodic;
 use rusty_battleships::serverstate;
 
 // http://stackoverflow.com/questions/35157399/how-to-concatenate-static-strings-in-rust/35159310
@@ -27,6 +28,9 @@ macro_rules! version {
 macro_rules! version_string {
     () => ( concat!(description!(), " v", version!()) )
 }
+
+const TICK_DURATION_MS: u64 = 250;
+
 
 // Tell server to perform propert shutdown, like removing player from their game, informing
 // opponent etc.
@@ -41,6 +45,7 @@ fn handle_client(stream: TcpStream, tx: mpsc::SyncSender<ToMainThreadCommand>, r
     let response_stream = stream.try_clone().unwrap();
     let mut buff_reader = BufReader::new(stream);
     let mut buff_writer = BufWriter::new(response_stream);
+    let tick = timer_periodic(TICK_DURATION_MS);
     loop {
         let request = deserialize_message(&mut buff_reader);
         let response_msg;
@@ -57,7 +62,7 @@ fn handle_client(stream: TcpStream, tx: mpsc::SyncSender<ToMainThreadCommand>, r
                             shutdown_player(&tx, &rx);
                         }
                     },
-                    ToChildCommand::TerminateConnection => return, 
+                    ToChildCommand::TerminateConnection => return,
                 }
             },
             // Normal connection termination
@@ -68,7 +73,7 @@ fn handle_client(stream: TcpStream, tx: mpsc::SyncSender<ToMainThreadCommand>, r
                 return;
             },
             // Malformed message received
-            Err(e) => {
+            Err(_) => {
                 shutdown_player(&tx, &rx);
                 println!("Received malformed message, terminating client");
                 response_msg = Message::InvalidRequestResponse;
@@ -82,6 +87,8 @@ fn handle_client(stream: TcpStream, tx: mpsc::SyncSender<ToMainThreadCommand>, r
         if clone_response == Message::InvalidRequestResponse {
             return;
         }
+
+        tick.recv().expect("Timer thread died unexpectedly."); // wait for next tick
     }
 }
 
@@ -97,15 +104,15 @@ fn handle_main(msg: Message, player: &mut board::PlayerHandle, lobby: &mut HashM
     // their nickname must be None
     if player.nickname.is_none() {
         if let Message::LoginRequest { username } = msg {
-            return serverstate::handle_login_request(username, player, lobby); 
+            return serverstate::handle_login_request(username, player, lobby);
         }
     } else {
         // All other requests are only valid after logging in, i.e. with a user name
         match msg {
-            Message::LoginRequest { username } => return serverstate::handle_login_request(username, player, lobby), 
+            Message::LoginRequest { username } => return serverstate::handle_login_request(username, player, lobby),
             Message::ReadyRequest => return serverstate::handle_ready_request(player, lobby),
             Message::NotReadyRequest => return serverstate::handle_not_ready_request(player, lobby),
-            Message::ChallengePlayerRequest { username } => return serverstate::handle_challenge_player_request(username, player, lobby, games),  
+            Message::ChallengePlayerRequest { username } => return serverstate::handle_challenge_player_request(username, player, lobby, games),
             Message::SurrenderRequest => return serverstate::handle_surrender_request(player, lobby),
             Message::PlaceShipsRequest { placement } => return serverstate::handle_place_ships_request(placement, player, lobby),
             Message::ShootRequest { x, y } => return serverstate::handle_move_shoot_request((x, y), None, player, lobby),
@@ -167,8 +174,8 @@ fn main() {
     let mut message_store: HashMap<String, Vec<Message>> = HashMap::new();
     let mut games: Vec<Game> = vec![];
     // stores player name -> game
-    // let mut games: HashMap<String, &Game> = HashMap::new();
 
+    let tick = timer_periodic(TICK_DURATION_MS);
     // Main loop
     loop {
         // Receive new players from tcp_loop
@@ -205,7 +212,7 @@ fn main() {
             }
         }
         // Send all messages saved in message_store
-        for (i, player_handle) in player_handles.iter_mut().enumerate() {
+        for player_handle in player_handles.iter_mut() {
             if let Some(ref name) = player_handle.nickname {
                 if message_store.contains_key(name) {
                     for message in message_store.remove(name).unwrap() {
@@ -218,7 +225,9 @@ fn main() {
 
         // let exceeded_turn_games = games.iter().filter(|game| game.is_running() && game.turn_time_exceeded());
         // TODO call serverstate::... in order to handle afk state
-        
+
         games.retain(|game| !game.shutdown_time_exceeded());
+
+        tick.recv().expect("Timer thread died unexpectedly."); // wait for next tick
     }
 }
