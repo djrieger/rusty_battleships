@@ -56,7 +56,7 @@ pub fn terminate_player(player_handle: &PlayerHandle, lobby: &mut HashMap<String
     {
         let mut player = lobby.get_mut(&name).unwrap();
         if player.has_non_finished_game() {
-            return player.game.as_mut().unwrap().shutdown(name.clone(), false, Reason::Disconnected);
+            return player.game.as_mut().unwrap().shutdown(/*name.clone(),*/ false, Reason::Disconnected);
         }
     }
     lobby.remove(&name);
@@ -198,16 +198,21 @@ pub fn handle_report_error_request(errormessage: String, player: &mut PlayerHand
             let mut user = lobby.get_mut(username).expect("Invalid state, requesting player not in lobby");
             println!("Client {} reported the following error: {}", username, errormessage);
             // player in game with player2?
-            if let Some(ref game) = user.game {
-                let player2_name = Some(game.get_opponent_name(username));
+            if let Some(ref mut game) = user.game {
+                let player2_name;
+                {
+                    player2_name = game.get_opponent_name(username).clone();
+                }
                 let player_left_update = Message::PlayerLeftUpdate { nickname: (*username).clone() };
                 let game_over_update = Message::GameOverUpdate {
                     victorious: false,
                     reason: Reason::Disconnected,
                 };
-                termination_result.updates.insert( (*player2_name.unwrap()).clone(), vec![player_left_update, game_over_update]);
-                // remove game from games
-                // TODO terminate_game ??
+                let mut updates = vec![player_left_update];
+                if let Some(updatemsg) = game.shutdown(false, Reason::Disconnected) {
+                    updates.push(updatemsg);
+                }
+                termination_result.updates.insert( player2_name, updates);
             }
         } 
         if let Some(ref name) = player2_name {

@@ -59,7 +59,7 @@ impl Game {
     }
 
     // returns GameOverUpdate message to be sent to opponent
-    pub fn shutdown(&mut self, initiator_name: String, victorious: bool, reason: Reason) -> Option<Message> {
+    pub fn shutdown(&mut self /*, initiator_name: String, */, victorious: bool, reason: Reason) -> Option<Message> {
         // shut down already initiated? 
         if let GameState::ShuttingDown = self.state {
             return None;
