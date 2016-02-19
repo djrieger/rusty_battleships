@@ -6,7 +6,6 @@ use message::{Message, Reason};
 pub enum GameState {
     Placing,
     Running,
-    ShuttingDown
 }
 
 pub struct Game {
@@ -15,7 +14,6 @@ pub struct Game {
     pub player1: String,
     pub player2: String,
     last_turn_started_at: Option<time::PreciseTime>,
-    pub shutdown_started_at: Option<time::PreciseTime>,
     player1_active: bool,
     pub player1_afk_count: u8,
     pub player2_afk_count: u8,
@@ -25,6 +23,7 @@ pub struct Game {
 impl PartialEq for Game {
     fn eq(&self, Rhs: &Game) -> bool {
         // TODO implement!
+        // Still necessary?
         return true;
     }
 
@@ -42,7 +41,6 @@ impl Game {
             player1: player1,
             player2: player2,
             last_turn_started_at: None,
-            shutdown_started_at: None,
             player1_active: true,
             player1_afk_count: 0,
             player2_afk_count: 0,
@@ -60,13 +58,6 @@ impl Game {
 
     // returns GameOverUpdate message to be sent to opponent
     pub fn shutdown(&mut self /*, initiator_name: String, */, victorious: bool, reason: Reason) -> Option<Message> {
-        // shut down already initiated? 
-        if let GameState::ShuttingDown = self.state {
-            return None;
-        }
-        self.state = GameState::ShuttingDown;
-        self.shutdown_started_at = Some(time::PreciseTime::now());
-
         // inform opponent
         return Some(Message::GameOverUpdate { victorious: !victorious, reason: reason });
     }
@@ -91,19 +82,8 @@ impl Game {
         return Game::time_exceeded(self.last_turn_started_at, 60);
     }
 
-    pub fn shutdown_time_exceeded(&self) -> bool {
-        return Game::time_exceeded(self.last_turn_started_at, 1);
-    }
-
     pub fn is_running(&self) -> bool {
         if let GameState::Running = self.state {
-            return true;
-        }
-        false
-    }
-
-    pub fn is_shutting_down(&self) -> bool {
-        if let GameState::ShuttingDown = self.state {
             return true;
         }
         false

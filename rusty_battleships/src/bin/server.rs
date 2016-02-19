@@ -226,8 +226,6 @@ fn main() {
         // let exceeded_turn_games = games.iter().filter(|game| game.is_running() && game.turn_time_exceeded());
         // TODO call serverstate::... in order to handle afk state
 
-        games.retain(|game| !game.shutdown_time_exceeded());
-
         tick.recv().expect("Timer thread died unexpectedly."); // wait for next tick
     }
 }

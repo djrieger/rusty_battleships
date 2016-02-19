@@ -55,8 +55,8 @@ pub fn terminate_player(player_handle: &PlayerHandle, lobby: &mut HashMap<String
     let name = player_handle.nickname.as_ref().unwrap().clone(); 
     {
         let mut player = lobby.get_mut(&name).unwrap();
-        if player.has_non_finished_game() {
-            return player.game.as_mut().unwrap().shutdown(/*name.clone(),*/ false, Reason::Disconnected);
+        if player.game.is_some() {
+            return Some(Message::GameOverUpdate { victorious: true, reason: Reason::Disconnected });
         }
     }
     lobby.remove(&name);
@@ -91,7 +91,7 @@ pub fn handle_login_request(username: String, player: &mut PlayerHandle, lobby: 
 
 pub fn handle_ready_request(player: &mut PlayerHandle, lobby: &mut HashMap<String, Player>) -> Result {
     let (player, _) = get_player!(player, lobby);
-    if player.has_non_finished_game() {
+    if player.game.is_some() {
         return Result::respond(Message::InvalidRequestResponse, false);
     } else {
         player.state = PlayerState::Ready;
@@ -126,7 +126,7 @@ pub fn handle_challenge_player_request(challenged_player_name: String, player: &
 
     // Is there a player called challenged_player_name?
     if let Some(ref mut challenged_player) = lobby.get_mut(&challenged_player_name) {
-        if challenged_player.has_non_finished_game() {
+        if challenged_player.game.is_some() {
             // Challenged player is already in a game -> NotWaiting
             return not_waiting_result;
         }
@@ -205,13 +205,10 @@ pub fn handle_report_error_request(errormessage: String, player: &mut PlayerHand
                 }
                 let player_left_update = Message::PlayerLeftUpdate { nickname: (*username).clone() };
                 let game_over_update = Message::GameOverUpdate {
-                    victorious: false,
+                    victorious: true,
                     reason: Reason::Disconnected,
                 };
-                let mut updates = vec![player_left_update];
-                if let Some(updatemsg) = game.shutdown(false, Reason::Disconnected) {
-                    updates.push(updatemsg);
-                }
+                let mut updates = vec![player_left_update, game_over_update];
                 termination_result.updates.insert( player2_name, updates);
             }
         } 
