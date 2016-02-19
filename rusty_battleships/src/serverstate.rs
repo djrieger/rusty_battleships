@@ -161,20 +161,21 @@ pub fn handle_surrender_request(player: &mut PlayerHandle, lobby: &mut HashMap<S
     let opponent_name;
     {
         let requesting_player = lobby.get_mut(username).expect("Invalid state, requesting player not in lobby");
-        match requesting_player.state {
-            PlayerState::Playing =>  {
-                requesting_player.state = PlayerState::Available;
-            },
-            _ => return Result::respond(Message::InvalidRequestResponse, false),
+        if let Some(ref game) = requesting_player.game {
+            requesting_player.state = PlayerState::Available;
+            // TODO terminate_game for updating other player
+            return Result::respond(Message::OkResponse, false);
+        } else {
+            return Result::respond(Message::NotYourTurnResponse, false);
         }
 
-        assert!(requesting_player.game.is_some());
-
         opponent_name = (*requesting_player.game.as_ref().unwrap()).borrow().get_opponent_name(username).clone();
+        // TODO: move to terminate_game
         requesting_player.game = None;
     }
 
     let opponent = lobby.get_mut(&opponent_name).expect("Invalid state, opponent not in lobby");
+    // TODO: move to terminate_game
     opponent.game = None;
     // Send GameOver to player and opponent
     let updatemsg = Message::GameOverUpdate {
@@ -183,6 +184,7 @@ pub fn handle_surrender_request(player: &mut PlayerHandle, lobby: &mut HashMap<S
     };
     let updatemsg2 = updatemsg.clone();
     return Result::respond_and_update_single(updatemsg, hashmap![opponent_name => vec![updatemsg2]], false);
+
 }
 
 pub fn handle_report_error_request(errormessage: String, player: &mut PlayerHandle, lobby: &mut HashMap<String, Player>, games: &mut Vec<Rc<RefCell<Game>>>) -> Result {
