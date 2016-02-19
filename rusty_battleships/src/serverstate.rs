@@ -48,19 +48,19 @@ impl Result {
     }
 }
 
-pub fn terminate_player(player_handle: &PlayerHandle, lobby: &mut HashMap<String, Player>, games: &mut Vec<Game>) {
+pub fn terminate_player(player_handle: &PlayerHandle, lobby: &mut HashMap<String, Player>, games: &mut Vec<Game>) -> Option<Message> {
     if player_handle.nickname.is_none() || !lobby.contains_key(player_handle.nickname.as_ref().unwrap()) {
         panic!("Invalid state. User has no nickname or nickname not in lobby HashTable");
     }
     let name = player_handle.nickname.as_ref().unwrap().clone(); 
     {
         let mut player = lobby.get_mut(&name).unwrap();
-
         if player.has_non_finished_game() {
-            // player.game.as_ref().unwrap().shutdown(name.clone(), player_handle, games);
+            return player.game.as_mut().unwrap().shutdown(name.clone(), false, Reason::Disconnected);
         }
     }
     lobby.remove(&name);
+    return None;
 }
 
 // This is called after a game has shut down
