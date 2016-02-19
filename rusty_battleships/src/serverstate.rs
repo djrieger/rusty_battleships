@@ -219,15 +219,14 @@ pub fn handle_report_error_request(errormessage: String, player: &mut PlayerHand
 }
 
 pub fn handle_place_ships_request(placement: [ShipPlacement; 5], player_handle: &mut PlayerHandle, lobby: &mut HashMap<String, Player>) -> Result {
-    /* TODO: Return OkResponse after saving the placement. Nevertheless - for testing purposes - we should check it and return an INVALID_REQUEST.
-    */
-    // TODO Check that current state allows placing ships
     let player_name = player_handle.nickname.as_ref().unwrap();
     let player = lobby.get_mut(player_name).unwrap();
 
-    // player.state = PlayerState::Available;
-    // Make sure player has a game
     if let Some(ref mut game) = player.game {
+        if let GameState::Running = game.state {
+            return Result::respond(Message::InvalidRequestResponse, false);
+        }
+
         // Translate placement to ships vector
         let mut ships = vec![];
         for ship_placement in &placement {
