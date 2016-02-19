@@ -63,16 +63,6 @@ pub fn terminate_player(player_handle: &PlayerHandle, lobby: &mut HashMap<String
     return None;
 }
 
-// This is called after a game has shut down
-pub fn purge_game(game: &Game, games: &mut Vec<Game>) {
-    // Remove game from games
-    games
-        .iter()
-        .by_ref()
-        .position(|ref x| x == &game)
-        .map(|e| games.remove(e));
-}
-
 pub fn handle_get_features_request() -> Result {
     return Result::respond(Message::FeaturesResponse {
         features: vec!["Awesomeness".to_owned()]

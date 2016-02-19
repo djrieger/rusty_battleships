@@ -216,10 +216,9 @@ fn main() {
         }
         message_store.clear();
 
-        let exceeded_turn_games = games.iter().filter(|game| game.is_running() && game.turn_time_exceeded());
-        // TODO call serverstate::...?
-        let shutdown_finished_games = games.iter().filter(|game| game.is_shutting_down() && game.shutdown_time_exceeded());
-        // TODO call serverstate::purge_game
-        // TODO Handle afk state somehow
+        // let exceeded_turn_games = games.iter().filter(|game| game.is_running() && game.turn_time_exceeded());
+        // TODO call serverstate::... in order to handle afk state
+        
+        games.retain(|game| !game.shutdown_time_exceeded());
     }
 }
