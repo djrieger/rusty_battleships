@@ -215,21 +215,30 @@ fn main() {
                 }
             }
         }
-        // Send all messages saved in message_store
-        for player_handle in player_handles.iter_mut() {
-            if let Some(ref name) = player_handle.nickname {
-                if message_store.contains_key(name) {
-                    for message in message_store.remove(name).unwrap() {
-                        player_handle.to_child_endpoint.send(ToChildCommand::Message(message));
-                    }
-                }
-            }
-        }
-        message_store.clear();
+        // Send all updates from result
+        send_updates(&mut player_handles, &mut message_store);
 
-        // let exceeded_turn_games = games.iter().filter(|game| game.is_running() && game.turn_time_exceeded());
-        // TODO call serverstate::... in order to handle afk state
+        // Send updates issued by handle_afk() for all games with exceeded turn times
+        games
+            .iter()
+            .map(|game_ref| game_ref.borrow_mut() )
+            .filter(|game| game.turn_time_exceeded())
+            .map(|mut game| serverstate::handle_afk(&mut game))
+            .map(|mut result| send_updates(&mut player_handles, &mut result.updates));
 
         tick.recv().expect("Timer thread died unexpectedly."); // wait for next tick
     }
+}
+
+fn send_updates(player_handles: &mut Vec<board::PlayerHandle>, message_store: &mut HashMap<String, Vec<Message>>) {
+    for player_handle in player_handles.iter_mut() {
+        if let Some(ref name) = player_handle.nickname {
+            if message_store.contains_key(name) {
+                for message in message_store.remove(name).unwrap() {
+                    player_handle.to_child_endpoint.send(ToChildCommand::Message(message));
+                }
+            }
+        }
+    }
+    message_store.clear();
 }
