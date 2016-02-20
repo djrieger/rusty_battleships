@@ -104,6 +104,7 @@ impl Board {
         if x >= W || y >= H {
             return HitResult::Miss;
         }
+        self.state[x][y].visible = true;
         return match self.state[x][y].ship_index {
             // no ship
             None => HitResult::Miss,
