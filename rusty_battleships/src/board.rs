@@ -70,10 +70,16 @@ pub struct Ship {
     pub health_points: usize,
 }
 
+#[derive(Copy, Clone)]
+pub struct CellState {
+    visible: bool,
+    ship_index: Option<u8>,
+}
+
 // #[derive(Copy, Clone)]
 pub struct Board {
     pub ships: Vec<Ship>,
-    pub state: [[usize; H]; W],
+    pub state: [[CellState; H]; W],
 }
 
 pub enum HitResult {
@@ -85,23 +91,24 @@ pub enum HitResult {
 impl Board {
     pub fn new(ships: Vec<Ship>) -> Board {
         Board {
-            state: [[0; H]; W],
+            state: [[CellState { visible: false, ship_index: None }; H]; W],
             ships: ships,
         }
     }
 
     fn clear(&mut self) -> () {
-        self.state = [[0; H]; W];
+        self.state =  [[CellState { visible: false, ship_index: None }; H]; W];
     }
 
     pub fn hit(&mut self, x: usize, y: usize) -> HitResult {
         if x >= W || y >= H {
             return HitResult::Miss;
         }
-        return match self.state[x][y] {
-            0 => HitResult::Miss,
-            ship_index => {
-                let ref mut ship = self.ships[ship_index - 1];
+        return match self.state[x][y].ship_index {
+            // no ship
+            None => HitResult::Miss,
+            Some(ship_index) => {
+                let ref mut ship = self.ships[ship_index as usize - 1];
                 ship.health_points -= 1;
                 match ship.health_points {
                     0 => HitResult::Destroyed,
@@ -129,10 +136,10 @@ impl Board {
                 } else {
                     dest = (ship.x, ship.y + (i as isize));
                 }
-                if dest.0 < 0 || dest.1 < 0 || dest.0 >= (W as isize) - 1 || dest.1 >= (H as isize) - 1 || self.state[dest.0 as usize][dest.1 as usize] != 0 {
+                if dest.0 < 0 || dest.1 < 0 || dest.0 >= (W as isize) - 1 || dest.1 >= (H as isize) - 1 || self.state[dest.0 as usize][dest.1 as usize].ship_index.is_some() {
                     return false;
                 } else {
-                    self.state[dest.0 as usize][dest.1 as usize] = ship_index + 1;
+                    self.state[dest.0 as usize][dest.1 as usize].ship_index = Some((ship_index + 1) as u8);
                 }
             }
         }
