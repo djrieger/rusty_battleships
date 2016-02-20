@@ -119,6 +119,25 @@ impl Board {
         }
     }
 
+    pub fn get_visibility_updates(&self) -> Vec<Message> {
+        let mut visibility_updates = vec![];
+        for x in 0..W - 1 {
+            for y in 0..H - 1 {
+                let ref cell = self.state[x][y];
+                if cell.visible {
+                    let ship_index = cell.ship_index;
+                    // if there is a ship that is not dead -> send visible update
+                    if ship_index.is_some() && self.ships[ship_index.unwrap() as usize - 1].health_points > 0 {
+                        visibility_updates.push(Message::EnemyVisibleUpdate { x: x as u8, y: y as u8 });
+                    } else {
+                        visibility_updates.push(Message::EnemyInvisibleUpdate { x: x as u8, y: y as u8 });
+                    }
+                }
+            }
+        }
+        visibility_updates
+    }
+
     /**
      * Compute new board state.
      * @return true if board state is valid, false otherwise (if ships overlap or are outside board

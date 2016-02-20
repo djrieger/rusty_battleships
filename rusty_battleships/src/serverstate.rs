@@ -337,6 +337,11 @@ fn handle_shoot(game: &mut Game, player_name: &String, target_x: u8, target_y: u
         }
     }
 
+    let visibility_updates = hashmap![(*player_name).clone() => game.get_board(player_name).get_visibility_updates()];
+
+    // Return updates in order EnemyHit/MissUpdate, EnemyVisible/InvisibleUpdates,
+    // YourTurn/EnemyTurnUpdates
+    merge_updates(&mut updates, visibility_updates);
     merge_updates(&mut updates, game.switch_turns());
     return Result::respond_and_update_single(response_msg, updates, false);
 }
@@ -345,9 +350,6 @@ pub fn handle_move_shoot_request(target_coords: (u8, u8), ship_movement: Option<
     let player_name = player_handle.nickname.as_ref().unwrap();
     let player = lobby.get_mut(player_name).unwrap();
 
-    // TODO update state, update other player, game over, afk,
-
-    // Make sure player has a running game
     if let Some(ref game) = player.game {
         let mut game_ref = (*game).borrow_mut();
         if let GameState::Running = game_ref.state {
