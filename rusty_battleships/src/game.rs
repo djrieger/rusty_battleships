@@ -1,6 +1,6 @@
 extern crate time;
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use board::{Board};
 use message::{Message, Reason};
 
@@ -19,6 +19,12 @@ pub struct Game {
     pub player1_afk_count: u8,
     pub player2_afk_count: u8,
     pub state: GameState,
+}
+
+impl PartialEq for Game {
+    fn eq(&self, other: &Game) -> bool {
+        self.player1 == other.player1 && self.player2 == other.player2
+    }
 }
 
 impl Game {
@@ -55,7 +61,7 @@ impl Game {
     }
 
     pub fn get_active_player(&self) -> String {
-        return if self.player1_active { self.player1.clone() } else { self.player2.clone() }; 
+        return if self.player1_active { self.player1.clone() } else { self.player2.clone() };
     }
 
     pub fn switch_turns(&mut self) -> HashMap<String, Vec<Message>> {

@@ -112,15 +112,16 @@ fn handle_main(msg: Message, player: &mut board::PlayerHandle, lobby: &mut HashM
         // All other requests are only valid after logging in, i.e. with a user name
         assert!(lobby.contains_key(player.nickname.as_ref().unwrap()), "Invalid state: nickname not in lobby.");
 
+        let nickname = player.nickname.as_ref().unwrap();
+
         match msg {
-            Message::LoginRequest { username } => return serverstate::handle_login_request(username, player, lobby),
-            Message::ReadyRequest => return serverstate::handle_ready_request(player, lobby),
-            Message::NotReadyRequest => return serverstate::handle_not_ready_request(player, lobby),
-            Message::ChallengePlayerRequest { username } => return serverstate::handle_challenge_player_request(username, player, lobby, games),
-            Message::SurrenderRequest => return serverstate::handle_surrender_request(player, lobby),
-            Message::PlaceShipsRequest { placement } => return serverstate::handle_place_ships_request(placement, player, lobby),
-            Message::ShootRequest { x, y } => return serverstate::handle_move_shoot_request((x, y), None, player, lobby),
-            Message::MoveAndShootRequest { id, direction, x, y } => return serverstate::handle_move_shoot_request((x, y), Some((id as usize, direction)), player, lobby),
+            Message::ReadyRequest => return serverstate::handle_ready_request(nickname, lobby),
+            Message::NotReadyRequest => return serverstate::handle_not_ready_request(nickname, lobby),
+            Message::ChallengePlayerRequest { username } => return serverstate::handle_challenge_player_request(username, nickname, lobby, games),
+            Message::SurrenderRequest => return serverstate::handle_surrender_request(nickname, lobby, games),
+            Message::PlaceShipsRequest { placement } => return serverstate::handle_place_ships_request(placement, nickname, lobby),
+            Message::ShootRequest { x, y } => return serverstate::handle_move_shoot_request((x, y), None, nickname, lobby, games),
+            Message::MoveAndShootRequest { id, direction, x, y } => return serverstate::handle_move_shoot_request((x, y), Some((id as usize, direction)), nickname, lobby, games),
             _ => {},
         };
     }
@@ -209,7 +210,9 @@ fn main() {
                         }
                     },
                     ToMainThreadCommand::TerminatePlayer => {
-                        serverstate::terminate_player(player_handle, &mut lobby, &mut games);
+                        if let Some(ref name) = player_handle.nickname {
+                            message_store = serverstate::terminate_player(name, &mut lobby, &mut games);
+                        }
                         player_handle.to_child_endpoint.send(ToChildCommand::TerminateConnection);
                     }
                 }
@@ -219,12 +222,16 @@ fn main() {
         send_updates(&mut player_handles, &mut message_store);
 
         // Send updates issued by handle_afk() for all games with exceeded turn times
-        games
-            .iter()
-            .map(|game_ref| game_ref.borrow_mut() )
-            .filter(|game| game.turn_time_exceeded())
-            .map(|mut game| serverstate::handle_afk(&mut game))
-            .map(|mut result| send_updates(&mut player_handles, &mut result.updates));
+        let mut afk_games: Vec<Rc<RefCell<Game>>> = vec![];
+        for game in games.iter() {
+            if game.borrow_mut().turn_time_exceeded() {
+                afk_games.push(game.clone());
+            }
+        }
+        for game in afk_games {
+            let mut result = serverstate::handle_afk(game.clone(), &mut lobby, &mut games);
+            send_updates(&mut player_handles, &mut result);
+        }
 
         tick.recv().expect("Timer thread died unexpectedly."); // wait for next tick
     }
