@@ -231,6 +231,11 @@ fn main() {
 }
 
 fn send_updates(player_handles: &mut Vec<board::PlayerHandle>, message_store: &mut HashMap<String, Vec<Message>>) {
+    // player_handles
+    //     .iter_mut()
+    //     .filter(|player_handle| player_handle.nickname.is_some() )
+    //     .filter(|player_handle| message_store.contains_key(&player_handle.nickname.unwrap()))
+    //     .map(|player_handle| message_store.remove(&player_handle.nickname.unwrap()).unwrap().iter().map(|msg| player_handle.to_child_endpoint.send(ToChildCommand::Message(*msg)) ) );
     for player_handle in player_handles.iter_mut() {
         if let Some(ref name) = player_handle.nickname {
             if message_store.contains_key(name) {
