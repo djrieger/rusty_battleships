@@ -46,6 +46,17 @@ impl Result {
             terminate_connection: terminate_connection,
         }
     }
+
+    pub fn update(updates: HashMap<String, Vec<Message>>) -> Result {
+        return Result {
+            response: None,
+            updates: updates,
+            terminate_connection: false,
+        }
+    }
+    pub fn empty() -> Result {
+        return Result { response: None, updates: hashmap![], terminate_connection: false };
+    }
 }
 
 pub fn terminate_player(player_handle: &PlayerHandle, lobby: &mut HashMap<String, Player>, games: &mut Vec<Rc<RefCell<Game>>>) -> Option<Message> {
@@ -326,14 +337,7 @@ fn handle_shoot(game: &mut Game, player_name: &String, target_x: u8, target_y: u
         }
     }
 
-    let mut turn_updates = game.switch_turns();
-    for (receiver_name, update_vec) in turn_updates.drain() {
-        if !updates.contains_key(&receiver_name) {
-            updates.insert(receiver_name, update_vec);
-        } else {
-            updates.get_mut(&receiver_name).as_mut().unwrap().extend(update_vec);
-        }
-    }
+    merge_updates(&mut updates, game.switch_turns());
     return Result::respond_and_update_single(response_msg, updates, false);
 }
 
@@ -364,4 +368,31 @@ pub fn handle_move_shoot_request(target_coords: (u8, u8), ship_movement: Option<
     }
 
     return Result::respond(Message::InvalidRequestResponse, false);
+}
+
+pub fn handle_afk(game: &mut Game) -> Result {
+    let ref mut exceeded_count = if game.is_player1_active() { game.player1_afk_count } else { game.player2_afk_count };
+    if *exceeded_count >= 3 {
+        // TODO terminate_game(game, current player loses)
+        return Result { response: None, updates: hashmap![], terminate_connection: false };
+    } else {
+        *exceeded_count += 1;
+        let opponent_name = game.get_opponent_name(&game.get_active_player()).clone();
+        let mut afk_updates = hashmap![
+            game.get_active_player() => vec![Message::AfkWarningUpdate { strikes: 3 }], // TODO: constant 3 correct?
+            opponent_name => vec![Message::EnemyAfkUpdate { strikes: 3 }] // constant 3 correct?
+        ];
+        merge_updates(&mut afk_updates, game.switch_turns());
+        return Result::empty();
+    }
+}
+
+fn merge_updates(updates: &mut HashMap<String, Vec<Message>>, mut additional_updates: HashMap<String, Vec<Message>>) {
+    for (receiver_name, update_vec) in additional_updates.drain() {
+        if !updates.contains_key(&receiver_name) {
+            updates.insert(receiver_name, update_vec);
+        } else {
+            updates.get_mut(&receiver_name).as_mut().unwrap().extend(update_vec);
+        }
+    }
 }

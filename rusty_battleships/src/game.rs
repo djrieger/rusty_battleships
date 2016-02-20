@@ -21,19 +21,6 @@ pub struct Game {
     pub state: GameState,
 }
 
-impl PartialEq for Game {
-    fn eq(&self, Rhs: &Game) -> bool {
-        // TODO implement!
-        // Still necessary?
-        return true;
-    }
-
-    fn ne(&self, Rhs: &Game) -> bool {
-        // TODO implement!
-        return true;
-    }
-}
-
 impl Game {
     pub fn new(board1: Board, board2: Board, player1: String, player2: String) -> Game {
         Game {
@@ -67,6 +54,10 @@ impl Game {
         return if *self.player1 == *player_name { self.player1_active } else { !self.player1_active };
     }
 
+    pub fn get_active_player(&self) -> String {
+        return if self.player1_active { self.player1.clone() } else { self.player2.clone() }; 
+    }
+
     pub fn switch_turns(&mut self) -> HashMap<String, Vec<Message>> {
         self.player1_active = !self.player1_active;
         self.last_turn_started_at = Some(time::PreciseTime::now());
@@ -94,5 +85,9 @@ impl Game {
             return true;
         }
         false
+    }
+
+    pub fn is_player1_active(&self) -> bool {
+        self.player1_active
     }
 }
