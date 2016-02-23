@@ -192,7 +192,7 @@ fn main() {
             if let Ok(maybe_msg) = player_handle.from_child_endpoint.try_recv() {
                 match maybe_msg {
                     ToMainThreadCommand::Message(msg) => {
-                        print!("[Child {}] {:?}", i, msg);
+                        print!("From child {} ({}): {:?}", i, player_handle.nickname.clone().unwrap_or("".to_owned()), msg);
                         // Handle Message received from child
                         let result = handle_main(msg, player_handle, &mut &mut lobby, &mut games);
                         if let Some(response) = result.response {
@@ -247,6 +247,7 @@ fn send_updates(player_handles: &mut Vec<board::PlayerHandle>, message_store: &m
         if let Some(ref name) = player_handle.nickname {
             if message_store.contains_key(name) {
                 for message in message_store.remove(name).unwrap() {
+                    println!("Update to {}: {:?}", name, message);
                     player_handle.to_child_endpoint.send(ToChildCommand::Message(message));
                 }
             }
