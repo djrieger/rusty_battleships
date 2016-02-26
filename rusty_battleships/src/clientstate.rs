@@ -28,7 +28,6 @@ impl State {
         }
     }
 
-    /* Requests features. */
     pub fn get_features(&mut self) -> bool {
         send_message(Message::GetFeaturesRequest, &mut self.buff_writer);
         let server_response = deserialize_message(&mut self.buff_reader);
@@ -60,17 +59,37 @@ impl State {
         }
     }
 
+    /* Sends a challenge to the server, if and only if the opponent is in the ready-and-waiting-list */
     pub fn challenge(&mut self, opponent: &str) -> bool {
-        if self.lobby.player_list.contains(&String::from(opponent)) {
+        if self.lobby.player_name != opponent {
+        //if self.lobby.player_list.contains(&String::from(opponent)) {
             send_message(Message::ChallengePlayerRequest { username: String::from(opponent) }, &mut self.buff_writer);
             let server_response = deserialize_message(&mut self.buff_reader);
             if server_response.is_err() {
                 return false;
             } else {
-                return true;
+                match server_response.unwrap() {
+                    Message::OkResponse => {println!("FOUND {:?}!", opponent);return true},
+                    _ => return false,
+                };
             }
         } else {
             return false;
+        }
+    }
+
+    /* Main loop; does most of the work. Main-Function should hand over control to this function as
+    soon as a tcp connection has been established.*/
+    pub fn handle_communication(&mut self) {
+        loop {
+            let server_response = deserialize_message(&mut self.buff_reader);
+            if server_response.is_err() {
+                return;
+            }
+//            match server_response { //May contain traces of state transisions
+//                Message::OkResponse => println!("You're now playing with {:?}", opp);
+//            }
+            println!("{:?}", server_response.unwrap());
         }
     }
 }

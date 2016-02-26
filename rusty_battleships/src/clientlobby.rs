@@ -1,5 +1,6 @@
 #[derive(Clone, Debug)]
 pub struct ClientLobby {
+    //these are public for avoiding the need for getters and setters.
     pub player_name: String,
     pub player_list: Vec<String>,
     pub feature_list: Vec<String>,
@@ -15,17 +16,9 @@ impl ClientLobby {
         }
     }
 
-//    pub fn get_player_name(&self) -> &str {
-//        return &self.player_name;
-//    }
-
     pub fn set_player_name(&mut self, name: &str ) {
         self.player_name = String::from(name);
     }
-
-//    pub fn get_player_list(&self) -> Vec<String> {
-//        return self.player_list.clone();
-//    }
 
     pub fn set_player_list(&mut self, players: Vec<String>) {
         self.player_list = players;

@@ -57,32 +57,36 @@ fn main() {
     let mut state = State::new(buff_reader, buff_writer);
     println!("Current name is {:?}", state.lobby.player_name);
 
+    if state.get_features() {
+        println!("Supported features: {:?}", state.lobby.feature_list);
+    } else {
+        println!("No features.");
+    }
+
     println!("Hello! Please state your desired Username.");
     let mut stdin = std::io::stdin();
     let nickname = stdin.lock().lines().next().unwrap().unwrap();
 
     if state.login(&nickname) {
-        println!("Logged in with playername {:?}", nickname);
+        println!("Logged in with playername {:?}", state.lobby.player_name);
     } else {
         println!("oops");
     }
 
+    if state.ready() {
+        println!("Your are now ready to be challenged.");
+    } else {
+        println!("Not ready. Oops.");
+    }
 
-//    send_message(Message::GetFeaturesRequest, &mut buff_writer);
-//    send_message(Message::LoginRequest { username: nickname }, &mut buff_writer);
-//    send_message(Message::ReadyRequest, &mut buff_writer);
-//    stdin = std::io::stdin();
-//    let opponent = stdin.lock().lines().next().unwrap().unwrap();
-//    if !opponent.is_empty() {
-//        send_message(Message::ChallengePlayerRequest { username: opponent }, &mut buff_writer);
-//    }
+    let opp = &"test2";
 
-//    loop {
-//        let server_response = deserialize_message(&mut buff_reader);
-//        if server_response.is_err() {
-//            return;
-//        }
-//        println!("{:?}", server_response.unwrap());
-//        }
+    if state.challenge(opp) {
+        println!("You're now playing with {:?}", opp);
+    } else {
+        println!("Player not found: {:?}", opp);
+        state.handle_communication();
+    }
+
     println!("testend");
 }
