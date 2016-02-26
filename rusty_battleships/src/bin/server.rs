@@ -34,7 +34,7 @@ macro_rules! version_string {
 const TICK_DURATION_MS: u64 = 250;
 
 
-// Tell server to perform propert shutdown, like removing player from their game, informing
+// Tell server to perform proper shutdown, like removing player from their game, informing
 // opponent etc.
 fn shutdown_player(tx: &mpsc::SyncSender<ToMainThreadCommand>, rx: &mpsc::Receiver<ToChildCommand>) {
     tx.send(ToMainThreadCommand::TerminatePlayer).expect("Main thread died, exiting.");

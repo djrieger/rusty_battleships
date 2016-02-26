@@ -8,6 +8,7 @@ use argparse::{ArgumentParser, Print, Store};
 
 extern crate rusty_battleships;
 use rusty_battleships::message::{serialize_message, deserialize_message, Message};
+use rusty_battleships::clientstate::State;
 
 // http://stackoverflow.com/questions/35157399/how-to-concatenate-static-strings-in-rust/35159310
 macro_rules! description {
@@ -53,24 +54,35 @@ fn main() {
     let mut buff_writer = BufWriter::new(sender);
     let mut buff_reader = BufReader::new(receiver);
 
-    let mut stdin = std::io::stdin();
+    let mut state = State::new(buff_reader, buff_writer);
+    println!("Current name is {:?}", state.lobby.player_name);
 
-    send_message(Message::GetFeaturesRequest, &mut buff_writer);
+    println!("Hello! Please state your desired Username.");
+    let mut stdin = std::io::stdin();
     let nickname = stdin.lock().lines().next().unwrap().unwrap();
-    send_message(Message::LoginRequest { username: nickname }, &mut buff_writer);
-    send_message(Message::ReadyRequest, &mut buff_writer);
-    stdin = std::io::stdin();
-    let opponent = stdin.lock().lines().next().unwrap().unwrap();
-    if !opponent.is_empty() {
-        send_message(Message::ChallengePlayerRequest { username: opponent }, &mut buff_writer);
+
+    if state.login(&nickname) {
+        println!("Logged in with playername {:?}", nickname);
+    } else {
+        println!("oops");
     }
 
-    loop {
-        let server_response = deserialize_message(&mut buff_reader);
-        if server_response.is_err() {
-            return;
-        }
-        println!("{:?}", server_response.unwrap());
-        }
-    println!("test");
+
+//    send_message(Message::GetFeaturesRequest, &mut buff_writer);
+//    send_message(Message::LoginRequest { username: nickname }, &mut buff_writer);
+//    send_message(Message::ReadyRequest, &mut buff_writer);
+//    stdin = std::io::stdin();
+//    let opponent = stdin.lock().lines().next().unwrap().unwrap();
+//    if !opponent.is_empty() {
+//        send_message(Message::ChallengePlayerRequest { username: opponent }, &mut buff_writer);
+//    }
+
+//    loop {
+//        let server_response = deserialize_message(&mut buff_reader);
+//        if server_response.is_err() {
+//            return;
+//        }
+//        println!("{:?}", server_response.unwrap());
+//        }
+    println!("testend");
 }

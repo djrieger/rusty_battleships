@@ -11,17 +11,17 @@ fn send_message(msg: Message, stream: &mut BufWriter<TcpStream>) {
     stream.flush();
 }
 
-pub struct state {
-    lobby : ClientLobby,
+pub struct State {
+    pub lobby : ClientLobby,
     //game : ClientGame;  <--- LATER TODAY
     buff_reader : BufReader<TcpStream>,
     buff_writer : BufWriter<TcpStream>,
 }
 
-impl state {
+impl State {
 
-    pub fn new (buff_reader: BufReader<TcpStream>, buff_writer: BufWriter<TcpStream>) -> state {
-        state {
+    pub fn new (buff_reader: BufReader<TcpStream>, buff_writer: BufWriter<TcpStream>) -> State {
+        State {
             lobby : ClientLobby::new(),
             buff_reader : buff_reader,
             buff_writer : buff_writer,
@@ -61,7 +61,7 @@ impl state {
     }
 
     pub fn challenge(&mut self, opponent: &str) -> bool {
-        if self.lobby.get_player_list().contains(&String::from(opponent)) {
+        if self.lobby.player_list.contains(&String::from(opponent)) {
             send_message(Message::ChallengePlayerRequest { username: String::from(opponent) }, &mut self.buff_writer);
             let server_response = deserialize_message(&mut self.buff_reader);
             if server_response.is_err() {
