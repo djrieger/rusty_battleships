@@ -80,12 +80,22 @@ fn main() {
     }
 
     let opp = &"test2";
+    let mut playing = false;
 
     if state.challenge(opp) {
         println!("You're now playing with {:?}", opp);
+        playing = true;
     } else {
         println!("Player not found: {:?}", opp);
         state.handle_communication();
+    }
+
+    if playing {
+        if state.place_ships() {
+            println!("Ship placement succesful!");
+        } else {
+            println!("Ship placement failed!");
+        }
     }
 
     println!("testend");
