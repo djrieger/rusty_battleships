@@ -304,7 +304,7 @@ fn extract_features(mut reader: &mut BufReader<TcpStream>) -> Result<Vec<String>
 fn extract_placement(mut reader: &mut BufReader<TcpStream>) -> Result<[ShipPlacement; 5]> {
     let mut placement:[ShipPlacement; 5]
             = [ShipPlacement { x: 0, y: 0, direction: Direction::North }; 5];
-    for i in 0..4 {
+    for i in 0..5 {
         placement[i] = ShipPlacement {
             x: try!(extract_number(&mut reader)),
             y: try!(extract_number(&mut reader)),
