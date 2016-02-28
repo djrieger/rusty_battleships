@@ -2,6 +2,8 @@ use std::net::{Ipv4Addr, TcpStream};
 use std::io::{BufReader, BufWriter, Write};
 use std::io::{self,BufRead};
 use std::option::Option::None;
+use std::sync::mpsc;
+use std::thread;
 
 extern crate argparse;
 use argparse::{ArgumentParser, Print, Store};
@@ -43,12 +45,18 @@ fn main() {
         ap.parse_args_or_exit();
     }
 
-    println!("Operating as client on port {}.", port);
-	println!("Connecting to {}.", ip);
 
     //Connect to the specified address and port.
 	let mut sender = TcpStream::connect((ip, port)).unwrap();
 	sender.set_write_timeout(None);
+    println!("Operating as client on port {}.", port);
+    println!("Connecting to {}.", ip);
+
+    //Setup thread (infra-)structure
+//    let (tx_main, rx_tcp) = mpsc::channel(); //Channel Main -> TCP
+//    let (tx_tcp, rx_main) = mpsc::sync_channel(0); //Channel TCP -> Main
+
+//    let main_loop = move | | state.handle_communication();
 
     let receiver = sender.try_clone().unwrap();
     let mut buff_writer = BufWriter::new(sender);
@@ -63,40 +71,8 @@ fn main() {
         println!("No features.");
     }
 
-    println!("Hello! Please state your desired Username.");
-    let mut stdin = std::io::stdin();
-    let nickname = stdin.lock().lines().next().unwrap().unwrap();
+    state.handle_communication();
 
-    if state.login(&nickname) {
-        println!("Logged in with playername {:?}", state.lobby.player_name);
-    } else {
-        println!("oops");
-    }
-
-    if state.ready() {
-        println!("Your are now ready to be challenged.");
-    } else {
-        println!("Not ready. Oops.");
-    }
-
-    let opp = &"test2";
-    let mut playing = false;
-
-    if state.challenge(opp) {
-        println!("You're now playing with {:?}", opp);
-        playing = true;
-    } else {
-        println!("Player not found: {:?}", opp);
-        state.handle_communication();
-    }
-
-    if playing {
-        if state.place_ships() {
-            println!("Ship placement succesful!");
-        } else {
-            println!("Ship placement failed!");
-        }
-    }
 
     println!("testend");
 }

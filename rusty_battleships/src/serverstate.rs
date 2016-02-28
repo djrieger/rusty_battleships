@@ -312,7 +312,7 @@ pub fn handle_place_ships_request(placement: [ShipPlacement; 5], player_name: &S
         }
 
         // Check if new state is valid
-        if new_board_valid {
+        if !new_board_valid {
             return Result::respond(Message::InvalidRequestResponse, false);
         } else {
             let mut game_ref = (*game).borrow_mut();
