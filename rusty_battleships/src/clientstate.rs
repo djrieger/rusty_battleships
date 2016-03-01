@@ -35,8 +35,27 @@ pub struct State {
     game : Option<Game>,
     opponent : String,
     //game : ClientGame;  <--- LATER TODAY
+    status : Status,
     buff_reader : BufReader<TcpStream>,
     buff_writer : BufWriter<TcpStream>,
+}
+
+pub struct Status {
+    //LOBBY
+    Unregistered,
+    AwaitingFeatures,
+    Register,
+    Available,
+    AwaitReady,
+    AwaitGameStart,
+    Waiting,
+    WaitNotReady,
+    //GAME
+    PlacingShips,
+    OpponentPlacing,
+    Planning,
+    OpponentPlanning,
+    Available,
 }
 
 impl State {
@@ -46,6 +65,7 @@ impl State {
             lobby : ClientLobby::new(),
             game : None,
             opponent : String::from("None"),
+            status : Status::Unregistered,
             buff_reader : buff_reader,
             buff_writer : buff_writer,
         }
@@ -53,43 +73,67 @@ impl State {
 
     pub fn get_features(&mut self) -> bool {
         send_message(Message::GetFeaturesRequest, &mut self.buff_writer);
+        self.status = Status::AwaitingFeatures;
         let server_response = deserialize_message(&mut self.buff_reader);
         if server_response.is_err() {
             return false;
         } else if let Ok(Message::FeaturesResponse { features: fts }) = server_response {
             self.lobby.set_feature_list(fts);
+            self.status = Status::Unregistered;
             return true;
         } else {
             println!("Something went wrong with receiving the feature list: MSG={:?}", server_response);
+            self.status = Status::Unregistered;
             return false;
         }
     }
 
+    //FIXME: Change return value to Result<(),String)>
     pub fn login(&mut self, nickname: &str) -> bool {
+        if self.status != Status::Register {
+            return false;
+        }
         send_message(Message::LoginRequest { username: String::from(nickname) }, &mut self.buff_writer);
+        self.status = Status::Register;
         let server_response = deserialize_message(&mut self.buff_reader);
         if server_response.is_err() {
+            self.status = Status::Unregistered;
             return false;
         } else {
-            self.lobby.set_player_name(nickname);
-            return true;
+            match server_response.unwrap() {
+                Message::OkResponse => {
+                    self.lobby.set_player_name(nickname);
+                    self.status = Status::Available;
+                    return true;
+                }
+            }
         }
     }
 
+    //FIXME: Change return value to Result<(),String)>
     pub fn ready(&mut self) -> bool {
+        if self.status != Status::Available {
+            return false;
+        }
         send_message(Message::ReadyRequest, &mut self.buff_writer);
+        self.status = Status:AwaitReady;
         let server_response = deserialize_message(&mut self.buff_reader);
         if server_response.is_err() {
             return false;
         } else {
+            self.status = Status::Waiting;
             return true;
         }
     }
 
     /* Sends a challenge to the server, if and only if the opponent is in the ready-and-waiting-list */
+    //FIXME: Change return value to Result<(),String)>
     pub fn challenge(&mut self, opponent: &str) -> bool {
+        if self.status != Status::Available {
+            return false;
+        }
         if self.lobby.player_name != opponent {
-        //if self.lobby.player_list.contains(&String::from(opponent)) {
+        //if self.lobby.player_list.contains(&String::from(opponent)) { //FIXME: Lobby updates and related stuff!
             send_message(Message::ChallengePlayerRequest { username: String::from(opponent) }, &mut self.buff_writer);
             let server_response = deserialize_message(&mut self.buff_reader);
             if server_response.is_err() {
@@ -98,6 +142,7 @@ impl State {
                 match server_response.unwrap() {
                     Message::OkResponse => {
                         println!("FOUND {:?}!", opponent);
+                        self.status = Status::PlacingShips;
                         return true;
                     },
                     _ => return false,
@@ -108,7 +153,11 @@ impl State {
         }
     }
 
+    //FIXME: Change return value to Result<(),String)>
     pub fn place_ships(&mut self) -> bool {
+        if status != PlacingShips {
+            return false;
+        }
         //Dummy Values
         //TODO:Ask user!
         let ship_placements0 = ShipPlacement { x: 0, y: 0, direction: Direction::East};
@@ -120,7 +169,6 @@ impl State {
         println!("{:?}", ship_placements);
         println!("REQUEST {:?}", Message::PlaceShipsRequest { placement: ship_placements });
 
-
         send_message(Message::PlaceShipsRequest { placement: ship_placements }, &mut self.buff_writer);
         let server_response =  deserialize_message(&mut self.buff_reader);
         if server_response.is_err() {
@@ -128,6 +176,7 @@ impl State {
         } else {
             match server_response.unwrap() {
                 Message::OkResponse => {
+                    self.status = Status::OpponentPlacing;
                     let mut ships = Vec::<Ship>::new();
                     ships.push(Ship {x: 0, y: 0, length: 5, horizontal: true, health_points: 5});
                     ships.push(Ship {x: 0, y: 1, length: 4, horizontal: true, health_points: 4});
@@ -166,7 +215,11 @@ impl State {
         }
     }
 
+    //FIXME: Change return value to Result<(),String)>
     pub fn shoot(&mut self, x: usize, y: usize) -> Result<bool, String> {
+        if self.status != Status::Playing {
+            return (false, "Not your turn!");
+        }
         if x >= W || y >= H {
             return Err(format!("Out of bounds! x={:?} y={:?}", x, y));
         }
@@ -183,7 +236,11 @@ impl State {
         }
     }
 
+    //FIXME: Change return value to Result<(),String)>
     pub fn move_and_shoot(&mut self, ship: usize, dir: Direction, x: usize, y: usize) -> Result<bool, String> {
+        if self.status != Status::Playing {
+            return (false, "Not your turn!");
+        }
         if 0 > ship || 4 < ship { //Destroyed ships shall also be unable to move!
             return Err(format!("Ship id out of bounds! id={:?}", ship));
         }
