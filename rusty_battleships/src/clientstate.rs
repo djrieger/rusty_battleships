@@ -3,6 +3,7 @@ use std::net::{TcpStream};
 use std::sync::mpsc::{self, Sender};
 use std::thread;
 use std::time::Duration;
+use std::sync::mpsc::TryRecvError;
 
 //extern crate argparse;
 //use argparse::{ArgumentParser, Print, Store};
@@ -10,8 +11,7 @@ use std::time::Duration;
 use message::{serialize_message, deserialize_message, Message, ShipPlacement, Direction};
 use clientlobby::ClientLobby;
 use game::Game;
-use board::Board;
-use board::Ship;
+use board::{Board, Ship, W, H};
 
 fn send_message(msg: Message, stream: &mut BufWriter<TcpStream>) {
     let serialized_msg = serialize_message(msg);
@@ -56,8 +56,12 @@ impl State {
         let server_response = deserialize_message(&mut self.buff_reader);
         if server_response.is_err() {
             return false;
-        } else {
+        } else if let Ok(Message::FeaturesResponse { features: fts }) = server_response {
+            self.lobby.set_feature_list(fts);
             return true;
+        } else {
+            println!("Something went wrong with receiving the feature list: MSG={:?}", server_response);
+            return false;
         }
     }
 
@@ -162,7 +166,42 @@ impl State {
         }
     }
 
+    pub fn shoot(&mut self, x: usize, y: usize) -> Result<bool, String> {
+        if x >= W || y >= H {
+            return Err(format!("Out of bounds! x={:?} y={:?}", x, y));
+        }
+        let msg = Message::ShootRequest {x: x as u8, y: y as u8};
+        send_message(msg, &mut self.buff_writer);
+        let server_response = deserialize_message(&mut self.buff_reader);
+        if server_response.is_err() {
+            return Err(String::from("Does not compute."));
+        } else {
+            match server_response.unwrap() {
+                Message::OkResponse => return Ok(true),
+                x => return Err(format!("Does not compute! MSG={:?}", x)),
+            }
+        }
+    }
 
+    pub fn move_and_shoot(&mut self, ship: usize, dir: Direction, x: usize, y: usize) -> Result<bool, String> {
+        if 0 > ship || 4 < ship { //Destroyed ships shall also be unable to move!
+            return Err(format!("Ship id out of bounds! id={:?}", ship));
+        }
+        if x >= W || y >= H {
+            return Err(format!("Shot location out of bounds! x={:?} y={:?}", x, y));
+        }
+        let msg = Message::MoveAndShootRequest { id: ship as u8, direction: dir, x: x as u8, y: y as u8 };
+        send_message(msg, &mut self.buff_writer);
+        let server_response = deserialize_message(&mut self.buff_reader);
+        if server_response.is_err() {
+            return Err(String::from("Does not compute."));
+        } else {
+            match server_response.unwrap() {
+                Message::OkResponse => return Ok(true),
+                x => return Err(format!("Does not compute! MSG={:?}", x)),
+            }
+        }
+    }
 
     /* Main loop; does most of the work. Main-Function should hand over control to this function as
     soon as a tcp connection has been established.*/
@@ -208,14 +247,18 @@ impl State {
             thread::spawn(move || tcp_poll(&mut one_time_reader, tx));
             loop {
                 println!("Checking for an incoming challenge.");
-                if let Ok(server_response) = rx.try_recv() {
-                    println!("Oh, a message for me!");
+                let received = rx.try_recv();
+                if let Ok(server_response) = received {
+                    println!("Oh, a message for me! MSG={:?}", server_response.clone());
                     match server_response { //May contain traces of state transisions
+                        Message::GameStartUpdate {nickname: nn} => println!("You have been challenged by captain {}", nn),
                         _ => println!("Message received: {:?}", server_response),
                     }
-                    println!("{:?}", server_response);
-                } else {
+                } else if received == Err(TryRecvError::Empty) {
+                    println!("Nothing there =(");
                     thread::sleep(Duration::new(1, 0));
+                } else {
+                    panic!(format!("Received some minor BS: MSG={:?}",received));
                 }
             }
 
