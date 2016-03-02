@@ -41,6 +41,12 @@ fn shutdown_player(tx: &mpsc::SyncSender<ToMainThreadCommand>, rx: &mpsc::Receiv
     rx.recv().expect("Main thread died before answering, exiting.");
 }
 
+fn respond(response_msg: Message, buff_writer: &mut BufWriter<TcpStream>) {
+    let serialized_msg = serialize_message(response_msg);
+    buff_writer.write(&serialized_msg[..]).expect("Could not write to TCP steam, exiting.");
+    buff_writer.flush().expect("Could not write to TCP steam, exiting.");
+}
+
 fn handle_client(stream: TcpStream, tx: mpsc::SyncSender<ToMainThreadCommand>, rx: mpsc::Receiver<ToChildCommand>) {
     println!("New incoming TCP stream");
 
@@ -48,51 +54,56 @@ fn handle_client(stream: TcpStream, tx: mpsc::SyncSender<ToMainThreadCommand>, r
     let mut buff_reader = BufReader::new(stream);
     let mut buff_writer = BufWriter::new(response_stream);
     let tick = timer_periodic(TICK_DURATION_MS);
-    loop {
-        let request = deserialize_message(&mut buff_reader);
-        let response_msg;
-        match request {
-            Ok(request_msg) => {
-                // Send parsed Message to main thread
-                tx.send(ToMainThreadCommand::Message(request_msg)).expect("Main thread died, exiting.");
-                // Wait for response Message
-                let maybe_response = rx.try_recv(); //.expect("Main thread died before answering, exiting.");
-                if let Ok(response) = maybe_response {
-                    match response {
-                        ToChildCommand::Message(msg) => {
-                            println!("Child from main: {:?}", msg);
-                            response_msg = msg;
-                            if response_msg == Message::InvalidRequestResponse {
-                                shutdown_player(&tx, &rx);
-                            }
-                        },
-                        ToChildCommand::TerminateConnection => return,
-                    }
-                } else {
-                    continue;
-                }
-            },
-            // Normal connection termination
-            Err(ref e) if e.kind() == std::io::ErrorKind::UnexpectedEof => {
-                shutdown_player(&tx, &rx);
-                println!("Client terminated connection");
-                // Client terminated TCP connection, exit
+    let (tx_client_msg, rx_client_msg) = mpsc::channel();
+
+    // launch thread receiving messages from child TCP endpoint
+    thread::spawn(move || {
+        loop {
+            let request = deserialize_message(&mut buff_reader);
+            let is_error = request.is_err();
+            tx_client_msg.send(request);
+            if is_error {
                 return;
-            },
-            // Malformed message received
-            Err(_) => {
-                shutdown_player(&tx, &rx);
-                println!("Received malformed message, terminating client");
-                response_msg = Message::InvalidRequestResponse;
             }
         }
-        // Serialize, send response and flush
-        let clone_response = response_msg.clone();
-        let serialized_msg = serialize_message(response_msg);
-        buff_writer.write(&serialized_msg[..]).expect("Could not write to TCP steam, exiting.");
-        buff_writer.flush().expect("Could not write to TCP steam, exiting.");
-        if clone_response == Message::InvalidRequestResponse {
-            return;
+    });
+
+    loop {
+        // Do we have any deserialized message from this child?
+        if let Ok(request) = rx_client_msg.try_recv() {
+            match request {
+                Ok(request_msg) => {
+                    // Send parsed Message to main thread
+                    tx.send(ToMainThreadCommand::Message(request_msg)).expect("Main thread died, exiting.");
+                },
+                // Normal connection termination
+                Err(ref e) if e.kind() == std::io::ErrorKind::UnexpectedEof => {
+                    shutdown_player(&tx, &rx);
+                    println!("Client terminated connection");
+                    return;
+                },
+                Err(_) => {
+                    shutdown_player(&tx, &rx);
+                    println!("Received malformed message, terminating client");
+                    respond(Message::InvalidRequestResponse, &mut buff_writer);
+                    return;
+                }
+            }
+        }
+
+        // Check for response from main thread
+        if let Ok(response) = rx.try_recv() {
+            match response {
+                ToChildCommand::TerminateConnection => return,
+                ToChildCommand::Message(Message::InvalidRequestResponse) => {
+                    shutdown_player(&tx, &rx);
+                    respond(Message::InvalidRequestResponse, &mut buff_writer);
+                    return;
+                },
+                ToChildCommand::Message(response_msg) => {
+                    respond(response_msg, &mut buff_writer);
+                },
+            }
         }
 
         tick.recv().expect("Timer thread died unexpectedly."); // wait for next tick
