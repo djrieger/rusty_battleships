@@ -56,15 +56,20 @@ fn handle_client(stream: TcpStream, tx: mpsc::SyncSender<ToMainThreadCommand>, r
                 // Send parsed Message to main thread
                 tx.send(ToMainThreadCommand::Message(request_msg)).expect("Main thread died, exiting.");
                 // Wait for response Message
-                let response = rx.recv().expect("Main thread died before answering, exiting.");
-                match response {
-                    ToChildCommand::Message(msg) => {
-                        response_msg = msg;
-                        if response_msg == Message::InvalidRequestResponse {
-                            shutdown_player(&tx, &rx);
-                        }
-                    },
-                    ToChildCommand::TerminateConnection => return,
+                let maybe_response = rx.try_recv(); //.expect("Main thread died before answering, exiting.");
+                if let Ok(response) = maybe_response {
+                    match response {
+                        ToChildCommand::Message(msg) => {
+                            println!("Child from main: {:?}", msg);
+                            response_msg = msg;
+                            if response_msg == Message::InvalidRequestResponse {
+                                shutdown_player(&tx, &rx);
+                            }
+                        },
+                        ToChildCommand::TerminateConnection => return,
+                    }
+                } else {
+                    continue;
                 }
             },
             // Normal connection termination
