@@ -27,7 +27,7 @@ macro_rules! version_string {            // Like this (with a literal instead of
 
 static WINDOW: &'static str = include_str!("assets/main_window.qml");
 
-#[derive(Copy, Clone)]
+#[derive(Debug, Copy, Clone)]
 enum State {
     Unregistered,
     AwaitFeatures,
@@ -58,16 +58,18 @@ impl Bridge {
         self.sender.send(Message::LoginRequest { username: username });
     }
 
-    fn poll_state(&mut self) -> &str {
+    fn poll_state(&mut self) -> String {
         if let Ok(msg) = self.receiver.try_recv() {
             self.state = msg;
         }
-        return match self.state {
-            State::Unregistered => "unregistered",
-            State::NameTaken => "nametaken",
-            State::Registered => "registered",
-            // _ => "",
-        };
+        // return match self.state {
+        //     State::Unregistered => "unregistered",
+        //     State::NameTaken => "nametaken",
+        //     State::Registered => "registered",
+        //     _ => "",
+        // };
+        let foo = format!("{:?}", self.state);
+        return foo;
     }
 }
 
