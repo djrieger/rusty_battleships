@@ -76,18 +76,16 @@ fn handle_client(stream: TcpStream, tx: mpsc::SyncSender<ToMainThreadCommand>, r
                     // Send parsed Message to main thread
                     tx.send(ToMainThreadCommand::Message(request_msg)).expect("Main thread died, exiting.");
                 },
-                // Normal connection termination
-                Err(ref e) if e.kind() == std::io::ErrorKind::UnexpectedEof => {
+                Err(ref e) => {
                     shutdown_player(&tx, &rx);
-                    println!("Client terminated connection");
+                    if e.kind() == std::io::ErrorKind::UnexpectedEof {
+                        println!("Client terminated connection");
+                    } else {
+                        println!("Received malformed message, terminating client");
+                        respond(Message::InvalidRequestResponse, &mut buff_writer);
+                    }
                     return;
                 },
-                Err(_) => {
-                    shutdown_player(&tx, &rx);
-                    println!("Received malformed message, terminating client");
-                    respond(Message::InvalidRequestResponse, &mut buff_writer);
-                    return;
-                }
             }
         }
 
