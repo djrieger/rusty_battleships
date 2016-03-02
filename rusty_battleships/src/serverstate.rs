@@ -152,7 +152,6 @@ pub fn handle_login_request(username: String, player: &mut PlayerHandle, lobby: 
     } else {
         let mut result = Result::respond(Message::OkResponse, false);
 
-        result.add_update_all(lobby, Message::PlayerJoinedUpdate { nickname: username.clone() });
 
         // Update lobby hashtable
         lobby.insert(username.clone(), Player {
@@ -161,6 +160,8 @@ pub fn handle_login_request(username: String, player: &mut PlayerHandle, lobby: 
         });
         // Update player struct
         player.nickname = Some(username.clone());
+
+        result.add_update_all(lobby, Message::PlayerJoinedUpdate { nickname: username.clone() });
 
         return result;
     }
