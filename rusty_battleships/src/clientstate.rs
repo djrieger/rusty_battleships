@@ -40,7 +40,8 @@ pub struct State {
     buff_writer : BufWriter<TcpStream>,
 }
 
-pub struct Status {
+#[derive(Debug, Hash, Eq, PartialEq, Clone)]
+pub enum Status {
     //LOBBY
     Unregistered,
     AwaitingFeatures,
@@ -55,7 +56,6 @@ pub struct Status {
     OpponentPlacing,
     Planning,
     OpponentPlanning,
-    Available,
 }
 
 impl State {
@@ -90,13 +90,14 @@ impl State {
 
     //FIXME: Change return value to Result<(),String)>
     pub fn login(&mut self, nickname: &str) -> bool {
-        if self.status != Status::Register {
+        if self.status != Status::Unregistered {
             return false;
         }
         send_message(Message::LoginRequest { username: String::from(nickname) }, &mut self.buff_writer);
         self.status = Status::Register;
         let server_response = deserialize_message(&mut self.buff_reader);
         if server_response.is_err() {
+            println!("Erroneous Login Response!");
             self.status = Status::Unregistered;
             return false;
         } else {
@@ -105,7 +106,13 @@ impl State {
                     self.lobby.set_player_name(nickname);
                     self.status = Status::Available;
                     return true;
-                }
+                },
+                Message::NameTakenResponse {nickname: _} => {
+                    println!("Name taken");
+                    self.status = Status::Unregistered;
+                    return false;
+                },
+                _ => panic!("This should not have happened! Illegal Login Resonse."),
             }
         }
     }
@@ -116,7 +123,7 @@ impl State {
             return false;
         }
         send_message(Message::ReadyRequest, &mut self.buff_writer);
-        self.status = Status:AwaitReady;
+        self.status = Status::AwaitReady;
         let server_response = deserialize_message(&mut self.buff_reader);
         if server_response.is_err() {
             return false;
@@ -133,10 +140,11 @@ impl State {
             return false;
         }
         if self.lobby.player_name != opponent {
-        //if self.lobby.player_list.contains(&String::from(opponent)) { //FIXME: Lobby updates and related stuff!
+            //if self.lobby.player_list.contains(&String::from(opponent)) { //FIXME: Lobby updates and related stuff!
             send_message(Message::ChallengePlayerRequest { username: String::from(opponent) }, &mut self.buff_writer);
             let server_response = deserialize_message(&mut self.buff_reader);
             if server_response.is_err() {
+                println!("Response is error");
                 return false;
             } else {
                 match server_response.unwrap() {
@@ -155,7 +163,7 @@ impl State {
 
     //FIXME: Change return value to Result<(),String)>
     pub fn place_ships(&mut self) -> bool {
-        if status != PlacingShips {
+        if self.status != Status::PlacingShips {
             return false;
         }
         //Dummy Values
@@ -217,8 +225,8 @@ impl State {
 
     //FIXME: Change return value to Result<(),String)>
     pub fn shoot(&mut self, x: usize, y: usize) -> Result<bool, String> {
-        if self.status != Status::Playing {
-            return (false, "Not your turn!");
+        if self.status != Status::Planning {
+            return Err(String::from("Not your turn!"));
         }
         if x >= W || y >= H {
             return Err(format!("Out of bounds! x={:?} y={:?}", x, y));
@@ -238,8 +246,8 @@ impl State {
 
     //FIXME: Change return value to Result<(),String)>
     pub fn move_and_shoot(&mut self, ship: usize, dir: Direction, x: usize, y: usize) -> Result<bool, String> {
-        if self.status != Status::Playing {
-            return (false, "Not your turn!");
+        if self.status != Status::Planning {
+            return Err(String::from("Not your turn!"));
         }
         if 0 > ship || 4 < ship { //Destroyed ships shall also be unable to move!
             return Err(format!("Ship id out of bounds! id={:?}", ship));
@@ -273,12 +281,6 @@ impl State {
             println!("oops");
         }
 
-        if self.ready() {
-            println!("Your are now ready to be challenged.");
-        } else {
-            println!("Not ready. Oops.");
-        }
-
         let opp = &"test2";
         let mut playing = false;
         let mut challenge_failed = false;
@@ -290,6 +292,14 @@ impl State {
             challenge_failed = true;
             println!("Player not found: {:?}", opp);
             //state.handle_communication();
+        }
+
+        if challenge_failed {
+            if self.ready() {
+                println!("Your are now ready to be challenged.");
+            } else {
+                println!("Not ready. Oops.");
+            }
         }
 
         if playing {

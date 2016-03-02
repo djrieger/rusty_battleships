@@ -209,7 +209,7 @@ pub fn handle_challenge_player_request(challenged_player_name: String, challenge
             // Challenged player is already in a game -> NotWaiting
             return not_waiting_result;
         }
-        if PlayerState::Ready == challenged_player.state  {
+        if let PlayerState::Ready = challenged_player.state  {
             // Challenged player is not in a game and Ready
             challenged_player.state = PlayerState::Playing;
             launch_game = true;
