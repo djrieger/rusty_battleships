@@ -1,6 +1,6 @@
-use std::io::{self, BufReader, BufWriter, Write, Read, stdin, BufRead};
+use std::io::{BufReader, BufWriter, Write, Read, stdin, BufRead};
 use std::net::{TcpStream};
-use std::sync::mpsc::{self, Sender};
+use std::sync::mpsc::{self, Sender, Receiver};
 use std::thread;
 use std::time::Duration;
 use std::sync::mpsc::TryRecvError;
@@ -50,7 +50,7 @@ pub enum Status {
     AwaitReady,
     AwaitGameStart,
     Waiting,
-    WaitNotReady,
+    AwaitNotReady,
     //GAME
     PlacingShips,
     OpponentPlacing,
@@ -78,11 +78,15 @@ impl State {
         if server_response.is_err() {
             return false;
         } else if let Ok(Message::FeaturesResponse { features: fts }) = server_response {
-            self.lobby.set_feature_list(fts);
-            self.status = Status::Unregistered;
-            return true;
+            if let Ok(()) = self.handle_get_features_response(fts) {
+                return true;
+            } else {
+                println!("Something went wrong with receiving the feature list.");
+                self.status = Status::Unregistered;
+                return false;
+            }
         } else {
-            println!("Something went wrong with receiving the feature list: MSG={:?}", server_response);
+            println!("That is no FeaturesResponse! MSG={:?}", server_response);
             self.status = Status::Unregistered;
             return false;
         }
@@ -128,8 +132,13 @@ impl State {
         if server_response.is_err() {
             return false;
         } else {
-            self.status = Status::Waiting;
-            return true;
+            match server_response {
+                Ok(Message::OkResponse) => {
+                    self.status = Status::Waiting;
+                    return true;
+                },
+                x => panic!(format!("SHOULD NOT HAPPEN! RECEIVED A {:?}", x)),
+            }
         }
     }
 
@@ -137,6 +146,7 @@ impl State {
     //FIXME: Change return value to Result<(),String)>
     pub fn challenge(&mut self, opponent: &str) -> bool {
         if self.status != Status::Available {
+            println!("You can't challenge anyone unless you're in state AVAILABLE! STATE={:?}", self.status.clone());
             return false;
         }
         if self.lobby.player_name != opponent {
@@ -153,7 +163,10 @@ impl State {
                         self.status = Status::PlacingShips;
                         return true;
                     },
-                    _ => return false,
+                    x => {
+                        println!("Illegal response to challenge request! Got a {:?}", x);
+                        return false;
+                    },
                 };
             }
         } else {
@@ -175,7 +188,6 @@ impl State {
         let ship_placements4 = ShipPlacement { x: 0, y: 4, direction: Direction::East};
         let ship_placements : [ShipPlacement; 5] = [ship_placements0, ship_placements1, ship_placements2, ship_placements3, ship_placements4];
         println!("{:?}", ship_placements);
-        println!("REQUEST {:?}", Message::PlaceShipsRequest { placement: ship_placements });
 
         send_message(Message::PlaceShipsRequest { placement: ship_placements }, &mut self.buff_writer);
         let server_response =  deserialize_message(&mut self.buff_reader);
@@ -249,7 +261,7 @@ impl State {
         if self.status != Status::Planning {
             return Err(String::from("Not your turn!"));
         }
-        if 0 > ship || 4 < ship { //Destroyed ships shall also be unable to move!
+        if 4 < ship { //Destroyed ships shall also be unable to move! Note that ship is unsigned! => no 0 > ship condition necessary!
             return Err(format!("Ship id out of bounds! id={:?}", ship));
         }
         if x >= W || y >= H {
@@ -268,12 +280,63 @@ impl State {
         }
     }
 
+    pub fn handle_get_features_response(&mut self, features: Vec<String>) -> Result<(), String> {
+        if self.status == Status::AwaitingFeatures {
+            self.lobby.set_feature_list(features);
+            self.status = Status::Unregistered;
+            return Ok(());
+        } else {
+            return Err(format!("ERROR: I did not expect a feature response! STATUS={:?}", self.status));
+        }
+    }
+
+    pub fn handle_game_start_update(&mut self, nickname: String) -> Result<(), String> {
+        if self.status == Status::Waiting {
+            self.status = Status::PlacingShips;
+            //Place the ships!
+            self.place_ships();
+            return Ok(());
+        } else {
+            return Err(format!("ERROR: I did not expect a GameStartUpdate! STATUS={:?}", self.status));
+        }
+    }
+
+    /* Program flow guideline: Set your values when you're sending the Requests and hand over to
+     * the usual message loop. If everythin goes the way it's meant to go, all's fine. If not, then
+     * we'll panic anyway. */
+    pub fn handle_ok_response(&mut self, msg: Message) -> Result<(), String> {
+        match self.status {
+            Status::Register => {
+                self.status = Status::Available;
+                return Ok(()); },
+            Status::AwaitGameStart => {
+                self.status = Status::PlacingShips;
+                return Ok(()); },
+            Status::AwaitReady => {
+                self.status = Status::Waiting;
+                return Ok(()); },
+            Status::AwaitNotReady => {
+                self.status = Status::Available;
+                return Ok(()); },
+            Status::PlacingShips => {
+                self.status = Status::OpponentPlacing;
+                return Ok(()); },
+            _ => return Err(format!("Wrong message! STATUS={:?}, MESSAGE={:?}", self.status, msg)),
+        }
+    }
+
     /* Main loop; does most of the work. Main-Function should hand over control to this function as
     soon as a tcp connection has been established.*/
     pub fn handle_communication(&mut self/*, br: BufReader<TcpStream>, bw: BufWriter<TcpStream>*/) {
         println!("Hello! Please state your desired Username.");
-        let mut stdin = stdin();
+        let stdin = stdin();
         let nickname = stdin.lock().lines().next().unwrap().unwrap();
+
+        if self.get_features() {
+            println!("Supported features: {:?}", self.lobby.feature_list);
+        } else {
+            println!("No features.");
+        }
 
         if self.login(&nickname) {
             println!("Logged in with playername {:?}", self.lobby.player_name);
@@ -308,25 +371,48 @@ impl State {
             } else {
                 println!("Ship placement failed!");
             }
+            loop{}
         } else if challenge_failed {
             let (tx, rx) = mpsc::channel();
             let mut one_time_reader = BufReader::<TcpStream>::new(self.buff_reader.get_ref().try_clone().unwrap());
             thread::spawn(move || tcp_poll(&mut one_time_reader, tx));
+
+            /*check-for-messages-loop*/
             loop {
                 println!("Checking for an incoming challenge.");
                 let received = rx.try_recv();
                 if let Ok(server_response) = received {
                     println!("Oh, a message for me! MSG={:?}", server_response.clone());
+
+                    let outcome: Result<(), String>;
                     match server_response { //May contain traces of state transisions
-                        Message::GameStartUpdate {nickname: nn} => println!("You have been challenged by captain {}", nn),
+                        Message::OkResponse => outcome = self.handle_ok_response(server_response),
+                        Message::PlayerJoinedUpdate {nickname: nn} => {
+                            println!("Welcome our new captain {:?}", nn);
+                            self.lobby.add_player(&nn.clone());
+                        },
+                        Message::PlayerReadyUpdate {nickname: nn} => {
+                            println!("Captain {:?} is now ready to be challenged.", nn);
+                            self.lobby.ready_player(&nn.clone());
+                        },
+                        Message::GameStartUpdate {nickname: nn} => {
+                            println!("Received a challenge by captain {:?}", nn);
+                            self.handle_game_start_update(nn.clone());
+                        },
+                        Message::FeaturesResponse {features: fts} => {
+                            println!("Received features list!");
+                            self.handle_get_features_response(fts);
+                        }
                         _ => println!("Message received: {:?}", server_response),
                     }
+
                 } else if received == Err(TryRecvError::Empty) {
                     println!("Nothing there =(");
-                    thread::sleep(Duration::new(1, 0));
-                } else {
-                    panic!(format!("Received some minor BS: MSG={:?}",received));
+                    thread::sleep(Duration::new(0, 100000000));
+                } else if received == Err(TryRecvError::Disconnected) {
+                    panic!("Server terminated connection. =(");
                 }
+
             }
 
             /*
