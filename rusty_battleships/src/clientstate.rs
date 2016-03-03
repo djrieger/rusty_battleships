@@ -21,13 +21,15 @@ fn send_message(msg: Message, stream: &mut BufWriter<TcpStream>) {
 
 /*Tries to read from the TCP stream. If there's no message, it waits patiently.*/
 pub fn tcp_poll(br: &mut BufReader<TcpStream>, tx: Sender<Message>) {
-    println!("Waiting for a message");
-    //This can take a while!
-    let msg_from_server = deserialize_message(br);
-    if msg_from_server.is_err() {
-        panic!("FUUUUU!");
+    loop {
+        println!("Waiting for a message");
+        //This can take a while!
+        let msg_from_server = deserialize_message(br);
+        if msg_from_server.is_err() {
+            panic!("FUUUUU!");
+        }
+        tx.send(msg_from_server.unwrap()).unwrap();
     }
-    tx.send(msg_from_server.unwrap()).unwrap();
 }
 
 pub struct State {
@@ -192,6 +194,9 @@ impl State {
                         Message::PlayerNotReadyUpdate {nickname: _} => {
                             continue;
                         },
+                        Message::NoSuchPlayerResponse { nickname: nn } => {
+                            return false;
+                        }
                         x => {
                             println!("Illegal response to challenge request! Got a {:?}", x);
                             return false;
@@ -440,7 +445,6 @@ impl State {
 
                     let outcome: Result<(), String>;
                     match server_response { //May contain traces of state transisions
-                        Message::OkResponse => outcome = self.handle_ok_response(server_response),
                         // UPDATES
                         Message::PlayerJoinedUpdate {nickname: nn} => {
                             println!("Welcome our new captain {:?}", nn);
@@ -468,6 +472,7 @@ impl State {
                             println!("REASON:{:?}",err);
                         }
                         // RESPONSES
+                        Message::OkResponse => outcome = self.handle_ok_response(server_response),
                         Message::InvalidRequestResponse => {
                             println!("Received an INVALID_REQUEST_RESPONSE in state {:?}.", self.status);
                         },

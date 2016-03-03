@@ -6,7 +6,6 @@ extern crate argparse;
 use argparse::{ArgumentParser, Print, Store};
 
 extern crate rusty_battleships;
-use rusty_battleships::message::{serialize_message, Message};
 use rusty_battleships::clientstate::State;
 
 // http://stackoverflow.com/questions/35157399/how-to-concatenate-static-strings-in-rust/35159310
