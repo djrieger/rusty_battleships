@@ -78,7 +78,7 @@ impl Game {
     fn time_exceeded(time: Option<time::PreciseTime>, limit_seconds: u64) -> bool {
         return match time {
             None => false,
-            Some(start_time) => start_time.to(time::PreciseTime::now()) < time::Duration::seconds(limit_seconds as i64),
+            Some(start_time) => start_time.to(time::PreciseTime::now()) > time::Duration::seconds(limit_seconds as i64),
         }
     }
 
