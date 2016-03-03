@@ -30,6 +30,16 @@ impl ClientLobby {
         self.player_list.push(String::from(player));
     }
 
+    pub fn remove_player(&mut self, player: &str) {
+        if self.player_list.contains(&String::from(player)) {
+            //This is safe because we already ensured that the element is contained.
+            let index = self.player_list.binary_search(&String::from(player)).unwrap();
+            self.player_list.remove(index);
+        } else {
+            panic!("Got a PLAYER_LEFT_UPDATE for a player who's not in our list.");
+        }
+    }
+
     pub fn ready_player(&mut self, player: &str) {
         if self.player_list.contains(&String::from(player)) {
             //This is safe because we already ensured that the element is contained.
@@ -37,7 +47,18 @@ impl ClientLobby {
             self.player_list.remove(index);
             self.ready_players.push(String::from(player));
         } else {
-            panic!("Well, fuck. Got a PLAYER_READY_UPDATE for a player who's not in our list.");
+            panic!("Got a PLAYER_READY_UPDATE for a player who's not in our list.");
+        }
+    }
+
+    pub fn unready_player(&mut self, player: &str) {
+        if self.ready_players.contains(&String::from(player)) {
+            //This is safe because we already ensured that the element is contained.
+            let index = self.ready_players.binary_search(&String::from(player)).unwrap();
+            self.ready_players.remove(index);
+            self.player_list.push(String::from(player));
+        } else {
+            panic!("Got a PLAYER_NOT_READY_UPDATE for a player who's not in our ready list!");
         }
     }
 

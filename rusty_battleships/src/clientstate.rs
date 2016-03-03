@@ -128,16 +128,31 @@ impl State {
         }
         send_message(Message::ReadyRequest, &mut self.buff_writer);
         self.status = Status::AwaitReady;
-        let server_response = deserialize_message(&mut self.buff_reader);
-        if server_response.is_err() {
-            return false;
-        } else {
-            match server_response {
-                Ok(Message::OkResponse) => {
-                    self.status = Status::Waiting;
-                    return true;
-                },
-                x => panic!(format!("SHOULD NOT HAPPEN! RECEIVED A {:?}", x)),
+        loop {
+            let server_response = deserialize_message(&mut self.buff_reader);
+            if server_response.is_err() {
+                return false;
+            } else {
+                let resp = server_response.unwrap();
+                match resp {
+                    Message::OkResponse => {
+                        self.status = Status::Waiting;
+                        return true;
+                    },
+                    Message::PlayerJoinedUpdate {nickname: _} => {
+                        continue;
+                    },
+                    Message::PlayerLeftUpdate {nickname: _} => {
+                        continue;
+                    },
+                    Message::PlayerReadyUpdate {nickname: _} => {
+                        continue;
+                    },
+                    Message::PlayerNotReadyUpdate {nickname: _} => {
+                        continue;
+                    },
+                    x => panic!(format!("SHOULD NOT HAPPEN! RECEIVED A {:?}", x)),
+                }
             }
         }
     }
@@ -157,17 +172,32 @@ impl State {
                 println!("Response is error");
                 return false;
             } else {
-                match server_response.unwrap() {
-                    Message::OkResponse => {
-                        println!("FOUND {:?}!", opponent);
-                        self.status = Status::PlacingShips;
-                        return true;
-                    },
-                    x => {
-                        println!("Illegal response to challenge request! Got a {:?}", x);
-                        return false;
-                    },
-                };
+                let resp = server_response.unwrap();
+                loop {
+                    match resp {
+                        Message::OkResponse => {
+                            println!("FOUND {:?}!", opponent);
+                            self.status = Status::PlacingShips;
+                            return true;
+                        },
+                        Message::PlayerJoinedUpdate {nickname: _} => {
+                            continue;
+                        },
+                        Message::PlayerLeftUpdate {nickname: _} => {
+                            continue;
+                        },
+                        Message::PlayerReadyUpdate {nickname: _} => {
+                            continue;
+                        },
+                        Message::PlayerNotReadyUpdate {nickname: _} => {
+                            continue;
+                        },
+                        x => {
+                            println!("Illegal response to challenge request! Got a {:?}", x);
+                            return false;
+                        },
+                    };
+                }
             }
         } else {
             return false;
@@ -290,7 +320,7 @@ impl State {
         }
     }
 
-    pub fn handle_game_start_update(&mut self, nickname: String) -> Result<(), String> {
+    pub fn handle_game_start_update(&mut self, nickname: &str) -> Result<(), String> {
         if self.status == Status::Waiting {
             self.status = Status::PlacingShips;
             //Place the ships!
@@ -322,6 +352,30 @@ impl State {
                 self.status = Status::OpponentPlacing;
                 return Ok(()); },
             _ => return Err(format!("Wrong message! STATUS={:?}, MESSAGE={:?}", self.status, msg)),
+        }
+    }
+
+    pub fn handle_name_taken_response(&mut self, nickname: &str) {
+        if self.status == Status::Register {
+            self.status = Status::Unregistered;
+        } else {
+            panic!("Received a NAME_TAKEN_RESPONSE while not in Register State! STATUS={:?}", self.status);
+        }
+    }
+
+    pub fn handle_no_such_player_response(&mut self, nickname: &str) {
+        if self.status == Status::AwaitGameStart {
+            self.status = Status::Available;
+        } else {
+            panic!("Received a NAME_TAKEN_RESPONSE while not in AwaitGameStart State! STATUS={:?}", self.status);
+        }
+    }
+
+    pub fn handle_not_waiting_response(&mut self, nickname: &str) {
+        if self.status == Status::AwaitGameStart {
+            self.status = Status::Available;
+        } else {
+            panic!("Received a NOT_WAITING_RESPONSE while not in AwaitGameStart State! STATUS={:?}", self.status);
         }
     }
 
@@ -387,22 +441,55 @@ impl State {
                     let outcome: Result<(), String>;
                     match server_response { //May contain traces of state transisions
                         Message::OkResponse => outcome = self.handle_ok_response(server_response),
+                        // UPDATES
                         Message::PlayerJoinedUpdate {nickname: nn} => {
                             println!("Welcome our new captain {:?}", nn);
                             self.lobby.add_player(&nn.clone());
+                            continue;
                         },
+                        Message::PlayerLeftUpdate {nickname: nn} => {
+                            println!("Say goodbye to captain {:?}", nn);
+                            self.lobby.remove_player(&nn.clone());
+                        }
                         Message::PlayerReadyUpdate {nickname: nn} => {
                             println!("Captain {:?} is now ready to be challenged.", nn);
                             self.lobby.ready_player(&nn.clone());
                         },
+                        Message::PlayerNotReadyUpdate {nickname : nn} => {
+                            println!("Captain {:?} is not ready.", nn);
+                            self.lobby.unready_player(&nn.clone());
+                        },
                         Message::GameStartUpdate {nickname: nn} => {
                             println!("Received a challenge by captain {:?}", nn);
-                            self.handle_game_start_update(nn.clone());
+                            self.handle_game_start_update(&nn.clone());
+                        },
+                        Message::ServerGoingDownUpdate {errormessage: err}=> {
+                            println!("The server is going down!");
+                            println!("REASON:{:?}",err);
+                        }
+                        // RESPONSES
+                        Message::InvalidRequestResponse => {
+                            println!("Received an INVALID_REQUEST_RESPONSE in state {:?}.", self.status);
                         },
                         Message::FeaturesResponse {features: fts} => {
                             println!("Received features list!");
                             self.handle_get_features_response(fts);
-                        }
+                        },
+                        Message::NameTakenResponse {nickname: nn} => {
+                            println!("There is already a captain {:?} registered. Choose a different name.", nn);
+                            self.handle_name_taken_response(&nn);
+                        },
+                        Message::NoSuchPlayerResponse {nickname: nn} => {
+                            println!("There is no captain {:?} registered.", nn);
+                            self.handle_no_such_player_response(&nn);
+                        },
+                        Message::NotWaitingResponse {nickname: nn} => {
+                            println!("Captain {:?} is not waiting to be challenged.", nn);
+                            self.handle_not_waiting_response(&nn);
+                        },
+                        Message::GameAlreadyStartedResponse => {
+                            println!("The game has already started.");
+                        },
                         _ => println!("Message received: {:?}", server_response),
                     }
 
