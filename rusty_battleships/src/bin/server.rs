@@ -7,6 +7,9 @@ use std::rc::Rc;
 use std::sync::mpsc;
 use std::thread;
 
+extern crate ansi_term;
+use ansi_term::Colour::{Green, Yellow, Cyan};
+
 extern crate time;
 
 extern crate argparse;
@@ -206,16 +209,16 @@ fn main() {
             if let Ok(maybe_msg) = player_handle.from_child_endpoint.try_recv() {
                 match maybe_msg {
                     ToMainThreadCommand::Message(msg) => {
-                        print!("From child {} ({}): {:?}", i, player_handle.nickname.clone().unwrap_or("".to_owned()), msg);
+                        println!("#{} ({}): {}", i, player_handle.nickname.clone().unwrap_or("".to_owned()), Green.paint(format!("{:?}", msg)));
                         // Handle Message received from child
                         let result = handle_main(msg, player_handle, &mut &mut lobby, &mut games);
                         if let Some(response) = result.response {
                             // handle_main generated a response -> send response Message back to child
-                            println!(" -> {:?}", response);
+                            println!("#{} ({}): {}", i, player_handle.nickname.clone().unwrap_or("".to_owned()), Cyan.paint(format!("{:?}", response)));
                             player_handle.to_child_endpoint.send(ToChildCommand::Message(response));
                         }
                         if result.terminate_connection {
-                            print!("-- Closing connection to child {}", i);
+                            println!("-- Closing connection to child {}", i);
                             player_handle.to_child_endpoint.send(ToChildCommand::TerminateConnection);
                         }
                         if !result.updates.is_empty() {
@@ -257,11 +260,11 @@ fn send_updates(player_handles: &mut Vec<board::PlayerHandle>, message_store: &m
     //     .filter(|player_handle| player_handle.nickname.is_some() )
     //     .filter(|player_handle| message_store.contains_key(&player_handle.nickname.unwrap()))
     //     .map(|player_handle| message_store.remove(&player_handle.nickname.unwrap()).unwrap().iter().map(|msg| player_handle.to_child_endpoint.send(ToChildCommand::Message(*msg)) ) );
-    for player_handle in player_handles.iter_mut() {
+    for (i, player_handle) in player_handles.iter_mut().enumerate() {
         if let Some(ref name) = player_handle.nickname {
             if message_store.contains_key(name) {
                 for message in message_store.remove(name).unwrap() {
-                    println!("Update to {}: {:?}", name, message);
+                    println!("#{} ({}): {}", i, name, Yellow.paint(format!("{:?}", message)));
                     player_handle.to_child_endpoint.send(ToChildCommand::Message(message));
                 }
             }

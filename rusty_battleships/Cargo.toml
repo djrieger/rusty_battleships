@@ -7,4 +7,5 @@ authors = ["Moritz Baumann <moritz.baumann@student.kit.edu>", "David Rieger <dav
 argparse = "0.2.1"
 time = "0.1"
 qmlrs = { git = "git://github.com/Landkeks/qmlrs.git" }
+ansi_term = "0.7"
 #rustty = "0.1.9"
