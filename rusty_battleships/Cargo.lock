@@ -2,10 +2,16 @@
 name = "rusty_battleships"
 version = "0.0.1"
 dependencies = [
+ "ansi_term 0.7.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "argparse 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "qmlrs 0.0.1 (git+git://github.com/Landkeks/qmlrs.git)",
  "time 0.1.34 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
+
+[[package]]
+name = "ansi_term"
+version = "0.7.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "argparse"
