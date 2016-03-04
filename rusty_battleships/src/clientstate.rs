@@ -470,11 +470,11 @@ impl State {
                     Message::GameAlreadyStartedResponse => {
                         println!("The game has already started.");
                     },
-                    Message::HitResponse {x: x, y: y} => {
+                    Message::HitResponse {x, y} => {
                         println!("You have hit a ship! ({}, {})", x, y);
                         self.handle_hit_response(x, y);
                     },
-                    Message::MissResponse {x: x, y: y} => {
+                    Message::MissResponse {x, y} => {
                         println!("You have missed.({}, {})", x, y);
                         self.handle_miss_response(x, y);
                     },

@@ -48,8 +48,9 @@ enum State {
 
 struct Bridge {
     sender: mpsc::Sender<Message>,
-    receiver: mpsc::Receiver<State>,
+    receiver: mpsc::Receiver<(State, Message)>,
     state: State,
+    last_rcvd_msg: Option<Message>,
 }
 
 impl Bridge {
@@ -59,29 +60,46 @@ impl Bridge {
     }
 
     fn poll_state(&mut self) -> String {
-        if let Ok(msg) = self.receiver.try_recv() {
-            self.state = msg;
+        if let Ok(tuple) = self.receiver.try_recv() {
+            self.state = tuple.0;
+            self.last_rcvd_msg = Some(tuple.1);
         }
-        // return match self.state {
-        //     State::Unregistered => "unregistered",
-        //     State::NameTaken => "nametaken",
-        //     State::Registered => "registered",
-        //     _ => "",
-        // };
-        let foo = format!("{:?}", self.state);
-        return foo;
+        let state_description = match self.state {
+            State::Unregistered => String::from("Noch nicht registriert"),
+            State::NameTaken => String::from("Name bereits vergeben"),
+            State::Registered => String::from("Registriert"),
+            _ => format!("{:?}", self.state),
+        };
+        return state_description;
+    }
+
+    fn poll_log(&mut self) -> String {
+        if let Ok(tuple) = self.receiver.try_recv() {
+            self.state = tuple.0;
+            self.last_rcvd_msg = Some(tuple.1);
+        }
+
+        return match self.last_rcvd_msg {
+            Some(ref msg) => format!("{:?}", msg),
+            None => String::new(),
+        }
+    }
+
+    fn connect(&self, hostname: String) {
     }
 }
 
 Q_OBJECT! { Bridge:
     slot fn send_login_request(String);
     slot fn poll_state();
+    slot fn poll_log();
+    slot fn connect(String);
 }
 
 fn main() {
     let mut current_state = State::Unregistered;
     let (tx_main, rcv_tcp) : (mpsc::Sender<Message>, mpsc::Receiver<Message>) = mpsc::channel();
-    let (tx_tcp, rcv_main) : (mpsc::Sender<State>, mpsc::Receiver<State>) = mpsc::channel();
+    let (tx_tcp, rcv_main) : (mpsc::Sender<(State, Message)>, mpsc::Receiver<(State, Message)>) = mpsc::channel();
 
     let tcp_loop = move || {
         let mut port:u16 = 5000;
@@ -115,12 +133,13 @@ fn main() {
                 // Parse server response and send to main thread
                 let server_response = deserialize_message(&mut buff_reader).unwrap();
                 println!("Got {:?} from server", server_response);
+                let cloned_response = server_response.clone();
                 match server_response {
                     Message::OkResponse => current_state = State::Registered,
                     Message::NameTakenResponse { nickname } => current_state = State::NameTaken,
                     _ => {},
                 }
-                tx_tcp.send(current_state);
+                tx_tcp.send((current_state, cloned_response));
             }
         };
         let tcp_recv_thread = thread::spawn(subloop);
@@ -147,7 +166,8 @@ fn main() {
     let mut bridge = Bridge { 
         state: State::Unregistered,
         sender: tx_main,
-        receiver: rcv_main
+        receiver: rcv_main,
+        last_rcvd_msg: None,
     };
     bridge.state = State::Unregistered;
     engine.set_property("bridge", bridge);

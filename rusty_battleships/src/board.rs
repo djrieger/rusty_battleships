@@ -1,16 +1,14 @@
 use std::cell::RefCell;
-use std::collections::hash_map::Entry;
-use std::collections::hash_map::OccupiedEntry;
 use std::rc::Rc;
 use std::sync::mpsc;
 
 extern crate time;
 
 // extern crate rusty_battleships;
-use message::{serialize_message, deserialize_message, Message, Direction};
-use game::{Game, GameState};
+use message::{Message, Direction};
+use game::Game;
 
-const BLOCK: char = '\u{25AA}';
+//const BLOCK: char = '\u{25AA}';
 
 pub const W: usize = 16;
 pub const H: usize = 10;
@@ -53,10 +51,10 @@ impl Player {
 //     }
 }
 
+#[derive(PartialEq)]
 pub enum PlayerState {
     Available,
     Ready,
-    Waiting,
     Playing
 }
 
