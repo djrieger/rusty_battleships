@@ -28,6 +28,14 @@ pub fn ask(question: String) -> String {
     return answer;
 }
 
+pub fn ask_u8(question: String) -> u8 {
+    println!("{}", question);
+    let stdin = stdin();
+    let answer_string : String = stdin.lock().lines().next().unwrap().unwrap();
+    let answer = answer_string.parse().ok().expect("Wanted a number");
+    return answer;
+}
+
 /*Tries to read from the TCP stream. If there's no message, it waits patiently.*/
 pub fn tcp_poll(br: &mut BufReader<TcpStream>, tx: Sender<Message>) {
     loop {
@@ -45,6 +53,7 @@ pub struct State {
     pub lobby : ClientLobby,
     opponent : String,
     status : Status,
+    my_turn : bool,
     my_board : Option<Board>,
     their_board : Option<Board>,
     buff_reader : BufReader<TcpStream>,
@@ -76,6 +85,7 @@ impl State {
             lobby : ClientLobby::new(),
             opponent : String::from("None"),
             status : Status::Unregistered,
+            my_turn : false,
             my_board : None,
             their_board : None,
             buff_reader : buff_reader,
@@ -331,6 +341,51 @@ impl State {
         }
     }
 
+    pub fn handle_miss_response(&mut self, x: u8, y: u8) {
+        if self.status == Status::Planning {
+            if let Some(ref mut board) = self.my_board {
+                board.miss(x as usize, y as usize);
+            }
+        } else {
+            panic!("Received a MISS_RESPONSE while not in PLANNING state! STATUS={:?}", self.status);
+        }
+    }
+
+    pub fn handle_destroyed_response(&mut self, x: u8, y: u8) {
+        if self.status == Status::Planning {
+            if let Some(ref mut board) = self.my_board {
+                board.destroyed(x as usize, y as usize);
+            }
+        } else {
+            panic!("Received a DESTROYED_RESPONSE while not in PLANNING state! STATUS={:?}", self.status);
+        }
+    }
+
+    pub fn handle_your_turn_update(&mut self) {
+        if self.status == Status::OpponentPlacing {
+            self.my_turn = true;
+            self.status = Status::Planning;
+            let mut x_coord : u8 = 13;
+            let mut y_coord : u8 = 13;
+
+
+            //FIXME: ONLY FOR TESTING! USE GUI! ----v
+            let mut x_correct = false;
+            let mut y_correct = false;
+            while !x_correct {
+                x_coord = ask_u8(String::from("X coordinate of shot:"));
+            }
+            while !y_correct {
+                y_coord = ask_u8(String::from("Y coordinate of shot:"));
+            }
+            //FIXME: ONLY FOR TESTING! USE GUI! ----^
+
+            send_message(Message::ShootRequest {x: x_coord, y: y_coord}, &mut self.buff_writer);
+        } else {
+            panic!("Received a YOUR_TURN_UPDATE while not in OPPONENT_PLACING state! STATUS={:?}", self.status);
+        }
+    }
+
     /* Main loop; does most of the work. Main-Function should hand over control to this function as
     soon as a tcp connection has been established.*/
     pub fn handle_communication(&mut self/*, br: BufReader<TcpStream>, bw: BufWriter<TcpStream>*/) {
@@ -347,7 +402,6 @@ impl State {
         } else {
             println!("Login error.");
         }
-
 
         let (tx, rx) = mpsc::channel();
         let mut one_time_reader = BufReader::<TcpStream>::new(self.buff_reader.get_ref().try_clone().unwrap());
@@ -386,6 +440,10 @@ impl State {
                     Message::ServerGoingDownUpdate {errormessage: err}=> {
                         println!("The server is going down!");
                         println!("REASON:{:?}",err);
+                    },
+                    Message::YourTurnUpdate => {
+                        println!("It's yout turn!");
+                        self.handle_your_turn_update();
                     }
                     // RESPONSES
                     Message::OkResponse => outcome = self.handle_ok_response(server_response),
@@ -413,9 +471,13 @@ impl State {
                         println!("The game has already started.");
                     },
                     Message::HitResponse {x: x, y: y} => {
-                        println!("You have been hit! ({}, {})", x, y);
+                        println!("You have hit a ship! ({}, {})", x, y);
                         self.handle_hit_response(x, y);
-                    }
+                    },
+                    Message::MissResponse {x: x, y: y} => {
+                        println!("You have missed.({}, {})", x, y);
+                        self.handle_miss_response(x, y);
+                    },
                     _ => println!("Message received: {:?}", server_response),
                 }
 
