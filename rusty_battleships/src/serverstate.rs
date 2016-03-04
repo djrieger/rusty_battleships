@@ -365,8 +365,10 @@ pub fn handle_place_ships_request(placement: [ShipPlacement; 5], player_name: &S
             // opponent also done placing ships?
             if opponent_ready {
                 game_ref.state = GameState::Running;
+                return Result::respond_and_update_single(Message::OkResponse, game_ref.switch_turns(), false);
+            } else {
+                return Result::respond(Message::OkResponse, false);
             }
-            return Result::respond_and_update_single(Message::OkResponse, game_ref.switch_turns(), false);
         }
     }
 
