@@ -412,7 +412,7 @@ impl State {
                     Message::GameAlreadyStartedResponse => {
                         println!("The game has already started.");
                     },
-                    Message::HitResponse {x: x, y: y} => {
+                    Message::HitResponse {x, y} => {
                         println!("You have been hit! ({}, {})", x, y);
                         self.handle_hit_response(x, y);
                     }
