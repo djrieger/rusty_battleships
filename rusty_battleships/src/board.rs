@@ -72,8 +72,8 @@ pub struct Ship {
 
 #[derive(Copy, Clone)]
 pub struct CellState {
-    visible: bool,
-    ship_index: Option<u8>,
+    pub visible: bool,
+    pub ship_index: Option<u8>,
 }
 
 // #[derive(Copy, Clone)]

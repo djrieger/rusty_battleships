@@ -11,7 +11,8 @@ use std::sync::mpsc::TryRecvError;
 use message::{serialize_message, deserialize_message, Message, ShipPlacement, Direction};
 use clientlobby::ClientLobby;
 use game::Game;
-use board::{Board, Ship, W, H};
+use board::{Ship};
+use clientboard::{Board, W, H};
 
 fn send_message(msg: Message, stream: &mut BufWriter<TcpStream>) {
     let serialized_msg = serialize_message(msg);
@@ -42,10 +43,10 @@ pub fn tcp_poll(br: &mut BufReader<TcpStream>, tx: Sender<Message>) {
 
 pub struct State {
     pub lobby : ClientLobby,
-    game : Option<Game>,
     opponent : String,
-    //game : ClientGame;  <--- LATER TODAY
     status : Status,
+    my_board : Option<Board>,
+    their_board : Option<Board>,
     buff_reader : BufReader<TcpStream>,
     buff_writer : BufWriter<TcpStream>,
 }
@@ -73,9 +74,10 @@ impl State {
     pub fn new (buff_reader: BufReader<TcpStream>, buff_writer: BufWriter<TcpStream>) -> State {
         State {
             lobby : ClientLobby::new(),
-            game : None,
             opponent : String::from("None"),
             status : Status::Unregistered,
+            my_board : None,
+            their_board : None,
             buff_reader : buff_reader,
             buff_writer : buff_writer,
         }
@@ -158,6 +160,15 @@ impl State {
         let ship_placements : [ShipPlacement; 5] = [ship_placements0, ship_placements1, ship_placements2, ship_placements3, ship_placements4];
         println!("{:?}", ship_placements);
         send_message(Message::PlaceShipsRequest { placement: ship_placements }, &mut self.buff_writer);
+
+        let mut ships = Vec::<Ship>::new();
+        ships.push(Ship { x: 0, y: 0, length: 2, horizontal:true, health_points: 2});
+        ships.push(Ship { x: 0, y: 1, length: 2, horizontal:true, health_points: 2});
+        ships.push(Ship { x: 0, y: 2, length: 3, horizontal:true, health_points: 3});
+        ships.push(Ship { x: 0, y: 3, length: 4, horizontal:true, health_points: 4});
+        ships.push(Ship { x: 0, y: 4, length: 5, horizontal:true, health_points: 5});
+        self.my_board = Some(Board::new(ships, true));
+        self.their_board = Some(Board::new(Vec::<Ship>::new(), false));
 
         return true;
     }
@@ -310,6 +321,16 @@ impl State {
         }
     }
 
+    pub fn handle_hit_response(&mut self, x: u8, y: u8) {
+        if self.status == Status::Planning {
+            if let Some(ref mut board) = self.my_board {
+                board.hit(x as usize, y as usize);
+            }
+        } else {
+            panic!("Received a HIT_RESPONSE while not in PLANNING state! STATUS={:?}", self.status);
+        }
+    }
+
     /* Main loop; does most of the work. Main-Function should hand over control to this function as
     soon as a tcp connection has been established.*/
     pub fn handle_communication(&mut self/*, br: BufReader<TcpStream>, bw: BufWriter<TcpStream>*/) {
@@ -391,6 +412,10 @@ impl State {
                     Message::GameAlreadyStartedResponse => {
                         println!("The game has already started.");
                     },
+                    Message::HitResponse {x: x, y: y} => {
+                        println!("You have been hit! ({}, {})", x, y);
+                        self.handle_hit_response(x, y);
+                    }
                     _ => println!("Message received: {:?}", server_response),
                 }
 

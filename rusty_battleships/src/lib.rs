@@ -6,3 +6,4 @@ pub mod timer;
 
 pub mod clientstate;
 pub mod clientlobby;
+pub mod clientboard;
