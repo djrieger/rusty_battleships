@@ -5,6 +5,7 @@ dependencies = [
  "ansi_term 0.7.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "argparse 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "qmlrs 0.0.1 (git+git://github.com/Landkeks/qmlrs.git)",
+ "rand 0.3.14 (registry+https://github.com/rust-lang/crates.io-index)",
  "time 0.1.34 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -44,6 +45,14 @@ source = "git+git://github.com/Landkeks/qmlrs.git#51d5a7e006f18f7b85e437e908a46c
 dependencies = [
  "libc 0.2.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "pkg-config 0.3.6 (git+https://github.com/alexcrichton/pkg-config-rs)",
+]
+
+[[package]]
+name = "rand"
+version = "0.3.14"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "libc 0.2.5 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
