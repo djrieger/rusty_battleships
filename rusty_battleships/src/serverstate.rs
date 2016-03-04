@@ -363,7 +363,7 @@ pub fn handle_place_ships_request(placement: [ShipPlacement; 5], player_name: &S
         // Check if new state is valid
         if !new_board_valid {
             return Result::respond(Message::InvalidRequestResponse, false);
-        } 
+        }
 
         let mut game_ref = (*game).borrow_mut();
         // opponent also done placing ships?
@@ -455,29 +455,41 @@ fn handle_shoot(games: &mut Vec<Rc<RefCell<Game>>>, game: Rc<RefCell<Game>>,
 pub fn handle_move_shoot_request(target_coords: (u8, u8),
         ship_movement: Option<(usize, Direction)>, player_name: &String,
         lobby: &mut HashMap<String, Player>, games: &mut Vec<Rc<RefCell<Game>>>) -> Result {
-    if let Some(ref game) = lobby.get_mut(player_name).unwrap().game.clone() {
+    let game;
+
+    {
+        // get reference to active game, if there is any
+        let ref active_game = lobby.get_mut(player_name).unwrap().game;
+
+        if active_game.is_none() {
+            return Result::respond(Message::NotYourTurnResponse, false);
+        }
+
+        game = active_game.as_ref().unwrap().clone();
+    }
+
+    {
         // check if in valid state and handle move, if requested
         let mut game_ref = (*game).borrow_mut();
-        if let GameState::Running = game_ref.state {
-            if game_ref.my_turn(player_name) {
-                // move if requested
-                if let Some(movement) = ship_movement {
-                    if let Some(result) = handle_move(&mut game_ref, player_name, movement) {
-                        return result;
-                    }
-                }
 
-                // handle shot
-                return handle_shoot(games, game.clone(), lobby, player_name, target_coords.0, target_coords.1);
-            } else {
-                return Result::respond(Message::NotYourTurnResponse, false);
-            }
-        } else {
+        if game_ref.state != GameState::Running {
             return Result::respond(Message::InvalidRequestResponse, false);
         }
-    } else {
-        return Result::respond(Message::NotYourTurnResponse, false);
+
+        if !game_ref.my_turn(player_name) {
+            return Result::respond(Message::NotYourTurnResponse, false);
+        }
+
+        // move if requested
+        if let Some(movement) = ship_movement {
+            if let Some(result) = handle_move(&mut game_ref, player_name, movement) {
+                return result;
+            }
+        }
     }
+
+    // handle shot
+    return handle_shoot(games, game, lobby, player_name, target_coords.0, target_coords.1);
 }
 
 pub fn handle_afk(game: Rc<RefCell<Game>>, lobby: &mut HashMap<String, Player>,

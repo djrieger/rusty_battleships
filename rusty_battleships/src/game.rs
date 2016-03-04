@@ -5,6 +5,7 @@ use std::collections::HashMap;
 use board::{Board};
 use message::{Message, Reason};
 
+#[derive(PartialEq)]
 pub enum GameState {
     Placing,
     Running,
