@@ -446,6 +446,18 @@ impl State {
         }
     }
 
+    pub fn handle_enemy_visible_update(&mut self, x: u8, y: u8) {
+        if let Some(ref mut board) = self.their_board {
+            board.visible(x as usize, y as usize);
+        }
+    }
+
+    pub fn handle_enemy_invisible_update(&mut self, x: u8, y: u8) {
+        if let Some(ref mut board) = self.their_board {
+            board.invisible(x as usize, y as usize);
+        }
+    }
+
     pub fn handle_afk_warning_update(&mut self, strikes: u8) {
         if self.status == Status::Planning {
             self.my_turn = false;
@@ -560,8 +572,8 @@ impl State {
                         self.handle_enemy_turn_update();
                     },
                     Message::NotYourTurnResponse => {
-                        println!("I'm sorry dave, I'm afraid I can't do that.");
-                        //FIXME IMPLEMENTME
+                        //println!("I'm sorry dave, I'm afraid I can't do that.");
+                        panic!("It's not your turn! Protocol demands termination.");
                     },
                     Message::AfkWarningUpdate {strikes} => {
                         self.handle_afk_warning_update(strikes);
@@ -573,7 +585,15 @@ impl State {
                     Message::EnemyMissUpdate {x, y} => {
                         println!("They missed! ({}, {})", x, y);
                         self.handle_enemy_miss_update(x, y);
-                    }
+                    },
+                    Message::EnemyVisibleUpdate {x, y} => {
+                        println!("The enemy has been sighted! ({}, {})", x, y);
+                        self.handle_enemy_visible_update(x, y);
+                    },
+                    Message::EnemyInvisibleUpdate {x, y} => {
+                        println!("We lost track of the enemy! ({}, {})", x, y);
+                        self.handle_enemy_invisible_update(x, y);
+                    },
                     // RESPONSES
                     Message::OkResponse => outcome = self.handle_ok_response(server_response),
                     Message::InvalidRequestResponse => {
@@ -610,7 +630,7 @@ impl State {
                     Message::DestroyedResponse {x, y} => {
                         println!("Congratulations! You destroyed an enemy ship!");
                         self.handle_destroyed_response(x, y);
-                    }
+                    },
                     _ => println!("Message received: {:?}", server_response),
                 }
 

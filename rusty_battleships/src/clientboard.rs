@@ -74,4 +74,26 @@ impl Board {
         }
         self.state[x][y] = CellState {visible: true, ship_index: None};
     }
+
+    pub fn visible(&mut self, x: usize, y: usize) {
+        if x >= W && y >= H {
+            panic!("Visible out of bounds! X={}, Y={}", x, y);
+        }
+        if self.mine {
+            // Irrelevant - We know the visibility conditions through enemy hits.
+        } else {
+            self.state[x][y] = CellState {visible: true, ship_index: Some(9)};
+        }
+    }
+
+    pub fn invisible(&mut self, x: usize, y: usize) {
+        if x >= W && y >= H {
+            panic!("Invisible out of bounds! X={}, Y={}", x, y);
+        }
+        if self.mine {
+            // Irrelevant - We know the visibility conditions through enemy hits.
+        } else {
+            self.state[x][y] = CellState {visible: true, ship_index: None};
+        }
+    }
 }
