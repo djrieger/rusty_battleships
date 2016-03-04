@@ -1,12 +1,9 @@
-use std::collections::HashMap;
-
 extern crate rand;
 use self::rand::{thread_rng, Rng};
 
 extern crate time;
 
 use board::{Board};
-use message::{Message, Reason};
 
 #[derive(PartialEq)]
 pub enum GameState {
@@ -53,12 +50,6 @@ impl Game {
 
     pub fn get_board(&mut self, player_name: &String) -> &mut Board {
         return if *self.player1 == *player_name { &mut self.board2 } else { &mut self.board1 };
-    }
-
-    // returns GameOverUpdate message to be sent to opponent
-    pub fn shutdown(&mut self /*, initiator_name: String, */, victorious: bool, reason: Reason) -> Option<Message> {
-        // inform opponent
-        return Some(Message::GameOverUpdate { victorious: !victorious, reason: reason });
     }
 
     pub fn my_turn(&self, player_name: &String) -> bool {
