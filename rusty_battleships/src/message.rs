@@ -429,7 +429,7 @@ pub fn deserialize_message(mut reader: &mut BufReader<TcpStream>) -> Result<Mess
 fn append_string(mut buf: &mut Vec<u8>, string: String) {
     assert!(string.len() <= 255, "String exceeds maximum allowed length.");
     buf.push(string.len() as u8);
-    write!(&mut buf, "{}", string);
+    write!(&mut buf, "{}", string).unwrap();
 }
 
 pub fn serialize_message(msg: Message) -> Vec<u8> {
