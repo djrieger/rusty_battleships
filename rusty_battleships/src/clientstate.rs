@@ -414,7 +414,8 @@ impl State {
         }
     }
 
-    fn shoot(&mut self) {
+    fn shoot(&mut self
+    ) {
         let mut x_coord : u8 = 13;
         let mut y_coord : u8 = 13;
         x_coord = ask_u8(String::from("X coordinate of shot:"));
