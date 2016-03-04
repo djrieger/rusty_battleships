@@ -59,7 +59,7 @@ pub enum PlayerState {
 }
 
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone,Debug)]
 pub struct Ship {
     pub x: isize,
     pub y: isize,

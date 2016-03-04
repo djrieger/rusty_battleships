@@ -8,7 +8,7 @@ use std::sync::mpsc::TryRecvError;
 //extern crate argparse;
 //use argparse::{ArgumentParser, Print, Store};
 
-use message::{serialize_message, deserialize_message, Message, ShipPlacement, Direction};
+use message::{serialize_message, deserialize_message, Message, ShipPlacement, Direction, Reason};
 use clientlobby::ClientLobby;
 use game::Game;
 use board::{Ship};
@@ -31,9 +31,22 @@ pub fn ask(question: String) -> String {
 pub fn ask_u8(question: String) -> u8 {
     println!("{}", question);
     let stdin = stdin();
-    let answer_string : String = stdin.lock().lines().next().unwrap().unwrap();
-    let answer = answer_string.parse().ok().expect("Wanted a number");
-    return answer;
+    let mut answer_correct = false;
+    let mut answer_number = 42;
+    while !answer_correct {
+        let mut answer_string : String = String::new();
+        stdin.read_line(&mut answer_string);
+        answer_string = String::from(answer_string.trim());
+        let answer = answer_string.parse::<u8>();
+        if !answer.is_err() {
+            answer_correct = true;
+            answer_number = answer.unwrap();
+        } else {
+            println!("That is no number.");
+        }
+    }
+
+    return answer_number;
 }
 
 /*Tries to read from the TCP stream. If there's no message, it waits patiently.*/
@@ -54,6 +67,8 @@ pub struct State {
     opponent : String,
     status : Status,
     my_turn : bool,
+    my_afks : u8,
+    their_afks : u8,
     my_board : Option<Board>,
     their_board : Option<Board>,
     buff_reader : BufReader<TcpStream>,
@@ -86,6 +101,8 @@ impl State {
             opponent : String::from("None"),
             status : Status::Unregistered,
             my_turn : false,
+            my_afks : 0,
+            their_afks : 0,
             my_board : None,
             their_board : None,
             buff_reader : buff_reader,
@@ -183,72 +200,72 @@ impl State {
         return true;
     }
 
-    pub fn have_i_been_challenged(&mut self) -> (bool, Option<String>) {
-        {
-            let message_waiting = false;
-            println!("Counting waiting bytes");
-            let waiting = self.buff_reader.get_ref().bytes().count();//.clone();
-            println!("Möp");
-        }
-
-        let server_response =  deserialize_message(&mut self.buff_reader);
-        if server_response.is_err() {
-            print!("foo");
-            return (false, None);
-        } else {
-            match server_response.unwrap() {
-                Message::GameStartUpdate { nickname: x } => {
-                    return (true,Some(x));
-                },
-                _ => return (false,None),
-            };
-        }
-    }
-
-    //FIXME: Change return value to Result<(),String)>
-    pub fn shoot(&mut self, x: usize, y: usize) -> Result<bool, String> {
-        if self.status != Status::Planning {
-            return Err(String::from("Not your turn!"));
-        }
-        if x >= W || y >= H {
-            return Err(format!("Out of bounds! x={:?} y={:?}", x, y));
-        }
-        let msg = Message::ShootRequest {x: x as u8, y: y as u8};
-        send_message(msg, &mut self.buff_writer);
-        let server_response = deserialize_message(&mut self.buff_reader);
-        if server_response.is_err() {
-            return Err(String::from("Does not compute."));
-        } else {
-            match server_response.unwrap() {
-                Message::OkResponse => return Ok(true),
-                x => return Err(format!("Does not compute! MSG={:?}", x)),
-            }
-        }
-    }
-
-    //FIXME: Change return value to Result<(),String)>
-    pub fn move_and_shoot(&mut self, ship: usize, dir: Direction, x: usize, y: usize) -> Result<bool, String> {
-        if self.status != Status::Planning {
-            return Err(String::from("Not your turn!"));
-        }
-        if 4 < ship { //Destroyed ships shall also be unable to move! Note that ship is unsigned! => no 0 > ship condition necessary!
-            return Err(format!("Ship id out of bounds! id={:?}", ship));
-        }
-        if x >= W || y >= H {
-            return Err(format!("Shot location out of bounds! x={:?} y={:?}", x, y));
-        }
-        let msg = Message::MoveAndShootRequest { id: ship as u8, direction: dir, x: x as u8, y: y as u8 };
-        send_message(msg, &mut self.buff_writer);
-        let server_response = deserialize_message(&mut self.buff_reader);
-        if server_response.is_err() {
-            return Err(String::from("Does not compute."));
-        } else {
-            match server_response.unwrap() {
-                Message::OkResponse => return Ok(true),
-                x => return Err(format!("Does not compute! MSG={:?}", x)),
-            }
-        }
-    }
+    // pub fn have_i_been_challenged(&mut self) -> (bool, Option<String>) {
+    //     {
+    //         let message_waiting = false;
+    //         println!("Counting waiting bytes");
+    //         let waiting = self.buff_reader.get_ref().bytes().count();//.clone();
+    //         println!("Möp");
+    //     }
+    //
+    //     let server_response =  deserialize_message(&mut self.buff_reader);
+    //     if server_response.is_err() {
+    //         print!("foo");
+    //         return (false, None);
+    //     } else {
+    //         match server_response.unwrap() {
+    //             Message::GameStartUpdate { nickname: x } => {
+    //                 return (true,Some(x));
+    //             },
+    //             _ => return (false,None),
+    //         };
+    //     }
+    // }
+    //
+    // //FIXME: Change return value to Result<(),String)>
+    // pub fn shoot(&mut self, x: usize, y: usize) -> Result<bool, String> {
+    //     if self.status != Status::Planning {
+    //         return Err(String::from("Not your turn!"));
+    //     }
+    //     if x >= W || y >= H {
+    //         return Err(format!("Out of bounds! x={:?} y={:?}", x, y));
+    //     }
+    //     let msg = Message::ShootRequest {x: x as u8, y: y as u8};
+    //     send_message(msg, &mut self.buff_writer);
+    //     let server_response = deserialize_message(&mut self.buff_reader);
+    //     if server_response.is_err() {
+    //         return Err(String::from("Does not compute."));
+    //     } else {
+    //         match server_response.unwrap() {
+    //             Message::OkResponse => return Ok(true),
+    //             x => return Err(format!("Does not compute! MSG={:?}", x)),
+    //         }
+    //     }
+    // }
+    //
+    // //FIXME: Change return value to Result<(),String)>
+    // pub fn move_and_shoot(&mut self, ship: usize, dir: Direction, x: usize, y: usize) -> Result<bool, String> {
+    //     if self.status != Status::Planning {
+    //         return Err(String::from("Not your turn!"));
+    //     }
+    //     if 4 < ship { //Destroyed ships shall also be unable to move! Note that ship is unsigned! => no 0 > ship condition necessary!
+    //         return Err(format!("Ship id out of bounds! id={:?}", ship));
+    //     }
+    //     if x >= W || y >= H {
+    //         return Err(format!("Shot location out of bounds! x={:?} y={:?}", x, y));
+    //     }
+    //     let msg = Message::MoveAndShootRequest { id: ship as u8, direction: dir, x: x as u8, y: y as u8 };
+    //     send_message(msg, &mut self.buff_writer);
+    //     let server_response = deserialize_message(&mut self.buff_reader);
+    //     if server_response.is_err() {
+    //         return Err(String::from("Does not compute."));
+    //     } else {
+    //         match server_response.unwrap() {
+    //             Message::OkResponse => return Ok(true),
+    //             x => return Err(format!("Does not compute! MSG={:?}", x)),
+    //         }
+    //     }
+    // }
 
     pub fn handle_get_features_response(&mut self, features: Vec<String>) -> Result<(), String> {
         if self.status == Status::AwaitingFeatures {
@@ -333,19 +350,53 @@ impl State {
 
     pub fn handle_hit_response(&mut self, x: u8, y: u8) {
         if self.status == Status::Planning {
-            if let Some(ref mut board) = self.my_board {
+            if let Some(ref mut board) = self.their_board {
                 board.hit(x as usize, y as usize);
             }
+            self.my_turn = false;
+            self.status = Status::OpponentPlanning;
         } else {
             panic!("Received a HIT_RESPONSE while not in PLANNING state! STATUS={:?}", self.status);
         }
     }
 
+    pub fn handle_enemy_hit_update(&mut self, x: u8, y: u8) {
+        if self.status == Status::OpponentPlanning {
+            if let Some(ref mut board) = self.my_board {
+                board.hit(x as usize, y as usize);
+            }
+            self.my_turn = true;
+            self.status = Status::Planning;
+            //FIXME: ONLY FOR TESTING! USE GUI! ----v
+            self.shoot();
+            //FIXME: ONLY FOR TESTING! USE GUI! ----^
+        } else {
+            panic!("Received a ENEMY_HIT_UPDATE while not in OPPONENT_PLANNING state! STATUS={:?}", self.status);
+        }
+    }
+
     pub fn handle_miss_response(&mut self, x: u8, y: u8) {
         if self.status == Status::Planning {
+            if let Some(ref mut board) = self.their_board {
+                board.miss(x as usize, y as usize);
+            }
+            self.my_turn = false;
+            self.status = Status::OpponentPlanning;
+        } else {
+            panic!("Received a MISS_RESPONSE while not in PLANNING state! STATUS={:?}", self.status);
+        }
+    }
+
+    pub fn handle_enemy_miss_update(&mut self, x: u8, y: u8) {
+        if self.status == Status::OpponentPlanning {
             if let Some(ref mut board) = self.my_board {
                 board.miss(x as usize, y as usize);
             }
+            self.my_turn = true;
+            self.status = Status::Planning;
+            //FIXME: ONLY FOR TESTING! USE GUI! ----v
+            self.shoot();
+            //FIXME: ONLY FOR TESTING! USE GUI! ----^
         } else {
             panic!("Received a MISS_RESPONSE while not in PLANNING state! STATUS={:?}", self.status);
         }
@@ -353,36 +404,91 @@ impl State {
 
     pub fn handle_destroyed_response(&mut self, x: u8, y: u8) {
         if self.status == Status::Planning {
-            if let Some(ref mut board) = self.my_board {
+            if let Some(ref mut board) = self.their_board {
                 board.destroyed(x as usize, y as usize);
             }
+            self.my_turn = false;
+            self.status = Status::OpponentPlanning;
         } else {
             panic!("Received a DESTROYED_RESPONSE while not in PLANNING state! STATUS={:?}", self.status);
         }
+    }
+
+    fn shoot(&mut self) {
+        let mut x_coord : u8 = 13;
+        let mut y_coord : u8 = 13;
+        x_coord = ask_u8(String::from("X coordinate of shot:"));
+        y_coord = ask_u8(String::from("Y coordinate of shot:"));
+        send_message(Message::ShootRequest {x: x_coord, y: y_coord}, &mut self.buff_writer);
     }
 
     pub fn handle_your_turn_update(&mut self) {
         if self.status == Status::OpponentPlacing {
             self.my_turn = true;
             self.status = Status::Planning;
-            let mut x_coord : u8 = 13;
-            let mut y_coord : u8 = 13;
-
 
             //FIXME: ONLY FOR TESTING! USE GUI! ----v
-            let mut x_correct = false;
-            let mut y_correct = false;
-            while !x_correct {
-                x_coord = ask_u8(String::from("X coordinate of shot:"));
-            }
-            while !y_correct {
-                y_coord = ask_u8(String::from("Y coordinate of shot:"));
-            }
+            self.shoot();
             //FIXME: ONLY FOR TESTING! USE GUI! ----^
 
-            send_message(Message::ShootRequest {x: x_coord, y: y_coord}, &mut self.buff_writer);
         } else {
             panic!("Received a YOUR_TURN_UPDATE while not in OPPONENT_PLACING state! STATUS={:?}", self.status);
+        }
+    }
+
+    pub fn handle_enemy_turn_update(&mut self) {
+        if self.status == Status::OpponentPlacing {
+            self.my_turn = false;
+            self.status = Status::OpponentPlanning;
+        } else {
+            panic!("Received a ENEMY_TURN_UPDATE while not in OPPONENT_PLACING state! STATUS={:?}", self.status);
+        }
+    }
+
+    pub fn handle_afk_warning_update(&mut self, strikes: u8) {
+        if self.status == Status::Planning {
+            self.my_turn = false;
+            self.my_afks += 1;
+            if self.my_afks != strikes {
+                panic!("Inconsistent strike count for **me**! MINE={}, SERVER={}", self.my_afks, strikes);
+            }
+            self.status = Status::OpponentPlanning;
+        } else {
+            panic!("Received a AFK_WARNING_UPDATE while not in PLANNING state! STATUS={:?}", self.status);
+        }
+    }
+
+    pub fn handle_enemy_afk_update(&mut self, strikes: u8) {
+        if self.status == Status::OpponentPlanning {
+            self.my_turn = true;
+            self.their_afks += 1;
+            if self.their_afks != strikes {
+                panic!("Inconsistent strike count for **the enemy**! MINE={}, SERVER={}", self.their_afks, strikes);
+            }
+            self.status = Status::Planning;
+            //FIXME: ONLY FOR TESTING! USE GUI! ----v
+            self.shoot();
+            //FIXME: ONLY FOR TESTING! USE GUI! ----^
+        } else {
+            panic!("Received a ENEMY_AFK_UPDATE while not in OPPONENT_PLANNING state! STATUS={:?}", self.status);
+        }
+    }
+
+    pub fn handle_game_over_update(&mut self, victory: bool, reason: Reason) {
+        if self.status == Status::OpponentPlanning || self.status == Status::Planning ||
+            self.status == Status::OpponentPlacing || self.status == Status::PlacingShips {
+                println!("The game is over.");
+                if victory {
+                    println!("Congratulations, captain! You've won!");
+                } else {
+                    println!("You've lost.", );
+                }
+                println!("Reason: {:?}", reason);
+                self.my_turn = false;
+                self.status = Status::Available;
+                //self.clear_gamestate(); //FIXME: Needs implementation!
+            } else {
+            panic!("Received a GAME_OVER_UPDATE while not in an ingame state! STATUS={:?}", self.status);
         }
     }
 
@@ -409,10 +515,10 @@ impl State {
 
         /*check-for-messages-loop*/
         loop {
-            println!("Checking for messages.");
+            //println!("Checking for messages.");
             let received = rx.try_recv();
             if let Ok(server_response) = received {
-                println!("Oh, a message for me! MSG={:?}", server_response.clone());
+                println!(">>>Oh, a message for me! MSG={:?}", server_response.clone());
 
                 let outcome: Result<(), String>;
                 match server_response { //May contain traces of state transisions
@@ -437,6 +543,9 @@ impl State {
                         println!("Received a challenge by captain {:?}", nn);
                         self.handle_game_start_update(&nn.clone());
                     },
+                    Message::GameOverUpdate {victorious, reason} => {
+                        self.handle_game_over_update(victorious, reason);
+                    }
                     Message::ServerGoingDownUpdate {errormessage: err}=> {
                         println!("The server is going down!");
                         println!("REASON:{:?}",err);
@@ -444,6 +553,25 @@ impl State {
                     Message::YourTurnUpdate => {
                         println!("It's yout turn!");
                         self.handle_your_turn_update();
+                    },
+                    Message::EnemyTurnUpdate => {
+                        println!("It's the enemy's turn!");
+                        self.handle_enemy_turn_update();
+                    },
+                    Message::NotYourTurnResponse => {
+                        println!("I'm sorry dave, I'm afraid I can't do that.");
+                        //FIXME IMPLEMENTME
+                    },
+                    Message::AfkWarningUpdate {strikes} => {
+                        self.handle_afk_warning_update(strikes);
+                    }
+                    Message::EnemyHitUpdate {x, y} => {
+                        println!("We're hit! ({}, {})", x, y);
+                        self.handle_enemy_hit_update(x, y);
+                    },
+                    Message::EnemyMissUpdate {x, y} => {
+                        println!("They missed! ({}, {})", x, y);
+                        self.handle_enemy_miss_update(x, y);
                     }
                     // RESPONSES
                     Message::OkResponse => outcome = self.handle_ok_response(server_response),
@@ -478,6 +606,10 @@ impl State {
                         println!("You have missed.({}, {})", x, y);
                         self.handle_miss_response(x, y);
                     },
+                    Message::DestroyedResponse {x, y} => {
+                        println!("Congratulations! You destroyed an enemy ship!");
+                        self.handle_destroyed_response(x, y);
+                    }
                     _ => println!("Message received: {:?}", server_response),
                 }
 

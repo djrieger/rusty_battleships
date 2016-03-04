@@ -29,10 +29,11 @@ impl Board {
                 None => ship_index = None,
                 Some(x) => {
                     ship_index = Some(x);
-                    self.ships[ship_index.unwrap() as usize].health_points -= 1;
-                    // if self.ships.ship_index.health_points == 0 {
-                    // TODO: What if it's destroyed?
-                    // }
+                    let mut ship = self.ships[ship_index.unwrap() as usize];
+                    ship.health_points -= 1;
+                    if ship.health_points == 0 {
+                        println!("Ship destroyed: {:?}", ship)// TODO: What if it's destroyed?
+                    }
                 },
             }
         } else { // We cannot know which ship we hit.
