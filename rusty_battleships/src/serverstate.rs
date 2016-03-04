@@ -17,9 +17,21 @@ macro_rules! hashmap {
     }}
 }
 
-fn add_update_all(lobby: &HashMap<String, Player>, updates: &mut HashMap<String, Vec<Message>>,
-        new_update: Message) {
-    for player in lobby.keys() {
+/// Send update to all players who are not currently playing a game.
+fn add_update_lobby(lobby: &HashMap<String, Player>,
+        updates: &mut HashMap<String, Vec<Message>>, new_update: Message) {
+    for player in lobby.keys()
+                       .filter(|p| lobby.get(*p).unwrap().game.is_none()) {
+        let player_updates = updates.entry(player.clone()).or_insert(vec![]);
+        player_updates.push(new_update.clone());
+    }
+}
+
+fn add_update_lobby_except(lobby: &HashMap<String, Player>, except_player: &String,
+        updates: &mut HashMap<String, Vec<Message>>, new_update: Message) {
+    for player in lobby.keys()
+                       .filter(|p| (*p) != except_player)
+                       .filter(|p| lobby.get(*p).unwrap().game.is_none()) {
         let player_updates = updates.entry(player.clone()).or_insert(vec![]);
         player_updates.push(new_update.clone());
     }
@@ -42,8 +54,13 @@ pub struct Result {
 }
 
 impl Result {
-    pub fn add_update_all(&mut self, lobby: &HashMap<String, Player>, new_update: Message) {
-        add_update_all(lobby, &mut self.updates, new_update);
+    pub fn add_update_lobby(&mut self, lobby: &HashMap<String, Player>, new_update: Message) {
+        add_update_lobby(lobby, &mut self.updates, new_update);
+    }
+
+    pub fn add_update_lobby_except(&mut self, lobby: &HashMap<String, Player>,
+            except_player: &String, new_update: Message) {
+        add_update_lobby_except(lobby, except_player, &mut self.updates, new_update);
     }
 
     pub fn respond(response: Message, terminate_connection: bool) -> Result {
@@ -131,7 +148,7 @@ pub fn terminate_player(name: &String, lobby: &mut HashMap<String, Player>,
 
     lobby.remove(name);
 
-    add_update_all(lobby, &mut result, Message::PlayerLeftUpdate{ nickname: name.clone() });
+    add_update_lobby(lobby, &mut result, Message::PlayerLeftUpdate{ nickname: name.clone() });
 
     return result;
 }
@@ -152,7 +169,7 @@ pub fn handle_login_request(username: String, player: &mut PlayerHandle, lobby: 
     } else {
         let mut result = Result::respond(Message::OkResponse, false);
 
-        result.add_update_all(lobby, Message::PlayerJoinedUpdate { nickname: username.clone() });
+        result.add_update_lobby(lobby, Message::PlayerJoinedUpdate { nickname: username.clone() });
 
         // Update lobby hashtable
         lobby.insert(username.clone(), Player {
@@ -169,27 +186,43 @@ pub fn handle_login_request(username: String, player: &mut PlayerHandle, lobby: 
 
 
 pub fn handle_ready_request(username: &String, lobby: &mut HashMap<String, Player>) -> Result {
-    let mut player = lobby.get_mut(username).unwrap();
+    let mut result;
 
-    if player.game.is_some() {
-        return Result::respond(Message::InvalidRequestResponse, false);
-    } else {
-        player.state = PlayerState::Ready;
-        return Result::respond(Message::OkResponse, false);
+    {
+        let mut player = lobby.get_mut(username).unwrap();
+
+        if player.game.is_some() {
+            return Result::respond(Message::InvalidRequestResponse, false);
+        } else {
+            player.state = PlayerState::Ready;
+            result = Result::respond(Message::OkResponse, false);
+        }
     }
+
+    result.add_update_lobby_except(lobby, username,
+        Message::PlayerReadyUpdate { nickname: username.clone() });
+
+    return result;
 }
 
 pub fn handle_not_ready_request(username: &String, lobby: &mut HashMap<String, Player>) -> Result {
-    let mut player = lobby.get_mut(username).unwrap();
+    let mut result;
 
-    match player.game {
-        None => {
+    {
+        let mut player = lobby.get_mut(username).unwrap();
+
+        if player.game.is_some() {
+            return Result::respond(Message::GameAlreadyStartedResponse, false);
+        } else {
             player.state = PlayerState::Available;
-            return Result::respond(Message::OkResponse, false);
-        },
-        Some(_) => return Result::respond(Message::GameAlreadyStartedResponse, false),
+            result = Result::respond(Message::OkResponse, false);
+        }
     }
-    panic!("Invalid state or request!");
+
+    result.add_update_lobby_except(lobby, username,
+        Message::PlayerNotReadyUpdate { nickname: username.clone() });
+
+    return result;
 }
 
 fn initialize_game(player1: &String, player2: &String) -> Rc<RefCell<Game>> {
@@ -199,42 +232,33 @@ fn initialize_game(player1: &String, player2: &String) -> Rc<RefCell<Game>> {
     return Rc::new(RefCell::new(Game::new(first_board, second_board, (*player1).clone(), (*player2).clone())));
 }
 
-pub fn handle_challenge_player_request(challenged_player_name: String, challenger_name: &String, lobby: &mut HashMap<String, Player>, games: &mut Vec<Rc<RefCell<Game>>>) -> Result {
-    let mut launch_game = false;
-
-    let not_waiting_result = Result::respond(Message::NotWaitingResponse {nickname: challenged_player_name.clone() }, false);
-
+pub fn handle_challenge_player_request(challenged_player_name: String, challenger_name: &String,
+        lobby: &mut HashMap<String, Player>, games: &mut Vec<Rc<RefCell<Game>>>) -> Result {
     // Is there a player called challenged_player_name?
     if let Some(ref mut challenged_player) = lobby.get_mut(&challenged_player_name) {
-        if challenged_player.game.is_some() {
-            // Challenged player is already in a game -> NotWaiting
-            return not_waiting_result;
+        if challenged_player.game.is_some() || challenged_player.state != PlayerState::Ready {
+            // Challenged player is already in a game or not ready anymore
+            return Result::respond(Message::NotWaitingResponse {
+                nickname: challenged_player_name.clone() }, false);
         }
-        if let PlayerState::Ready = challenged_player.state  {
-            // Challenged player is not in a game and Ready
-            challenged_player.state = PlayerState::Playing;
-            launch_game = true;
-        } else {
-            return not_waiting_result;
-        }
+
+        // Challenged player is not in a game and Ready
+        challenged_player.state = PlayerState::Playing;
     } else {
         return Result::respond(Message::NoSuchPlayerResponse {nickname:challenged_player_name}, false);
     }
 
-    if launch_game {
-        // Create and save new game
-        let new_game = initialize_game(challenger_name, &challenged_player_name);
-        lobby.get_mut(challenger_name).unwrap().state = PlayerState::Playing;
-        // Set game reference for both players
-        lobby.get_mut(challenger_name).unwrap().game = Some(new_game.clone());
-        lobby.get_mut(&challenged_player_name).unwrap().game = Some(new_game.clone());
-        games.push(new_game);
-        // tell challenged player about the game
-        let update_message = Message::GameStartUpdate {nickname: (*challenger_name).clone() };
-        // OkResponse for player who issued challenge
-        return Result::respond_and_update_single(Message::OkResponse, hashmap![challenged_player_name => vec![update_message]], false);
-    }
-    panic!("Invalid state or request!");
+    // Create and save new game
+    let new_game = initialize_game(challenger_name, &challenged_player_name);
+    lobby.get_mut(challenger_name).unwrap().state = PlayerState::Playing;
+    // Set game reference for both players
+    lobby.get_mut(challenger_name).unwrap().game = Some(new_game.clone());
+    lobby.get_mut(&challenged_player_name).unwrap().game = Some(new_game.clone());
+    games.push(new_game);
+    // tell challenged player about the game
+    let update_message = Message::GameStartUpdate {nickname: (*challenger_name).clone() };
+    // OkResponse for player who issued challenge
+    return Result::respond_and_update_single(Message::OkResponse, hashmap![challenged_player_name => vec![update_message]], false);
 }
 
 pub fn handle_surrender_request(username: &String, lobby: &mut HashMap<String, Player>,
@@ -259,7 +283,7 @@ pub fn handle_surrender_request(username: &String, lobby: &mut HashMap<String, P
 }
 
 pub fn handle_report_error_request(errormessage: String, player: &mut PlayerHandle, lobby: &mut HashMap<String, Player>, games: &mut Vec<Rc<RefCell<Game>>>) -> Result {
-    let mut termination_result: Result = return Result {
+    let mut termination_result = Result {
         response: None,
         updates: HashMap::new(),
         terminate_connection: true,
@@ -335,7 +359,7 @@ fn handle_move(game: &mut Game, player_name: &String, movement: (usize, Directio
         return Some(Result::respond(Message::InvalidRequestResponse, false));
     }
 
-    let mut movement_allowed = true;
+    let movement_allowed;
     let ref mut my_board = if *game.player1 == *player_name { &mut game.board2 } else { &mut game.board1 };
     {
         let ref mut my_ship = my_board.ships[ship_index - 1];

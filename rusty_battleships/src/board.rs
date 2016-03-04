@@ -51,6 +51,7 @@ impl Player {
 //     }
 }
 
+#[derive(PartialEq)]
 pub enum PlayerState {
     Available,
     Ready,
