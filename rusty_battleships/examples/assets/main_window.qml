@@ -17,7 +17,20 @@ ApplicationWindow {
       interval: 50
       running: true
       repeat: true
-      onTriggered: infoLabel.text = bridge.poll_state() // console.log("ping!") // TODO: poll model, update view
+      onTriggered: {
+        statusLabel.text = bridge.poll_state();
+        logLabel.text = bridge.poll_log();
+      }
+    }
+
+    statusBar: StatusBar {
+        RowLayout {
+            anchors.fill: parent
+            RowLayout {
+                Label { text: "Read Only"; id: statusLabel }
+                Label { text: "Read Only"; id: logLabel }
+            }
+        }
     }
 
     RowLayout {
@@ -41,6 +54,25 @@ ApplicationWindow {
             }
         }
 
+    ColumnLayout {
+         RowLayout {
+              TextField {
+                id: hostnameField
+                Layout.fillWidth: true
+
+                placeholderText: "Enter host"
+                focus: true
+
+                onAccepted: connect()
+              }
+
+              Button {
+                text: "Connect"
+
+                onClicked: connect()
+              }
+          }
+
          RowLayout {
               TextField {
                 id: usernameField
@@ -57,13 +89,13 @@ ApplicationWindow {
 
                 onClicked: login()
               }
+            }
 
               Label {
                 id: infoLabel
                 text: ""
               }
-
-            }
+    }
 
         ListView {
             id: userList
@@ -113,8 +145,54 @@ ApplicationWindow {
         }
     }
 
+    RowLayout {
+        Rectangle {
+            width: 200; height: 200; color: "black"
+
+            Grid {
+                x: 5; y: 5
+                rows: 6; columns: 6; spacing: 2
+
+                Repeater { 
+                    model: 36
+                    Button { 
+                        width: 30; height: 30
+                        Text { text: "X" //index
+                          font.pointSize: 15
+                          anchors.centerIn: parent 
+                        }
+                    }
+                }
+            }
+        }
+
+        Rectangle {
+            width: 200; height: 200; color: "black"
+
+            Grid {
+                x: 5; y: 5
+                rows: 6; columns: 6; spacing: 2
+
+                Repeater { 
+                    model: 36
+                    Button { 
+                        width: 30; height: 30
+                        Text { text: "X" //index
+                          font.pointSize: 15
+                          anchors.centerIn: parent 
+                        }
+                    }
+                }
+            }
+        }
+    }
+
                function login() {
                   bridge.send_login_request(usernameField.text);
+              }
+
+              function connect() {
+                  bridge.connect(hostnameField.text);
               }
 }
 
