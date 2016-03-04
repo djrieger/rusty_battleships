@@ -37,13 +37,25 @@ fn add_update_lobby_except(lobby: &HashMap<String, Player>, except_player: &Stri
     }
 }
 
+fn list_lobby_for(lobby: &HashMap<String, Player>, username: &String) -> Vec<Message> {
+    let mut result = vec![];
+
+    for (name, player) in lobby {
+        if name != username {
+            result.push(Message::PlayerJoinedUpdate { nickname: name.clone() });
+            if player.state == PlayerState::Ready {
+                result.push(Message::PlayerReadyUpdate { nickname: name.clone() });
+            }
+        }
+    }
+
+    return result;
+}
+
 fn merge_updates(updates: &mut HashMap<String, Vec<Message>>, mut additional_updates: HashMap<String, Vec<Message>>) {
     for (receiver_name, update_vec) in additional_updates.drain() {
-        if !updates.contains_key(&receiver_name) {
-            updates.insert(receiver_name, update_vec);
-        } else {
-            updates.get_mut(&receiver_name).as_mut().unwrap().extend(update_vec);
-        }
+        let receiver_updates = updates.entry(receiver_name.clone()).or_insert(vec![]);
+        receiver_updates.extend(update_vec);
     }
 }
 
@@ -54,6 +66,11 @@ pub struct Result {
 }
 
 impl Result {
+    pub fn add_list_lobby_for(&mut self, lobby: &HashMap<String, Player>, username: &String) {
+        let player_updates = self.updates.entry(username.clone()).or_insert(vec![]);
+        player_updates.extend(list_lobby_for(lobby, username));
+    }
+
     pub fn add_update_lobby(&mut self, lobby: &HashMap<String, Player>, new_update: Message) {
         add_update_lobby(lobby, &mut self.updates, new_update);
     }
@@ -102,10 +119,12 @@ fn terminate_game(games: &mut Vec<Rc<RefCell<Game>>>, game: Rc<RefCell<Game>>,
         p1.state = PlayerState::Available;
     }
     if reason != Reason::Disconnected {
-        updates.insert(active_player_name.clone(), vec![Message::GameOverUpdate {
+        let mut active_player_updates = vec![Message::GameOverUpdate {
             reason: reason,
             victorious: victorious
-        }]);
+        }];
+        active_player_updates.extend(list_lobby_for(lobby, active_player_name));
+        updates.insert(active_player_name.clone(), active_player_updates);
     }
 
     // delete game for opponent
@@ -114,10 +133,12 @@ fn terminate_game(games: &mut Vec<Rc<RefCell<Game>>>, game: Rc<RefCell<Game>>,
         p2.game = None;
         p2.state = PlayerState::Available;
     }
-    updates.insert(opponent_name.clone(), vec![Message::GameOverUpdate {
+    let mut opponent_updates = vec![Message::GameOverUpdate {
         reason: reason,
         victorious: !victorious
-    }]);
+    }];
+    opponent_updates.extend(list_lobby_for(lobby, opponent_name));
+    updates.insert(opponent_name.clone(), opponent_updates);
 
     // delete game
     games.retain(|g| (*(*g).borrow()) != (*game_ref));
@@ -169,6 +190,7 @@ pub fn handle_login_request(username: String, player: &mut PlayerHandle, lobby: 
     } else {
         let mut result = Result::respond(Message::OkResponse, false);
 
+        result.add_list_lobby_for(lobby, &username);
         result.add_update_lobby(lobby, Message::PlayerJoinedUpdate { nickname: username.clone() });
 
         // Update lobby hashtable
@@ -178,7 +200,6 @@ pub fn handle_login_request(username: String, player: &mut PlayerHandle, lobby: 
         });
         // Update player struct
         player.nickname = Some(username.clone());
-
 
         return result;
     }

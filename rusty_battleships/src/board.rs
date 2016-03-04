@@ -55,7 +55,6 @@ impl Player {
 pub enum PlayerState {
     Available,
     Ready,
-    Waiting,
     Playing
 }
 
