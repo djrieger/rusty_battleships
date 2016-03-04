@@ -319,6 +319,23 @@ pub fn handle_report_error_request(errormessage: String, player: &mut PlayerHand
     return termination_result;
 }
 
+fn placement2ships(placement: [ShipPlacement; 5]) -> Vec<Ship> {
+    let mut ships = vec![];
+    let lengths_and_hp = vec![5, 4, 3, 2, 2];
+    for (&ship_placement, &length_and_hp) in placement.iter().zip(lengths_and_hp.iter()) {
+        let ShipPlacement { x, y, direction } = ship_placement;
+        let ship = Ship {
+            x: x as isize,
+            y: y as isize,
+            horizontal: direction == Direction::West || direction == Direction::East, // FIXME?
+            length: length_and_hp,
+            health_points: length_and_hp,
+        };
+        ships.push(ship);
+    }
+    return ships;
+}
+
 pub fn handle_place_ships_request(placement: [ShipPlacement; 5], player_name: &String, lobby: &mut HashMap<String, Player>) -> Result {
     let player = lobby.get_mut(player_name).unwrap();
 
@@ -327,21 +344,7 @@ pub fn handle_place_ships_request(placement: [ShipPlacement; 5], player_name: &S
             return Result::respond(Message::InvalidRequestResponse, false);
         }
 
-        // Translate placement to ships vector
-        let mut ships = vec![];
-        let lengths_and_hp = vec![5, 4, 3, 2, 2];
-        for (&ship_placement, &length_and_hp) in placement.iter().zip(lengths_and_hp.iter()) {
-            let ShipPlacement { x, y, direction } = ship_placement;
-            let ship = Ship {
-                x: x as isize,
-                y: y as isize,
-                horizontal: direction == Direction::West || direction == Direction::East, // FIXME?
-                length: length_and_hp,
-                health_points: length_and_hp,
-            };
-            ships.push(ship);
-        }
-
+        let ships = placement2ships(placement);
         let new_board_valid;
         let opponent_ready;
         {
@@ -360,15 +363,15 @@ pub fn handle_place_ships_request(placement: [ShipPlacement; 5], player_name: &S
         // Check if new state is valid
         if !new_board_valid {
             return Result::respond(Message::InvalidRequestResponse, false);
+        } 
+
+        let mut game_ref = (*game).borrow_mut();
+        // opponent also done placing ships?
+        if opponent_ready {
+            game_ref.state = GameState::Running;
+            return Result::respond_and_update_single(Message::OkResponse, game_ref.switch_turns(), false);
         } else {
-            let mut game_ref = (*game).borrow_mut();
-            // opponent also done placing ships?
-            if opponent_ready {
-                game_ref.state = GameState::Running;
-                return Result::respond_and_update_single(Message::OkResponse, game_ref.switch_turns(), false);
-            } else {
-                return Result::respond(Message::OkResponse, false);
-            }
+            return Result::respond(Message::OkResponse, false);
         }
     }
 
