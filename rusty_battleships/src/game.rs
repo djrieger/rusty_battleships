@@ -1,6 +1,7 @@
 extern crate time;
 
 use std::collections::HashMap;
+
 use board::{Board};
 use message::{Message, Reason};
 
@@ -16,8 +17,8 @@ pub struct Game {
     pub player2: String,
     last_turn_started_at: Option<time::PreciseTime>,
     player1_active: bool,
-    pub player1_afk_count: u8,
-    pub player2_afk_count: u8,
+    player1_afk_count: u8,
+    player2_afk_count: u8,
     pub state: GameState,
 }
 
@@ -95,5 +96,17 @@ impl Game {
 
     pub fn is_player1_active(&self) -> bool {
         self.player1_active
+    }
+
+    pub fn get_active_player_afk_count(&self) -> u8 {
+        if self.player1_active { self.player1_afk_count } else { self.player2_afk_count }
+    }
+
+    pub fn inc_active_player_afk_count(&mut self) -> () {
+        if self.player1_active {
+            self.player1_afk_count += 1;
+        } else {
+            self.player2_afk_count += 1;
+        }
     }
 }

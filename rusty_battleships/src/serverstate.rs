@@ -437,14 +437,14 @@ pub fn handle_afk(game: Rc<RefCell<Game>>, lobby: &mut HashMap<String, Player>,
     {
         let mut game_ref = (*game).borrow_mut();
         active_player = game_ref.get_active_player();
-        let ref mut exceeded_count = if game_ref.is_player1_active() { game_ref.player1_afk_count } else { game_ref.player2_afk_count };
+        let strike_count = game_ref.get_active_player_afk_count();
 
-        if *exceeded_count < 2 {
-            *exceeded_count += 1;
+        if strike_count < 2 {
+            game_ref.inc_active_player_afk_count();
             let opponent_name = game_ref.get_opponent_name(&game_ref.get_active_player()).clone();
             let mut afk_updates = hashmap![
-                active_player => vec![Message::AfkWarningUpdate { strikes: *exceeded_count }],
-                opponent_name => vec![Message::EnemyAfkUpdate { strikes: *exceeded_count }]
+                active_player => vec![Message::AfkWarningUpdate { strikes: strike_count + 1 }],
+                opponent_name => vec![Message::EnemyAfkUpdate { strikes: strike_count + 1 }]
             ];
             merge_updates(&mut afk_updates, game_ref.switch_turns());
             return afk_updates;
