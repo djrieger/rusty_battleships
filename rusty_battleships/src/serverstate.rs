@@ -196,7 +196,7 @@ fn initialize_game(player1: &String, player2: &String) -> Rc<RefCell<Game>> {
     let first_board = Board::new(vec![]);
     let second_board = Board::new(vec![]);
 
-    return Rc::new(RefCell::new(Game::new(first_board, second_board, (*player1).clone(), (*player1).clone())));
+    return Rc::new(RefCell::new(Game::new(first_board, second_board, (*player1).clone(), (*player2).clone())));
 }
 
 pub fn handle_challenge_player_request(challenged_player_name: String, challenger_name: &String, lobby: &mut HashMap<String, Player>, games: &mut Vec<Rc<RefCell<Game>>>) -> Result {
