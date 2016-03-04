@@ -64,7 +64,7 @@ fn handle_client(stream: TcpStream, tx: mpsc::SyncSender<ToMainThreadCommand>, r
         loop {
             let request = deserialize_message(&mut buff_reader);
             let is_error = request.is_err();
-            tx_client_msg.send(request);
+            tx_client_msg.send(request).unwrap();
             if is_error {
                 return;
             }
@@ -215,11 +215,11 @@ fn main() {
                         if let Some(response) = result.response {
                             // handle_main generated a response -> send response Message back to child
                             println!("#{} ({}): {}", i, player_handle.nickname.clone().unwrap_or("".to_owned()), Cyan.paint(format!("{:?}", response)));
-                            player_handle.to_child_endpoint.send(ToChildCommand::Message(response));
+                            player_handle.to_child_endpoint.send(ToChildCommand::Message(response)).unwrap();
                         }
                         if result.terminate_connection {
                             println!("-- Closing connection to child {}", i);
-                            player_handle.to_child_endpoint.send(ToChildCommand::TerminateConnection);
+                            player_handle.to_child_endpoint.send(ToChildCommand::TerminateConnection).unwrap();
                         }
                         if !result.updates.is_empty() {
                             message_store = result.updates;
@@ -230,7 +230,7 @@ fn main() {
                         if let Some(ref name) = player_handle.nickname {
                             message_store = serverstate::terminate_player(name, &mut lobby, &mut games);
                         }
-                        player_handle.to_child_endpoint.send(ToChildCommand::TerminateConnection);
+                        player_handle.to_child_endpoint.send(ToChildCommand::TerminateConnection).unwrap();
                     }
                 }
             }
@@ -240,12 +240,12 @@ fn main() {
 
         // Send updates issued by handle_afk() for all games with exceeded turn times
         let mut afk_games: Vec<Rc<RefCell<Game>>> = vec![];
-        for game in games.iter() {
-            if game.borrow_mut().turn_time_exceeded() {
+        for game in &games {
+            if (*game).borrow_mut().turn_time_exceeded() {
                 afk_games.push(game.clone());
             }
         }
-        for game in afk_games {
+        for game in &afk_games {
             let mut result = serverstate::handle_afk(game.clone(), &mut lobby, &mut games);
             send_updates(&mut player_handles, &mut result);
         }
@@ -265,7 +265,7 @@ fn send_updates(player_handles: &mut Vec<board::PlayerHandle>, message_store: &m
             if message_store.contains_key(name) {
                 for message in message_store.remove(name).unwrap() {
                     println!("#{} ({}): {}", i, name, Yellow.paint(format!("{:?}", message)));
-                    player_handle.to_child_endpoint.send(ToChildCommand::Message(message));
+                    player_handle.to_child_endpoint.send(ToChildCommand::Message(message)).unwrap();
                 }
             }
         }
