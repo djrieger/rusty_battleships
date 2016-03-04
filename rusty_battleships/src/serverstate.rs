@@ -369,7 +369,10 @@ pub fn handle_place_ships_request(placement: [ShipPlacement; 5], player_name: &S
         // opponent also done placing ships?
         if opponent_ready {
             game_ref.state = GameState::Running;
-            return Result::respond_and_update_single(Message::OkResponse, game_ref.switch_turns(), false);
+            let mut result = Result::respond(Message::OkResponse, false);
+            result.updates.insert(game_ref.get_active_player(), vec![Message::YourTurnUpdate]);
+            result.updates.insert(game_ref.get_waiting_player(), vec![Message::EnemyTurnUpdate]);
+            return result;
         } else {
             return Result::respond(Message::OkResponse, false);
         }
@@ -447,7 +450,7 @@ fn handle_shoot(games: &mut Vec<Rc<RefCell<Game>>>, game: Rc<RefCell<Game>>,
         return Result::respond_and_update_single(response_msg, updates, false);
     } else {
         let mut game_ref = (*game).borrow_mut();
-        merge_updates(&mut updates, game_ref.switch_turns());
+        game_ref.switch_turns();
         return Result::respond_and_update_single(response_msg, updates, false);
     }
 }
@@ -503,13 +506,12 @@ pub fn handle_afk(game: Rc<RefCell<Game>>, lobby: &mut HashMap<String, Player>,
 
         if strike_count < 2 {
             game_ref.inc_active_player_afk_count();
+            game_ref.switch_turns();
             let opponent_name = game_ref.get_opponent_name(&game_ref.get_active_player()).clone();
-            let mut afk_updates = hashmap![
+            return hashmap![
                 active_player => vec![Message::AfkWarningUpdate { strikes: strike_count + 1 }],
                 opponent_name => vec![Message::EnemyAfkUpdate { strikes: strike_count + 1 }]
             ];
-            merge_updates(&mut afk_updates, game_ref.switch_turns());
-            return afk_updates;
         }
     }
 
