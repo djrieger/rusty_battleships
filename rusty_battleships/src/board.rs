@@ -73,6 +73,13 @@ pub struct CellState {
     pub visible: bool,
     pub ship_index: Option<u8>,
 }
+ 
+impl CellState {
+    fn new() -> CellState {
+        CellState { visible: false, ship_index: None }
+    }
+}
+
 
 // #[derive(Copy, Clone)]
 pub struct Board {
@@ -89,13 +96,13 @@ pub enum HitResult {
 impl Board {
     pub fn new(ships: Vec<Ship>) -> Board {
         Board {
-            state: [[CellState { visible: false, ship_index: None }; H]; W],
+            state: [[CellState::new(); H]; W],
             ships: ships,
         }
     }
 
     fn clear(&mut self) -> () {
-        self.state =  [[CellState { visible: false, ship_index: None }; H]; W];
+        self.state =  [[CellState::new(); H]; W];
     }
 
     pub fn hit(&mut self, x: usize, y: usize) -> HitResult {
