@@ -18,48 +18,6 @@ macro_rules! hashmap {
     }}
 }
 
-/// Send update to all players who are not currently playing a game.
-fn add_update_lobby(lobby: &HashMap<String, Player>,
-        updates: &mut HashMap<String, Vec<Message>>, new_update: Message) {
-    for player in lobby.keys()
-                       .filter(|p| lobby.get(*p).unwrap().game.is_none()) {
-        let player_updates = updates.entry(player.clone()).or_insert(vec![]);
-        player_updates.push(new_update.clone());
-    }
-}
-
-fn add_update_lobby_except(lobby: &HashMap<String, Player>, except_player: &String,
-        updates: &mut HashMap<String, Vec<Message>>, new_update: Message) {
-    for player in lobby.keys()
-                       .filter(|p| (*p) != except_player)
-                       .filter(|p| lobby.get(*p).unwrap().game.is_none()) {
-        let player_updates = updates.entry(player.clone()).or_insert(vec![]);
-        player_updates.push(new_update.clone());
-    }
-}
-
-fn list_lobby_for(lobby: &HashMap<String, Player>, username: &String) -> Vec<Message> {
-    let mut result = vec![];
-
-    for (name, player) in lobby {
-        if name != username {
-            result.push(Message::PlayerJoinedUpdate { nickname: name.clone() });
-            if player.state == PlayerState::Ready {
-                result.push(Message::PlayerReadyUpdate { nickname: name.clone() });
-            }
-        }
-    }
-
-    return result;
-}
-
-fn merge_updates(updates: &mut HashMap<String, Vec<Message>>, mut additional_updates: HashMap<String, Vec<Message>>) {
-    for (receiver_name, update_vec) in additional_updates.drain() {
-        let receiver_updates = updates.entry(receiver_name.clone()).or_insert(vec![]);
-        receiver_updates.extend(update_vec);
-    }
-}
-
 pub struct Result {
     pub response: Option<Message>,
     pub updates: HashMap<String, Vec<Message>>,
@@ -102,6 +60,48 @@ impl Result {
     }
     pub fn empty() -> Result {
         return Result { response: None, updates: hashmap![], terminate_connection: false };
+    }
+}
+
+/// Send update to all players who are not currently playing a game.
+fn add_update_lobby(lobby: &HashMap<String, Player>,
+        updates: &mut HashMap<String, Vec<Message>>, new_update: Message) {
+    for player in lobby.keys()
+                       .filter(|p| lobby.get(*p).unwrap().game.is_none()) {
+        let player_updates = updates.entry(player.clone()).or_insert(vec![]);
+        player_updates.push(new_update.clone());
+    }
+}
+
+fn add_update_lobby_except(lobby: &HashMap<String, Player>, except_player: &String,
+        updates: &mut HashMap<String, Vec<Message>>, new_update: Message) {
+    for player in lobby.keys()
+                       .filter(|p| (*p) != except_player)
+                       .filter(|p| lobby.get(*p).unwrap().game.is_none()) {
+        let player_updates = updates.entry(player.clone()).or_insert(vec![]);
+        player_updates.push(new_update.clone());
+    }
+}
+
+fn list_lobby_for(lobby: &HashMap<String, Player>, username: &String) -> Vec<Message> {
+    let mut result = vec![];
+
+    for (name, player) in lobby {
+        if name != username {
+            result.push(Message::PlayerJoinedUpdate { nickname: name.clone() });
+            if player.state == PlayerState::Ready {
+                result.push(Message::PlayerReadyUpdate { nickname: name.clone() });
+            }
+        }
+    }
+
+    return result;
+}
+
+fn merge_updates(updates: &mut HashMap<String, Vec<Message>>, mut additional_updates: HashMap<String, Vec<Message>>) {
+    for (receiver_name, update_vec) in additional_updates.drain() {
+        let receiver_updates = updates.entry(receiver_name.clone()).or_insert(vec![]);
+        receiver_updates.extend(update_vec);
     }
 }
 
@@ -445,7 +445,7 @@ fn handle_shoot(games: &mut Vec<Rc<RefCell<Game>>>, game: Rc<RefCell<Game>>,
             HitResult::Destroyed => {
                 response_msg = Message::DestroyedResponse { x: target_x, y: target_y };
                 if !game_over {
-                    // TODO which update for enemy?
+                    updates = hashmap![opponent_name.clone() => vec![Message::EnemyHitUpdate { x: target_x, y: target_y }]];
                 }
             },
         }
