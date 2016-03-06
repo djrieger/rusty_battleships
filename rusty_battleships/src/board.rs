@@ -78,10 +78,16 @@ impl CellState {
     fn new() -> CellState {
         CellState { visible: false, ship_index: None }
     }
+
+    pub fn has_ship(&self) -> bool {
+        self.ship_index.is_some()
+    }
+
+    pub fn set_ship(&mut self, ship_index: u8) {
+        self.ship_index = Some(ship_index);
+    }
 }
 
-
-// #[derive(Copy, Clone)]
 pub struct Board {
     pub ships: Vec<Ship>,
     pub state: [[CellState; H]; W],
@@ -148,21 +154,19 @@ impl Board {
         let mut new_state = [[CellState::new(); H]; W];
         let mut visibility_updates = vec![];
 
-        for (ship_index, ship) in self.ships.iter().filter(|ship| ship.health_points > 0).enumerate() {
+        for (ship_index, ship) in self.ships.iter().filter(|ship| !ship.is_dead()).enumerate() {
             for i in 0..ship.length  {
                 let (dest_x, dest_y) = Board::get_ship_dest_coords(ship, i);
-                if !self.coords_valid(dest_x, dest_y) || new_state[dest_x][dest_y].ship_index.is_some() {
+                if !self.coords_valid(dest_x, dest_y) || new_state[dest_x][dest_y].has_ship() {
                     // coordinates are invalid or there is another ship at these coordinates
                     return (false, vec![]);
                 } else {
                     let ref cell = self.state[dest_x][dest_y];
-                    if cell.visible {
-                        if cell.ship_index.is_none() {
-                            // no ship was here before but now this ship occupies this cell
-                            visibility_updates.push(Message::EnemyVisibleUpdate { x: dest_x as u8, y: dest_y as u8 });
-                        }
+                    if cell.visible && cell.has_ship() {
+                        // no ship was here before but now this ship occupies this cell
+                        visibility_updates.push(Message::EnemyVisibleUpdate { x: dest_x as u8, y: dest_y as u8 });
                     }
-                    new_state[dest_x as usize][dest_y as usize].ship_index = Some((ship_index + 1) as u8);
+                    new_state[dest_x as usize][dest_y as usize].set_ship((ship_index + 1) as u8);
                 }
             }
         }
@@ -173,7 +177,7 @@ impl Board {
             for y in 0..H {
                 // copy visibility information to new state
                 new_state[x][y].visible = self.state[x][y].visible;
-                if self.state[x][y].visible && self.state[x][y].ship_index.is_some() && new_state[x][y].ship_index.is_none() {
+                if self.state[x][y].visible && self.state[x][y].has_ship() && !new_state[x][y].has_ship() {
                     visibility_updates.push(Message::EnemyInvisibleUpdate { x: x as u8, y: y as u8 });
                 }
             }
