@@ -9,7 +9,6 @@ extern crate time;
 
 pub const W: usize = 16;
 pub const H: usize = 10;
-pub const SHIP_COUNT: usize = 2;
 
 pub enum ToChildCommand {
     Message(Message),
@@ -23,8 +22,6 @@ pub enum ToMainThreadCommand {
 
 pub struct PlayerHandle {
     pub nickname: Option<String>,
-    // Sending None to the main thread indicates that the client will be terminated and requests
-    // cleanup operations such as terminating a running game for that client
     pub from_child_endpoint: mpsc::Receiver<ToMainThreadCommand>,
     pub to_child_endpoint: mpsc::Sender<ToChildCommand>,
 }
@@ -148,9 +145,11 @@ impl Board {
         // some ship moved out of some cell
         for x in 0..W {
             for y in 0..H {
+                let ref old_cell = self.state[x][y];
+                let ref mut new_cell = new_state[x][y];
                 // copy visibility information to new state
-                new_state[x][y].visible = self.state[x][y].visible;
-                if self.state[x][y].visible && self.state[x][y].has_ship() && !new_state[x][y].has_ship() {
+                new_cell.visible = old_cell.visible;
+                if old_cell.visible && old_cell.has_ship() && !new_cell.has_ship() {
                     visibility_updates.push(Message::EnemyInvisibleUpdate { x: x as u8, y: y as u8 });
                 }
             }
