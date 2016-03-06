@@ -124,51 +124,63 @@ impl Board {
         }
     }
 
-    pub fn get_visibility_updates(&self) -> Vec<Message> {
-        let mut visibility_updates = vec![];
-        for x in 0..W - 1 {
-            for y in 0..H - 1 {
-                let ref cell = self.state[x][y];
-                if cell.visible {
-                    let ship_index = cell.ship_index;
-                    // if there is a ship that is not dead -> send visible update
-                    if ship_index.is_some() && self.ships[ship_index.unwrap() as usize - 1].health_points > 0 {
-                        visibility_updates.push(Message::EnemyVisibleUpdate { x: x as u8, y: y as u8 });
-                    } else {
-                        visibility_updates.push(Message::EnemyInvisibleUpdate { x: x as u8, y: y as u8 });
-                    }
-                }
-            }
-        }
-        visibility_updates
+    fn coords_valid(&self, x: usize, y: usize) -> bool {
+        return !(x < 0 || y < 0 || x >= (W as usize) - 1 || y >= (H as usize) - 1);
     }
 
+    fn get_ship_dest_coords(ship: &Ship, i: usize) -> (usize, usize) {
+        let mut dest = (ship.x, ship.y);
+        if ship.horizontal {
+            dest.0 += i as isize;
+        } else { 
+            dest.1 += i as isize;
+        }
+        return (dest.0 as usize, dest.1 as usize);
+    }
+        
     /**
      * Compute new board state.
-     * @return true if board state is valid, false otherwise (if ships overlap or are outside board
+     * @return.0 true if board state is valid, false otherwise (if ships overlap or are outside board
      * boarders)
+     * @return.1 a list of visibility updates caused by recent movement
      */
-    pub fn compute_state(&mut self) -> bool {
-        self.clear();
-        let mut dest;
-        for (ship_index, ship) in self.ships.iter().enumerate() {
+    pub fn compute_state(&mut self) -> (bool, Vec<Message>) {
+        let mut new_state = [[CellState::new(); H]; W];
+        let mut visibility_updates = vec![];
+
+        for (ship_index, ship) in self.ships.iter().filter(|ship| ship.health_points > 0).enumerate() {
             for i in 0..ship.length  {
-                if ship.health_points == 0 {
-                    continue;
-                }
-                if ship.horizontal {
-                    dest = (ship.x + (i as isize), ship.y);
+                let (dest_x, dest_y) = Board::get_ship_dest_coords(ship, i);
+                if !self.coords_valid(dest_x, dest_y) || new_state[dest_x][dest_y].ship_index.is_some() {
+                    // coordinates are invalid or there is another ship at these coordinates
+                    return (false, vec![]);
                 } else {
-                    dest = (ship.x, ship.y + (i as isize));
-                }
-                if dest.0 < 0 || dest.1 < 0 || dest.0 >= (W as isize) - 1 || dest.1 >= (H as isize) - 1 || self.state[dest.0 as usize][dest.1 as usize].ship_index.is_some() {
-                    return false;
-                } else {
-                    self.state[dest.0 as usize][dest.1 as usize].ship_index = Some((ship_index + 1) as u8);
+                    let ref cell = self.state[dest_x][dest_y];
+                    if cell.visible {
+                        if cell.ship_index.is_none() {
+                            // no ship was here before but now this ship occupies this cell
+                            visibility_updates.push(Message::EnemyVisibleUpdate { x: dest_x as u8, y: dest_y as u8 });
+                        }
+                    }
+                    new_state[dest_x as usize][dest_y as usize].ship_index = Some((ship_index + 1) as u8);
                 }
             }
         }
-        return true;
+
+        // Find all cells that had ships in old state (self.state) but no longer in new_state ->
+        // some ship moved out of some cell
+        for x in 0..W {
+            for y in 0..H {
+                // copy visibility information to new state
+                new_state[x][y].visible = self.state[x][y].visible;
+                if self.state[x][y].visible && self.state[x][y].ship_index.is_some() && new_state[x][y].ship_index.is_none() {
+                    visibility_updates.push(Message::EnemyInvisibleUpdate { x: x as u8, y: y as u8 });
+                }
+            }
+        }
+
+        self.state = new_state;
+        return (true, visibility_updates);
     }
 
     pub fn is_dead(&self) -> bool {

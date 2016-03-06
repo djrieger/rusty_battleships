@@ -351,11 +351,11 @@ pub fn handle_place_ships_request(placement: [ShipPlacement; 5], player_name: &S
             let mut game_ref = (*game).borrow_mut();
             if game_ref.player1 == *player_name {
                 game_ref.board1.ships = ships;
-                new_board_valid = game_ref.board1.compute_state();
+                new_board_valid = game_ref.board1.compute_state().0;
                 opponent_ready = game_ref.board2.ships.len() > 0;
             } else {
                 game_ref.board2.ships = ships;
-                new_board_valid = game_ref.board2.compute_state();
+                new_board_valid = game_ref.board2.compute_state().0;
                 opponent_ready = game_ref.board1.ships.len() > 0;
             };
         }
@@ -381,11 +381,16 @@ pub fn handle_place_ships_request(placement: [ShipPlacement; 5], player_name: &S
     return Result::respond(Message::InvalidRequestResponse, false);
 }
 
-fn handle_move(game: &mut Game, player_name: &String, movement: (usize, Direction)) -> Option<Result> {
+/**
+ * Tries performing the requested movement
+ * If the movement was invalid (invalid ship index, out of bounds etc.) None is returned
+ * Otherwise Some is returned with a vector of visibility updates
+ */
+fn handle_move(game: &mut Game, player_name: &String, movement: (usize, Direction)) -> Option<Vec<Message>> {
     let (ship_index, direction) = movement;
     if ship_index < 1 || ship_index > 5 {
         // ship index is out of bounds
-        return Some(Result::respond(Message::InvalidRequestResponse, false));
+        return None;
     }
 
     let movement_allowed;
@@ -395,25 +400,31 @@ fn handle_move(game: &mut Game, player_name: &String, movement: (usize, Directio
         movement_allowed = my_ship.move_me(direction);
     }
 
-    if !movement_allowed || !my_board.compute_state() {
-        return Some(Result::respond(Message::InvalidRequestResponse, false));
+    if !movement_allowed {
+        return None;
     }
 
-    None
+    let (state_valid, visibility_updates) = my_board.compute_state();
+    if !state_valid {
+        return None;
+    }
+
+    return Some(visibility_updates);
 }
 
 fn handle_shoot(games: &mut Vec<Rc<RefCell<Game>>>, game: Rc<RefCell<Game>>,
         lobby: &mut HashMap<String, Player>, player_name: &String, target_x: u8,
-        target_y: u8) -> Result {
+        target_y: u8, visibility_updates: Vec<Message>) -> Result {
     let game_over;
     let hit_result;
     let response_msg;
     let mut updates = hashmap![];
+    let opponent_name;
 
     // evaluate shot
     {
         let mut game_ref = (*game).borrow_mut();
-        let opponent_name = game_ref.get_opponent_name(player_name).to_owned();
+        opponent_name = game_ref.get_opponent_name(player_name).to_owned();
 
         {
             let ref mut opponent_board = if game_ref.player1 != *player_name { &mut game_ref.board2 } else { &mut game_ref.board1 };
@@ -425,16 +436,10 @@ fn handle_shoot(games: &mut Vec<Rc<RefCell<Game>>>, game: Rc<RefCell<Game>>,
             HitResult::Hit => {
                 response_msg = Message::HitResponse { x: target_x, y: target_y };
                 updates = hashmap![opponent_name.clone() => vec![Message::EnemyHitUpdate { x: target_x, y: target_y }]];
-
-                let visibility_updates = hashmap![(*player_name).clone() => game_ref.get_board(player_name).get_visibility_updates()];
-                merge_updates(&mut updates, visibility_updates);
             },
             HitResult::Miss => {
                 response_msg = Message::MissResponse { x: target_x, y: target_y };
                 updates = hashmap![opponent_name.clone() => vec![Message::EnemyMissUpdate { x: target_x, y: target_y }]];
-
-                let visibility_updates = hashmap![(*player_name).clone() => game_ref.get_board(player_name).get_visibility_updates()];
-                merge_updates(&mut updates, visibility_updates);
             },
             HitResult::Destroyed => {
                 response_msg = Message::DestroyedResponse { x: target_x, y: target_y };
@@ -444,6 +449,8 @@ fn handle_shoot(games: &mut Vec<Rc<RefCell<Game>>>, game: Rc<RefCell<Game>>,
             },
         }
     }
+
+    merge_updates(&mut updates, hashmap![opponent_name => visibility_updates]);
 
     if game_over {
         updates = terminate_game(games, game, lobby, player_name, true, Reason::Obliterated);
@@ -471,6 +478,8 @@ pub fn handle_move_shoot_request(target_coords: (u8, u8),
         game = active_game.as_ref().unwrap().clone();
     }
 
+    let mut visibility_updates = vec![];
+
     {
         // check if in valid state and handle move, if requested
         let mut game_ref = (*game).borrow_mut();
@@ -485,14 +494,15 @@ pub fn handle_move_shoot_request(target_coords: (u8, u8),
 
         // move if requested
         if let Some(movement) = ship_movement {
-            if let Some(result) = handle_move(&mut game_ref, player_name, movement) {
-                return result;
+            match handle_move(&mut game_ref, player_name, movement) {
+                Some(updates) => visibility_updates = updates,
+                None => return Result::respond(Message::InvalidRequestResponse, false),
             }
         }
     }
 
     // handle shot
-    return handle_shoot(games, game, lobby, player_name, target_coords.0, target_coords.1);
+    return handle_shoot(games, game, lobby, player_name, target_coords.0, target_coords.1, visibility_updates);
 }
 
 pub fn handle_afk(game: Rc<RefCell<Game>>, lobby: &mut HashMap<String, Player>,
