@@ -1,4 +1,5 @@
-use board::{Ship, CellState};
+use board::{CellState};
+use ship::Ship;
 
 pub const W: usize = 16;
 pub const H: usize = 10;

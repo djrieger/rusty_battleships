@@ -11,7 +11,7 @@ use std::sync::mpsc::TryRecvError;
 use message::{serialize_message, deserialize_message, Message, ShipPlacement, Direction, Reason};
 use clientlobby::ClientLobby;
 use game::Game;
-use board::{Ship};
+use ship::{Ship};
 use clientboard::{Board, W, H};
 
 fn send_message(msg: Message, stream: &mut BufWriter<TcpStream>) {

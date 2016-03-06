@@ -5,7 +5,8 @@ use std::rc::Rc;
 use message::Message;
 use message::{ShipPlacement, Direction};
 use message::Reason;
-use board::{Board, PlayerState, Player, PlayerHandle, Ship, HitResult};
+use board::{Board, PlayerState, Player, PlayerHandle, HitResult};
+use ship::Ship;
 use game::{Game, GameState};
 
 // From http://stackoverflow.com/a/28392068
