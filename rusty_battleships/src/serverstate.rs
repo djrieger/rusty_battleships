@@ -177,7 +177,7 @@ pub fn terminate_player(name: &String, lobby: &mut HashMap<String, Player>,
 
 pub fn handle_get_features_request() -> Result {
     return Result::respond(Message::FeaturesResponse {
-        features: vec!["Awesomeness".to_owned()]
+        features: vec!["UDP Server Discovery".to_owned()]
     }, false);
 }
 

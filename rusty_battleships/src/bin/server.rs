@@ -1,4 +1,5 @@
 use std::cell::RefCell;
+use std::net::UdpSocket;
 use std::collections::HashMap;
 use std::io::{BufReader, BufWriter, Write};
 use std::net::{Ipv4Addr, TcpListener, TcpStream};
@@ -6,6 +7,12 @@ use std::option::Option::None;
 use std::rc::Rc;
 use std::sync::mpsc;
 use std::thread;
+
+extern crate net2;
+use net2::UdpSocketExt;
+
+extern crate byteorder;
+use byteorder::{BigEndian, WriteBytesExt};
 
 extern crate ansi_term;
 use ansi_term::Colour::{Green, Yellow, Cyan};
@@ -36,6 +43,38 @@ macro_rules! version_string {
 
 const TICK_DURATION_MS: u64 = 250;
 
+fn start_udp_discovery(tcp_port: u16) {
+    let socket = match UdpSocket::bind("0.0.0.0:49001") {
+        Ok(s) => s,
+        Err(e) => panic!("couldn't bind socket: {}", e)
+    };
+    match socket.join_multicast_v4(&Ipv4Addr::new(224, 0, 0, 250), &Ipv4Addr::new(0, 0, 0, 0)) {
+        Err(why) => println!("{:?}", why),
+        Ok(_) => {},
+    };
+    println!("Joined UDP multicast group 224.0.0.250, listening on port 49001 for UDP discovery");
+    let udp_discovery_loop = move || {
+        let mut buf = [0; 2048];
+        loop {
+            match socket.recv_from(&mut buf) {
+                Ok((num_bytes, src)) => {
+                    println!("num_bytes: {}", num_bytes);
+                    println!("src: {}", src);
+                    println!("{}", std::str::from_utf8(&buf).unwrap_or(""));
+                    let mut response = vec![];
+                    response.write_u16::<BigEndian>(tcp_port).unwrap();
+                    write!(&mut response, "Some host name");
+                    socket.send_to(&response[..], &src).expect("unable to respond");
+                    println!("Responded with port and host name");
+                },
+                Err(e) => {
+                    println!("couldn't recieve a datagram: {}", e);
+                }
+            }
+        }
+    };
+    thread::spawn(udp_discovery_loop);
+}
 
 // Tell server to perform proper shutdown, like removing player from their game, informing
 // opponent etc.
@@ -193,6 +232,8 @@ fn main() {
     };
 
     thread::spawn(tcp_loop);
+    start_udp_discovery(port);
+
     let mut message_store: HashMap<String, Vec<Message>> = HashMap::new();
     let mut games: Vec<Rc<RefCell<Game>>> = vec![];
     // stores player name -> game
@@ -255,11 +296,6 @@ fn main() {
 }
 
 fn send_updates(player_handles: &mut Vec<board::PlayerHandle>, message_store: &mut HashMap<String, Vec<Message>>) {
-    // player_handles
-    //     .iter_mut()
-    //     .filter(|player_handle| player_handle.nickname.is_some() )
-    //     .filter(|player_handle| message_store.contains_key(&player_handle.nickname.unwrap()))
-    //     .map(|player_handle| message_store.remove(&player_handle.nickname.unwrap()).unwrap().iter().map(|msg| player_handle.to_child_endpoint.send(ToChildCommand::Message(*msg)) ) );
     for (i, player_handle) in player_handles.iter_mut().enumerate() {
         if let Some(ref name) = player_handle.nickname {
             if message_store.contains_key(name) {

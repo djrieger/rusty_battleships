@@ -9,4 +9,5 @@ argparse = "0.2.1"
 qmlrs = { git = "git://github.com/Landkeks/qmlrs.git" }
 rand = "0.3"
 time = "0.1"
-#rustty = "0.1.9"
+net2 = "*"
+byteorder = "0.4.2"
