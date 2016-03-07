@@ -52,11 +52,11 @@ pub fn ask_u8(question: String) -> u8 {
 /*Tries to read from the TCP stream. If there's no message, it waits patiently.*/
 pub fn tcp_poll(br: &mut BufReader<TcpStream>, tx: Sender<Message>) {
     loop {
-        println!("Waiting for a message");
+        println!(">>> TCP: Waiting for a message");
         //This can take a while!
         let msg_from_server = deserialize_message(br);
         if msg_from_server.is_err() {
-            panic!("FUUUUU!");
+            panic!(">>> TCP: FUUUUU!");
         }
         tx.send(msg_from_server.unwrap()).unwrap();
     }
@@ -71,15 +71,16 @@ pub struct State {
     their_afks : u8,
     my_board : Option<Board>,
     their_board : Option<Board>,
-    buff_reader : BufReader<TcpStream>,
+    pub buff_reader : BufReader<TcpStream>,
     buff_writer : BufWriter<TcpStream>,
+    use_qml_interface :  bool,
 }
 
 #[derive(Debug, Hash, Eq, PartialEq, Clone)]
 pub enum Status {
     //LOBBY
     Unregistered,
-    AwaitingFeatures,
+    AwaitFeatures,
     Register,
     Available,
     AwaitReady,
@@ -95,7 +96,7 @@ pub enum Status {
 
 impl State {
 
-    pub fn new (buff_reader: BufReader<TcpStream>, buff_writer: BufWriter<TcpStream>) -> State {
+    pub fn new (use_qml_interface: bool, buff_reader: BufReader<TcpStream>, buff_writer: BufWriter<TcpStream>) -> State {
         State {
             lobby : ClientLobby::new(),
             opponent : String::from("None"),
@@ -107,12 +108,13 @@ impl State {
             their_board : None,
             buff_reader : buff_reader,
             buff_writer : buff_writer,
+            use_qml_interface : use_qml_interface,
         }
     }
 
     pub fn get_features(&mut self) -> bool {
         send_message(Message::GetFeaturesRequest, &mut self.buff_writer);
-        self.status = Status::AwaitingFeatures;
+        self.status = Status::AwaitFeatures;
         let server_response = deserialize_message(&mut self.buff_reader);
         if server_response.is_err() {
             return false;
@@ -200,75 +202,9 @@ impl State {
         return true;
     }
 
-    // pub fn have_i_been_challenged(&mut self) -> (bool, Option<String>) {
-    //     {
-    //         let message_waiting = false;
-    //         println!("Counting waiting bytes");
-    //         let waiting = self.buff_reader.get_ref().bytes().count();//.clone();
-    //         println!("Möp");
-    //     }
-    //
-    //     let server_response =  deserialize_message(&mut self.buff_reader);
-    //     if server_response.is_err() {
-    //         print!("foo");
-    //         return (false, None);
-    //     } else {
-    //         match server_response.unwrap() {
-    //             Message::GameStartUpdate { nickname: x } => {
-    //                 return (true,Some(x));
-    //             },
-    //             _ => return (false,None),
-    //         };
-    //     }
-    // }
-    //
-    // //FIXME: Change return value to Result<(),String)>
-    // pub fn shoot(&mut self, x: usize, y: usize) -> Result<bool, String> {
-    //     if self.status != Status::Planning {
-    //         return Err(String::from("Not your turn!"));
-    //     }
-    //     if x >= W || y >= H {
-    //         return Err(format!("Out of bounds! x={:?} y={:?}", x, y));
-    //     }
-    //     let msg = Message::ShootRequest {x: x as u8, y: y as u8};
-    //     send_message(msg, &mut self.buff_writer);
-    //     let server_response = deserialize_message(&mut self.buff_reader);
-    //     if server_response.is_err() {
-    //         return Err(String::from("Does not compute."));
-    //     } else {
-    //         match server_response.unwrap() {
-    //             Message::OkResponse => return Ok(true),
-    //             x => return Err(format!("Does not compute! MSG={:?}", x)),
-    //         }
-    //     }
-    // }
-    //
-    // //FIXME: Change return value to Result<(),String)>
-    // pub fn move_and_shoot(&mut self, ship: usize, dir: Direction, x: usize, y: usize) -> Result<bool, String> {
-    //     if self.status != Status::Planning {
-    //         return Err(String::from("Not your turn!"));
-    //     }
-    //     if 4 < ship { //Destroyed ships shall also be unable to move! Note that ship is unsigned! => no 0 > ship condition necessary!
-    //         return Err(format!("Ship id out of bounds! id={:?}", ship));
-    //     }
-    //     if x >= W || y >= H {
-    //         return Err(format!("Shot location out of bounds! x={:?} y={:?}", x, y));
-    //     }
-    //     let msg = Message::MoveAndShootRequest { id: ship as u8, direction: dir, x: x as u8, y: y as u8 };
-    //     send_message(msg, &mut self.buff_writer);
-    //     let server_response = deserialize_message(&mut self.buff_reader);
-    //     if server_response.is_err() {
-    //         return Err(String::from("Does not compute."));
-    //     } else {
-    //         match server_response.unwrap() {
-    //             Message::OkResponse => return Ok(true),
-    //             x => return Err(format!("Does not compute! MSG={:?}", x)),
-    //         }
-    //     }
-    // }
 
     pub fn handle_get_features_response(&mut self, features: Vec<String>) -> Result<(), String> {
-        if self.status == Status::AwaitingFeatures {
+        if self.status == Status::AwaitFeatures {
             self.lobby.set_feature_list(features);
             self.status = Status::Unregistered;
             return Ok(());
@@ -324,7 +260,10 @@ impl State {
     pub fn handle_name_taken_response(&mut self, nickname: &str) {
         if self.status == Status::Register {
             self.status = Status::Unregistered;
-            let new_name = ask(String::from("What was yer name again?")); //FIXME: FOR TESTING ONLY!
+            let mut new_name = String::from("");
+            if !self.use_qml_interface {
+                new_name = ask(String::from("What was yer name again?")); //FIXME: FOR TESTING ONLY!
+            }
             send_message(Message::LoginRequest { username: String::from(new_name) }, &mut self.buff_writer); //FIXME: FOR TESTING ONLY!
             self.status = Status::Register; //FIXME: FOR TESTING ONLY!
         } else {
@@ -418,8 +357,10 @@ impl State {
     ) {
         let mut x_coord : u8 = 13;
         let mut y_coord : u8 = 13;
-        x_coord = ask_u8(String::from("X coordinate of shot:"));
-        y_coord = ask_u8(String::from("Y coordinate of shot:"));
+        if !self.use_qml_interface {
+            x_coord = ask_u8(String::from("X coordinate of shot:"));
+            y_coord = ask_u8(String::from("Y coordinate of shot:"));
+        }
         send_message(Message::ShootRequest {x: x_coord, y: y_coord}, &mut self.buff_writer);
     }
 
@@ -505,7 +446,7 @@ impl State {
         }
     }
 
-    /* Main loop; does most of the work. Main-Function should hand over control to this function as
+    /* Contains the maain loop that does most of the work. Main-Function should hand over control to this function as
     soon as a tcp connection has been established.*/
     pub fn handle_communication(&mut self/*, br: BufReader<TcpStream>, bw: BufWriter<TcpStream>*/) {
         if self.get_features() {
@@ -514,7 +455,11 @@ impl State {
             println!("No features.");
         }
 
-        let nickname = ask(String::from("What's yer name, captain!?"));
+        let mut nickname = String::from("");
+
+        if !self.use_qml_interface {
+            nickname = ask(String::from("What's yer name, captain!?"));
+        }
 
         if self.login(&nickname) {
             println!("G'day, captain {:?}!", self.lobby.player_name);
@@ -526,6 +471,10 @@ impl State {
         let mut one_time_reader = BufReader::<TcpStream>::new(self.buff_reader.get_ref().try_clone().unwrap());
         thread::spawn(move || tcp_poll(&mut one_time_reader, tx));
 
+        self.update_listen_loop(rx);
+    }
+
+    pub fn update_listen_loop(&mut self, rx: Receiver<Message>) {
         /*check-for-messages-loop*/
         loop {
             //println!("Checking for messages.");
@@ -644,5 +593,4 @@ impl State {
         }
 
     }
-
 }
