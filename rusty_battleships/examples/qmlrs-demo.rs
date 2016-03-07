@@ -1,4 +1,9 @@
 use std::net::{Ipv4Addr, TcpStream};
+use std::net::UdpSocket;
+
+extern crate byteorder;
+use byteorder::{BigEndian, ReadBytesExt};
+
 use std::io::{BufReader, BufWriter, Write};
 use std::option::Option::None;
 use std::sync::mpsc;
@@ -87,6 +92,34 @@ impl Bridge {
 
     fn connect(&self, hostname: String) {
     }
+
+    fn discover_servers() {
+        let socket = UdpSocket::bind("0.0.0.0:0").unwrap();
+        let response = vec![];
+        socket.send_to(&response[..], &(Ipv4Addr::new(224, 0, 0, 250), 49001 as u16));
+        let udp_discovery_loop = move || {
+            let mut buf = [0; 2048];
+            loop {
+                match socket.recv_from(&mut buf) {
+                    Ok((num_bytes, src)) => {
+                        if num_bytes < 2 {
+                            panic!("Received invalid response from {} to UDP discovery request", src);
+                        }
+                        // println!("num_bytes: {}", num_bytes);
+                        // println!("src: {}", src);
+                        // Wozu Port?
+                        // let port = BigEndian::read_u16(&buf[0..1]);
+                        let server_name = std::str::from_utf8(&buf[2..]).unwrap_or("");
+                        println!("Found server '{}' listening on {}", server_name, src);
+                    },
+                    Err(e) => {
+                        println!("couldn't recieve a datagram: {}", e);
+                    }
+                }
+            }
+        };
+        thread::spawn(udp_discovery_loop);
+    }
 }
 
 Q_OBJECT! { Bridge:
@@ -119,7 +152,14 @@ fn main() {
         println!("Connecting to {}.", ip);
 
         //Connect to the specified address and port.
-        let mut sender = TcpStream::connect((ip, port)).unwrap();
+        let mut sender;
+        match TcpStream::connect((ip, port)) {
+            Ok(foo) => sender = foo,
+            Err(why) => {
+                println!("{:?}", why);
+                return;
+            }
+        };
         sender.set_write_timeout(None);
 
         let receiver = sender.try_clone().unwrap();
@@ -160,6 +200,8 @@ fn main() {
 
         }
     };
+
+    Bridge::discover_servers();
 
     let tcp_thread = thread::spawn(tcp_loop);
     let mut engine = qmlrs::Engine::new();
