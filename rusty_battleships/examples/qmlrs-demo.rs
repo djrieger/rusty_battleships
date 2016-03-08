@@ -17,6 +17,7 @@ use argparse::{ArgumentParser, Print, Store};
 
 extern crate rusty_battleships;
 use rusty_battleships::message::{serialize_message, deserialize_message, Message};
+use rusty_battleships::clientstate::{State, Status, tcp_poll};
 
 // http://stackoverflow.com/questions/35157399/how-to-concatenate-static-strings-in-rust/35159310
 macro_rules! description {
@@ -32,29 +33,10 @@ macro_rules! version_string {            // Like this (with a literal instead of
 
 static WINDOW: &'static str = include_str!("assets/main_window.qml");
 
-#[derive(Debug, Copy, Clone)]
-enum State {
-    Unregistered,
-    AwaitFeatures,
-    NameTaken,
-    Registered,
-    Available,
-    AwaitingReadyResponse,
-    Waiting,
-    AwaitingNotReadyResponse,
-    AwaitingGameStart,
-    PlacingShips,
-    AwaitingPlacementResponse,
-    OpponentPlacing,
-    PlanningTurn,
-    OpponentPlanningTurn,
-    GameOver,
-}
-
 struct Bridge {
     sender: mpsc::Sender<Message>,
-    receiver: mpsc::Receiver<(State, Message)>,
-    state: State,
+    receiver: mpsc::Receiver<(Status, Message)>,
+    state: Status,
     last_rcvd_msg: Option<Message>,
 }
 
@@ -70,9 +52,8 @@ impl Bridge {
             self.last_rcvd_msg = Some(tuple.1);
         }
         let state_description = match self.state {
-            State::Unregistered => String::from("Noch nicht registriert"),
-            State::NameTaken => String::from("Name bereits vergeben"),
-            State::Registered => String::from("Registriert"),
+            Status::Unregistered => String::from("Noch nicht registriert"),
+            Status::Available => String::from("Registriert"),
             _ => format!("{:?}", self.state),
         };
         return state_description;
@@ -130,9 +111,12 @@ Q_OBJECT! { Bridge:
 }
 
 fn main() {
-    let mut current_state = State::Unregistered;
+    // Channel pair for connecting the Bridge and ???
     let (tx_main, rcv_tcp) : (mpsc::Sender<Message>, mpsc::Receiver<Message>) = mpsc::channel();
-    let (tx_tcp, rcv_main) : (mpsc::Sender<(State, Message)>, mpsc::Receiver<(State, Message)>) = mpsc::channel();
+    let (tx_tcp, rcv_main) : (mpsc::Sender<(Status, Message)>, mpsc::Receiver<(Status, Message)>) = mpsc::channel();
+    /* From UI-Thread (this one) to Status-Update-Thread.
+    Since every UI input corresponds to a Request, we can recycle message.rs for encoding user input. */
+    let (tx_ui_update, rcv_ui_update) : (mpsc::Sender<Message>, mpsc::Receiver<Message>) = mpsc::channel();
 
     let tcp_loop = move || {
         let mut port:u16 = 5000;
@@ -166,37 +150,42 @@ fn main() {
         let mut buff_writer = BufWriter::new(sender);
         let mut buff_reader = BufReader::new(receiver);
 
+        /* Holds the current state and provides state-based services such as shoot(), move-and-shoot() as well as state- and server-message-dependant state transitions. */
+        let mut current_state = State::new(true, Some(rcv_ui_update), buff_reader, buff_writer);
+
         // This thread blocks while waiting for messages from the server.
         // Any received messages are sent to the main thread via tx_tcp
-        let subloop = move || {
-            loop {
-                // Parse server response and send to main thread
-                let server_response = deserialize_message(&mut buff_reader).unwrap();
-                println!("Got {:?} from server", server_response);
-                let cloned_response = server_response.clone();
-                match server_response {
-                    Message::OkResponse => current_state = State::Registered,
-                    Message::NameTakenResponse { nickname } => current_state = State::NameTaken,
-                    _ => {},
-                }
-                tx_tcp.send((current_state, cloned_response));
-            }
-        };
-        let tcp_recv_thread = thread::spawn(subloop);
+        // let subloop = move || {
+        //     loop {
+        //         // Parse server response and send to main thread
+        //         let server_response = deserialize_message(&mut buff_reader).unwrap();
+        //         println!("Got {:?} from server", server_response);
+        //         let cloned_response = server_response.clone();
+        //         match server_response {
+        //             Message::OkResponse => current_state = State::Registered,
+        //             Message::NameTakenResponse { nickname } => current_state = State::NameTaken,
+        //             _ => {},
+        //         }
+        //         tx_tcp.send((current_state, cloned_response));
+        //     }tx_tcp
+        // };
+
+        // Spawn a TCP-Polling-Thread and a Status-Update-Thread, connected via a "Channel<Message>"
+
 
         // Request features from server
-        let serialized_msg = serialize_message(Message::GetFeaturesRequest);
-        buff_writer.write(&serialized_msg[..]).unwrap();
-        buff_writer.flush();
+        // let serialized_msg = serialize_message(Message::GetFeaturesRequest);
+        // buff_writer.write(&serialized_msg[..]).unwrap();
+        // buff_writer.flush();
 
         loop {
             // See if main thread has any messages to be sent to the server
             // FIXME kann hier blocken bzw kein try, sync_channel...?
-            if let Ok(msg) = rcv_tcp.try_recv() {
-                let serialized_msg = serialize_message(msg);
-                buff_writer.write(&serialized_msg[..]).unwrap();
-                buff_writer.flush();
-            }
+            // if let Ok(msg) = rcv_tcp.try_recv() {
+            //     let serialized_msg = serialize_message(msg);
+            //     buff_writer.write(&serialized_msg[..]).unwrap();
+            //     buff_writer.flush();
+            // }
 
         }
     };
@@ -205,13 +194,13 @@ fn main() {
 
     let tcp_thread = thread::spawn(tcp_loop);
     let mut engine = qmlrs::Engine::new();
-    let mut bridge = Bridge { 
-        state: State::Unregistered,
+    let mut bridge = Bridge {
+        state: Status::Unregistered,
         sender: tx_main,
         receiver: rcv_main,
         last_rcvd_msg: None,
     };
-    bridge.state = State::Unregistered;
+    bridge.state = Status::Unregistered;
     engine.set_property("bridge", bridge);
     engine.load_data(WINDOW);
     engine.exec();
