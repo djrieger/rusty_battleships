@@ -44,9 +44,7 @@ impl Bridge {
     fn send_login_request(&mut self, username: String) {
         println!(">>> UI: Sending login request for {} ...", username);
         self.sender.send(Message::LoginRequest { username: username });
-        println!("Polling");
         if let Ok(tuple) = self.receiver.try_recv() {
-            println!("Success!");
             self.state = tuple.0;
             self.last_rcvd_msg = Some(tuple.1);
         }
@@ -54,6 +52,15 @@ impl Bridge {
 
     fn send_get_features_request(&self) {
         self.sender.send(Message::GetFeaturesRequest);
+    }
+
+    fn send_challenge(&mut self, username: String) {
+        println!(">>> UI: Sending challenge request for {} ...", username);
+        self.sender.send(Message::ChallengePlayerRequest { username: username });
+        if let Ok(tuple) = self.receiver.try_recv() {
+            self.state = tuple.0;
+            self.last_rcvd_msg = Some(tuple.1);
+        }
     }
 
     fn poll_state(&mut self) -> String {
@@ -124,6 +131,7 @@ impl Bridge {
 Q_OBJECT! { Bridge:
     slot fn send_login_request(String);
     slot fn send_get_features_request();
+    slot fn send_challenge(String);
     slot fn poll_state();
     slot fn poll_log();
     slot fn get_last_message();

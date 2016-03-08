@@ -14,13 +14,13 @@ ApplicationWindow {
     minimumHeight: 600 + 2 * margin
 
     Timer {
-      interval: 50
-      running: true
-      repeat: true
-      onTriggered: {
-        statusLabel.text = bridge.poll_state();
-        logLabel.text = bridge.poll_log();
-      }
+        interval: 50
+        running: true
+        repeat: true
+        onTriggered: {
+            statusLabel.text = bridge.poll_state();
+            logLabel.text = bridge.poll_log();
+        }
     }
 
     statusBar: StatusBar {
@@ -54,109 +54,133 @@ ApplicationWindow {
             }
         }
 
-    ColumnLayout {
-         RowLayout { //Host connect field
-              TextField {
-                id: hostnameField
-                Layout.fillWidth: true
+        ColumnLayout {
+            RowLayout { //Host connect field
+                TextField {
+                    id: hostnameField
+                    Layout.fillWidth: true
 
-                placeholderText: "Enter host"
-                focus: true
+                    placeholderText: "Enter host"
+                    focus: true
 
-                onAccepted: connect()
-              }
+                    onAccepted: connect()
+                }
 
-              Button {
-                text: "Connect"
+                Button {
+                    text: "Connect"
 
-                onClicked: connect()
-              }
-          }
-
-         RowLayout { //Login field
-              TextField {
-                id: usernameField
-                Layout.fillWidth: true
-
-                placeholderText: "Enter nickname"
-                focus: true
-
-                onAccepted: login()
-              }
-
-              Button {
-                text: "Login"
-
-                onClicked: login()
-              }
+                    onClicked: connect()
+                }
             }
 
-              Label {
+            RowLayout { //Login field
+                TextField {
+                    id: usernameField
+                    Layout.fillWidth: true
+
+                    placeholderText: "Enter nickname"
+                    focus: true
+
+                    onAccepted: login()
+                }
+
+                Button {
+                    text: "Login"
+
+                    onClicked: login()
+                }
+            }
+
+            Label {
                 id: infoLabel
                 text: ""
-              }
+            }
 
-          RowLayout { //Features Button
+            RowLayout { //Challenge field
+                TextField {
+                    id: challengeField
+                    Layout.fillWidth: true
 
-               Button {
-                 text: "GetFeatures"
+                    placeholderText: "Enter enemy nickname"
+                    focus: true
 
-                 onClicked: features()
-               }
-             }
+                    onAccepted: challenge()
+                }
 
-               Label {
-                 id: featuresLabel
-                 text: "<none>"
-               }
-    }
+                Button {
+                    text: "Challenge"
 
-//        ListView { //TODO: Needs to be filled.
-//            id: userList
-//            width: 200
-//            Layout.fillHeight: true
-//            model: ListModel {
-//                ListElement {
-//                    name: "Grey"
-//                    colorCode: "grey"
-//                }
+                    onClicked: challenge()
+                }
+            }
 
-//                ListElement {
-//                    name: "Red"
-//                    colorCode: "red"
-//                }
+            Label {
+                id: challengeLabel
+                text: ""
+            }
 
-//                ListElement {
-//                    name: "Blue"
-//                    colorCode: "blue"
-//                }
+            RowLayout { //Features Button
 
-//                ListElement {
-//                    name: "Green"
-//                    colorCode: "green"
-//                }
-//            }
-//            delegate: Item {
-//                x: 5
-//                width: 80
-//                height: 40
-//                Row {
-//                    id: row1
-//                    spacing: 10
-//                    Rectangle {
-//                        width: 40
-//                        height: 40
-//                        color: colorCode
-//                    }
+                Button {
+                    text: "GetFeatures"
 
-//                    Text {
-//                        text: name
-//                        anchors.verticalCenter: parent.verticalCenter
-//                        font.bold: true
-//                    }
-//                }
-//            }
-//        }
+                    onClicked: features()
+                }
+            }
+
+            Label {
+                id: featuresLabel
+                text: "<none>"
+            }
+
+        }
+
+        //        ListView { //TODO: Needs to be filled.
+        //            id: userList
+        //            width: 200
+        //            Layout.fillHeight: true
+        //            model: ListModel {
+        //                ListElement {
+        //                    name: "Grey"
+        //                    colorCode: "grey"
+        //                }
+
+        //                ListElement {
+        //                    name: "Red"
+        //                    colorCode: "red"
+        //                }
+
+        //                ListElement {
+        //                    name: "Blue"
+        //                    colorCode: "blue"
+        //                }
+
+        //                ListElement {
+        //                    name: "Green"
+        //                    colorCode: "green"
+        //                }
+        //            }
+        //            delegate: Item {
+        //                x: 5
+        //                width: 80
+        //                height: 40
+        //                Row {
+        //                    id: row1
+        //                    spacing: 10
+        //                    Rectangle {
+        //                        width: 40
+        //                        height: 40
+        //                        color: colorCode
+        //                    }
+
+        //                    Text {
+        //                        text: name
+        //                        anchors.verticalCenter: parent.verticalCenter
+        //                        font.bold: true
+        //                    }
+        //                }
+        //            }
+        //        }
     }
 
     RowLayout {
@@ -172,8 +196,8 @@ ApplicationWindow {
                     Button {
                         width: 18; height: 18
                         Text { text: "X" //index
-                          font.pointSize: 10
-                          anchors.centerIn: parent
+                            font.pointSize: 10
+                            anchors.centerIn: parent
                         }
                     }
                 }
@@ -192,8 +216,8 @@ ApplicationWindow {
                     Button {
                         width: 18; height: 18
                         Text { text: "X" //index
-                          font.pointSize: 10
-                          anchors.centerIn: parent
+                            font.pointSize: 10
+                            anchors.centerIn: parent
                         }
                     }
                 }
@@ -201,21 +225,26 @@ ApplicationWindow {
         }
     }
 
-               function login() {
-                  bridge.send_login_request(usernameField.text);
-                  bridge.poll_state();
-              }
+    function login() {
+        bridge.send_login_request(usernameField.text);
+        bridge.poll_state();
+    }
 
-              function features() {
-                  bridge.send_get_features_request();
-                  bridge.poll_state();
-              }
+    function features() {
+        bridge.send_get_features_request();
+        bridge.poll_state();
+    }
 
-              function update_status() {
-                  Statusbar.statusLabel = bridge.get_last_message();
-              }
+    function challenge() {
+        bridge.send_challenge(challengeField.text);
+        bridge.poll_state();
+    }
 
-              function connect() {
-                  bridge.connect(hostnameField.text);
-              }
+    function update_status() {
+        Statusbar.statusLabel = bridge.get_last_message();
+    }
+
+    function connect() {
+        bridge.connect(hostnameField.text);
+    }
 }

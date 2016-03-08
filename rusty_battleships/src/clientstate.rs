@@ -143,10 +143,11 @@ impl State {
     //FIXME: Change return value to Result<(),String)>
     pub fn login(&mut self, nickname: &str) -> bool {
         if self.status != Status::Unregistered {
+            println!("You're already logged in! STATUS = {:?}", self.status);
             return false;
-            println!("You're already logged in!");
         }
         send_message(Message::LoginRequest { username: String::from(nickname) }, &mut self.buff_writer);
+        self.lobby.set_player_name(nickname);
         self.status = Status::Register;
         return true;
     }
@@ -183,15 +184,15 @@ impl State {
             return false;
         }
 
-        if self.lobby.player_name != opponent {
+        // if self.lobby.player_name != opponent {
             //if self.lobby.player_list.contains(&String::from(opponent)) //FIXME: Lobby updates and related stuff!
             println!("Challenging captain {:?}", opponent);
             send_message(Message::ChallengePlayerRequest { username: String::from(opponent) }, &mut self.buff_writer);
             self.status = Status::AwaitGameStart;
             return true;
-        } else {
-            return false;
-        }
+        // } else {
+            // return false;
+        // }
     }
 
     //FIXME: Change return value to Result<(),String)>
@@ -252,6 +253,17 @@ impl State {
         if self.status == Status::AwaitFeatures {
             self.lobby.set_feature_list(features);
             self.status = Status::Unregistered;
+            if !self.use_qml_interface { // To keep testing via terminal easy.
+                let mut nickname = String::from("");
+
+                nickname = ask(String::from("What's yer name, captain!?"));
+
+                if self.login(&nickname) {
+                    println!("G'day, captain {:?}!", self.lobby.player_name);
+                } else {
+                    println!("Login error.");
+                }
+            }
             return Ok(());
         } else {
             return Err(format!("ERROR: I did not expect a feature response! STATUS={:?}", self.status));
@@ -283,7 +295,9 @@ impl State {
         match self.status {
             Status::Register => {
                 self.status = Status::Available;
-//                self.challenge("test2"); //FIXME ONLY FOR TESTING!
+                if !self.use_qml_interface {
+                    self.challenge("test2"); //FIXME ONLY FOR TESTING!
+                }
                 return Ok(());
             },
             Status::AwaitGameStart => {
@@ -502,17 +516,7 @@ impl State {
             } else {
                 println!("No features.");
             }
-
-            let mut nickname = String::from("");
-
-            nickname = ask(String::from("What's yer name, captain!?"));
-
-            if self.login(&nickname) {
-                println!("G'day, captain {:?}!", self.lobby.player_name);
-            } else {
-                println!("Login error.");
-            }
-    }
+        }
 
         let (tx, rx) = mpsc::channel();
         let mut one_time_reader = BufReader::<TcpStream>::new(self.buff_reader.get_ref().try_clone().unwrap());
@@ -616,7 +620,9 @@ impl State {
                     Message::NotWaitingResponse {nickname: nn} => {
                         println!("Captain {:?} is not waiting to be challenged.", nn);
                         self.handle_not_waiting_response(&nn);
-                        self.ready();
+                        if !self.use_qml_interface {
+                            self.ready();
+                        }
                     },
                     Message::GameAlreadyStartedResponse => {
                         println!("The game has already started.");
@@ -647,55 +653,67 @@ impl State {
                 panic!("Server terminated connection. =(");
             }
 
-            let mut input = Err(TryRecvError::Disconnected);
-            /* Handle user input */
-            if let Some(ref mut r) = self.ui_update_receiver {
-                let rec = r; //Safe because of if-condition!
-                println!(">>>Checking for UI input.");
-                input = rec.try_recv();
-            }
 
-            if let Ok(received) = input {
-                println!(">>>UI input!");
-                got_ui_message= true;
-                match received {
-                    Message::GetFeaturesRequest => {
-                        self.get_features();
-                    },
-                    Message::LoginRequest { username } => {
-                        self.login(&username);
-                    },
-                    Message::ReadyRequest => {
-                        self.ready();
-                    },
-                    Message::NotReadyRequest => {
-                        self.unready();
-                    },
-                    Message::ChallengePlayerRequest { username } => {
-                        self.challenge(&username);
-                    },
-                    Message::PlaceShipsRequest { placement } => {
-                        self.place_ships(); //FIXME incorporate transmitted placement.
-                    },
-                    Message::ShootRequest { x, y } => {
-                        self.shoot( Some(x), Some(y) );
-                    },
-                    Message::MoveAndShootRequest { id, direction, x, y } => {
-                        self.move_and_shoot( x, y, id, direction );
-                    },
-                    Message::SurrenderRequest => {
-                        self.surrender();
-                    },
-                    N => panic!("Received illegal request from client: {:?}", N),
-                }
+            let interface;
+            if self.use_qml_interface {
+                interface = true;
             } else {
-                println!(">>>No UI input: {:?}", input);
+                interface = false;
             }
 
+            if interface {
 
-            if !got_server_message && !got_ui_message {
-                println!(">>>Nothing to do.");
-                thread::sleep(Duration::new(0, 500000000));
+                let mut input = Err(TryRecvError::Disconnected);
+                /* Handle user input */
+                if let Some(ref mut r) = self.ui_update_receiver {
+                    let rec = r; //Safe because of if-condition!
+                    println!(">>>Checking for UI input.");
+                    input = rec.try_recv();
+                }
+
+                if let Ok(received) = input {
+                    println!(">>>UI input!");
+                    got_ui_message= true;
+                    match received {
+                        Message::GetFeaturesRequest => {
+                            self.get_features();
+                        },
+                        Message::LoginRequest { username } => {
+                            self.login(&username);
+                        },
+                        Message::ReadyRequest => {
+                            self.ready();
+                        },
+                        Message::NotReadyRequest => {
+                            self.unready();
+                        },
+                        Message::ChallengePlayerRequest { username } => {
+                            self.challenge(&username);
+                        },
+                        Message::PlaceShipsRequest { placement } => {
+                            self.place_ships(); //FIXME incorporate transmitted placement.
+                        },
+                        Message::ShootRequest { x, y } => {
+                            self.shoot( Some(x), Some(y) );
+                        },
+                        Message::MoveAndShootRequest { id, direction, x, y } => {
+                            self.move_and_shoot( x, y, id, direction );
+                        },
+                        Message::SurrenderRequest => {
+                            self.surrender();
+                        },
+                        N => panic!("Received illegal request from client: {:?}", N),
+                    }
+                } else {
+                    println!(">>>No UI input: {:?}", input);
+                }
+
+
+                if !got_server_message && !got_ui_message {
+                    println!(">>>Nothing to do.");
+                    thread::sleep(Duration::new(0, 500000000));
+                }
+
             }
 
         }
