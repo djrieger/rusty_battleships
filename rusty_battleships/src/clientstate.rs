@@ -74,6 +74,7 @@ pub struct State {
     pub buff_reader : BufReader<TcpStream>,
     buff_writer : BufWriter<TcpStream>,
     use_qml_interface :  bool,
+    ui_update_receiver : Option<Receiver<Message>>,
 }
 
 #[derive(Debug, Hash, Eq, PartialEq, Clone)]
@@ -92,11 +93,13 @@ pub enum Status {
     OpponentPlacing,
     Planning,
     OpponentPlanning,
+    //INTERMEDIATE
+    Surrendered,
 }
 
 impl State {
 
-    pub fn new (use_qml_interface: bool, buff_reader: BufReader<TcpStream>, buff_writer: BufWriter<TcpStream>) -> State {
+    pub fn new (use_qml_interface: bool, rec_ui_update: Option<Receiver<Message>>, buff_reader: BufReader<TcpStream>, buff_writer: BufWriter<TcpStream>) -> State {
         State {
             lobby : ClientLobby::new(),
             opponent : String::from("None"),
@@ -109,6 +112,7 @@ impl State {
             buff_reader : buff_reader,
             buff_writer : buff_writer,
             use_qml_interface : use_qml_interface,
+            ui_update_receiver : rec_ui_update,
         }
     }
 
@@ -152,6 +156,18 @@ impl State {
         self.status = Status::AwaitReady;
         send_message(Message::ReadyRequest, &mut self.buff_writer);
         println!("Sending READY_REQUEST");
+        return true;
+    }
+
+    //FIXME: Change return value to Result<(),String)>
+    pub fn unready(&mut self) -> bool {
+        if self.status != Status::Waiting {
+            return false;
+            println!("Müp");
+        }
+        self.status = Status::AwaitNotReady;
+        send_message(Message::NotReadyRequest, &mut self.buff_writer);
+        println!("Sending NOT_READY_REQUEST");
         return true;
     }
 
@@ -202,6 +218,31 @@ impl State {
         return true;
     }
 
+    fn shoot(&mut self, x: Option<u8>, y: Option<u8>) {
+        if self.status != Status::Planning {
+            panic!("I cannot shoot when I'm not in Planning state! STATUS = {:?}", self.status);
+        }
+        let mut x_coord : u8 = 13;
+        let mut y_coord : u8 = 13;
+        if x == None && y == None {
+            if !self.use_qml_interface {
+                x_coord = ask_u8(String::from("X coordinate of shot:"));
+                y_coord = ask_u8(String::from("Y coordinate of shot:"));
+            }
+        } else {
+            x_coord = x.unwrap(); //Safe because of if-condition
+            y_coord = y.unwrap(); //Safe because of if-condition
+        }
+        send_message(Message::ShootRequest {x: x_coord, y: y_coord}, &mut self.buff_writer);
+    }
+
+    fn move_and_shoot(&mut self, x: u8, y: u8, id: u8, direction: Direction) {
+        if self.status != Status::Planning {
+            panic!("I cannot move and shoot when I'm not in Planning state! STATUS = {:?}", self.status);
+        }
+        send_message(Message::MoveAndShootRequest { id: id, direction: direction, x: x, y: y }, &mut self.buff_writer);
+    }
+
 
     pub fn handle_get_features_response(&mut self, features: Vec<String>) -> Result<(), String> {
         if self.status == Status::AwaitFeatures {
@@ -210,6 +251,13 @@ impl State {
             return Ok(());
         } else {
             return Err(format!("ERROR: I did not expect a feature response! STATUS={:?}", self.status));
+        }
+    }
+
+    pub fn surrender(&mut self) {
+        if self.status == Status::Planning || self.status == Status::OpponentPlanning
+            || self.status == Status::OpponentPlacing || self.status == Status::PlacingShips {
+            send_message(Message::SurrenderRequest, &mut self.buff_writer);
         }
     }
 
@@ -251,6 +299,11 @@ impl State {
             Status::PlacingShips => {
                 println!("Ships ok.");
                 self.status = Status::OpponentPlacing;
+                return Ok(());
+            },
+            Status::Surrendered => {
+                println!("Surrender request was received.");
+                self.status = Status::Available;
                 return Ok(());
             },
             _ => return Err(format!("Wrong message! STATUS={:?}, MESSAGE={:?}", self.status, msg)),
@@ -307,7 +360,7 @@ impl State {
             self.my_turn = true;
             self.status = Status::Planning;
             //FIXME: ONLY FOR TESTING! USE GUI! ----v
-            self.shoot();
+            self.shoot(None, None);
             //FIXME: ONLY FOR TESTING! USE GUI! ----^
         } else {
             panic!("Received a ENEMY_HIT_UPDATE while not in OPPONENT_PLANNING state! STATUS={:?}", self.status);
@@ -334,7 +387,7 @@ impl State {
             self.my_turn = true;
             self.status = Status::Planning;
             //FIXME: ONLY FOR TESTING! USE GUI! ----v
-            self.shoot();
+            self.shoot(None, None);
             //FIXME: ONLY FOR TESTING! USE GUI! ----^
         } else {
             panic!("Received a MISS_RESPONSE while not in PLANNING state! STATUS={:?}", self.status);
@@ -353,24 +406,13 @@ impl State {
         }
     }
 
-    fn shoot(&mut self
-    ) {
-        let mut x_coord : u8 = 13;
-        let mut y_coord : u8 = 13;
-        if !self.use_qml_interface {
-            x_coord = ask_u8(String::from("X coordinate of shot:"));
-            y_coord = ask_u8(String::from("Y coordinate of shot:"));
-        }
-        send_message(Message::ShootRequest {x: x_coord, y: y_coord}, &mut self.buff_writer);
-    }
-
     pub fn handle_your_turn_update(&mut self) {
         if self.status == Status::OpponentPlacing {
             self.my_turn = true;
             self.status = Status::Planning;
 
             //FIXME: ONLY FOR TESTING! USE GUI! ----v
-            self.shoot();
+            self.shoot(None, None);
             //FIXME: ONLY FOR TESTING! USE GUI! ----^
 
         } else {
@@ -421,7 +463,7 @@ impl State {
             }
             self.status = Status::Planning;
             //FIXME: ONLY FOR TESTING! USE GUI! ----v
-            self.shoot();
+            self.shoot(None, None);
             //FIXME: ONLY FOR TESTING! USE GUI! ----^
         } else {
             panic!("Received a ENEMY_AFK_UPDATE while not in OPPONENT_PLANNING state! STATUS={:?}", self.status);
@@ -430,7 +472,8 @@ impl State {
 
     pub fn handle_game_over_update(&mut self, victory: bool, reason: Reason) {
         if self.status == Status::OpponentPlanning || self.status == Status::Planning ||
-            self.status == Status::OpponentPlacing || self.status == Status::PlacingShips {
+            self.status == Status::OpponentPlacing || self.status == Status::PlacingShips ||
+            self.status == Status::Available {
                 println!("The game is over.");
                 if victory {
                     println!("Congratulations, captain! You've won!");
@@ -483,7 +526,9 @@ impl State {
                 println!(">>>Oh, a message for me! MSG={:?}", server_response.clone());
 
                 let outcome: Result<(), String>;
-                match server_response { //May contain traces of state transisions
+
+                /* Handle messages from the server. */
+                match server_response {
                     // UPDATES
                     Message::PlayerJoinedUpdate {nickname: nn} => {
                         println!("Welcome our new captain {:?}", nn);
@@ -582,6 +627,47 @@ impl State {
                     },
                     _ => println!("Message received: {:?}", server_response),
                 }
+
+                let mut input = Err(TryRecvError::Disconnected);
+                /* Handle user input */
+                if let Some(ref mut r) = self.ui_update_receiver {
+                    let rec = r; //Safe because of if-condition!
+                    input = rec.try_recv();
+                }
+
+                if let Ok(received) = input {
+                    match received {
+                        Message::GetFeaturesRequest => {
+                            self.get_features();
+                        },
+                        Message::LoginRequest { username } => {
+                            self.login(&username);
+                        },
+                        Message::ReadyRequest => {
+                            self.ready();
+                        },
+                        Message::NotReadyRequest => {
+                            self.unready();
+                        },
+                        Message::ChallengePlayerRequest { username } => {
+                            self.challenge(&username);
+                        },
+                        Message::PlaceShipsRequest { placement } => {
+                            self.place_ships(); //FIXME incorporate transmitted placement.
+                        },
+                        Message::ShootRequest { x, y } => {
+                            self.shoot( Some(x), Some(y) );
+                        },
+                        Message::MoveAndShootRequest { id, direction, x, y } => {
+                            self.move_and_shoot( x, y, id, direction );
+                        },
+                        Message::SurrenderRequest => {
+                            self.surrender();
+                        },
+                        N => panic!("Received illegal request from client: {:?}", N),
+                    }
+                }
+
 
             } else if received == Err(TryRecvError::Empty) {
                 //println!("Nothing there =(");
