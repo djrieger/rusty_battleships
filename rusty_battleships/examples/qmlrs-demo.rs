@@ -42,8 +42,12 @@ struct Bridge {
 
 impl Bridge {
     fn send_login_request(&self, username: String) {
-        println!("Sending login request for {} ...", username);
+        println!(">>> UI: Sending login request for {} ...", username);
         self.sender.send(Message::LoginRequest { username: username });
+    }
+
+    fn send_get_features_request(&self) {
+        self.sender.send(Message::GetFeaturesRequest);
     }
 
     fn poll_state(&mut self) -> String {
@@ -153,6 +157,12 @@ fn main() {
         /* Holds the current state and provides state-based services such as shoot(), move-and-shoot() as well as state- and server-message-dependant state transitions. */
         let mut current_state = State::new(true, Some(rcv_ui_update), buff_reader, buff_writer);
 
+        thread::spawn(move || {
+            current_state.handle_communication();
+        });
+        println!("Sending FeatureRequest from UI to core.");
+        //tx_ui_update.send(Message::GetFeaturesRequest);
+
         // This thread blocks while waiting for messages from the server.
         // Any received messages are sent to the main thread via tx_tcp
         // let subloop = move || {
@@ -196,7 +206,7 @@ fn main() {
     let mut engine = qmlrs::Engine::new();
     let mut bridge = Bridge {
         state: Status::Unregistered,
-        sender: tx_main,
+        sender: tx_ui_update,
         receiver: rcv_main,
         last_rcvd_msg: None,
     };

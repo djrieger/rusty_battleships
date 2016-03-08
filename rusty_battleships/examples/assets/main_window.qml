@@ -5,7 +5,7 @@ import QtQuick.Dialogs 1.1
 
 ApplicationWindow {
     visible: true
-    title: "Battleships"
+    title: "Rusty Battleships v1.337"
 
     property int margin: 11
     width: mainLayout.implicitWidth + 2 * margin
@@ -55,7 +55,7 @@ ApplicationWindow {
         }
 
     ColumnLayout {
-         RowLayout {
+         RowLayout { //Host connect field
               TextField {
                 id: hostnameField
                 Layout.fillWidth: true
@@ -73,7 +73,7 @@ ApplicationWindow {
               }
           }
 
-         RowLayout {
+         RowLayout { //Login field
               TextField {
                 id: usernameField
                 Layout.fillWidth: true
@@ -95,9 +95,23 @@ ApplicationWindow {
                 id: infoLabel
                 text: ""
               }
+
+          RowLayout { //Features Button
+
+               Button {
+                 text: "GetFeatures"
+
+                 onClicked: features()
+               }
+             }
+
+               Label {
+                 id: featuresLabel
+                 text: ""
+               }
     }
 
-        ListView {
+        ListView { //TODO: Needs to be filled.
             id: userList
             width: 200
             Layout.fillHeight: true
@@ -147,19 +161,19 @@ ApplicationWindow {
 
     RowLayout {
         Rectangle {
-            width: 200; height: 200; color: "black"
+            width: 200; height: 200; color: "blue"
 
             Grid {
                 x: 5; y: 5
-                rows: 6; columns: 6; spacing: 2
+                rows: 10; columns: 10; spacing: 1
 
-                Repeater { 
-                    model: 36
-                    Button { 
-                        width: 30; height: 30
+                Repeater {
+                    model: 100
+                    Button {
+                        width: 18; height: 18
                         Text { text: "X" //index
-                          font.pointSize: 15
-                          anchors.centerIn: parent 
+                          font.pointSize: 10
+                          anchors.centerIn: parent
                         }
                     }
                 }
@@ -167,19 +181,19 @@ ApplicationWindow {
         }
 
         Rectangle {
-            width: 200; height: 200; color: "black"
+            width: 200; height: 200; color: "blue"
 
             Grid {
                 x: 5; y: 5
-                rows: 6; columns: 6; spacing: 2
+                rows: 10; columns: 10; spacing: 1
 
-                Repeater { 
-                    model: 36
-                    Button { 
-                        width: 30; height: 30
+                Repeater {
+                    model: 100
+                    Button {
+                        width: 18; height: 18
                         Text { text: "X" //index
-                          font.pointSize: 15
-                          anchors.centerIn: parent 
+                          font.pointSize: 10
+                          anchors.centerIn: parent
                         }
                     }
                 }
@@ -191,8 +205,13 @@ ApplicationWindow {
                   bridge.send_login_request(usernameField.text);
               }
 
+              function features() {
+                  bridge.send_get_features_request();
+                  bridge.poll_state();
+                  featuresLabel.text = bridge.state.lobby.feature_list;
+              }
+
               function connect() {
                   bridge.connect(hostnameField.text);
               }
 }
-

@@ -492,23 +492,23 @@ impl State {
     /* Contains the maain loop that does most of the work. Main-Function should hand over control to this function as
     soon as a tcp connection has been established.*/
     pub fn handle_communication(&mut self/*, br: BufReader<TcpStream>, bw: BufWriter<TcpStream>*/) {
-        if self.get_features() {
-            println!("Supported features: {:?}", self.lobby.feature_list);
-        } else {
-            println!("No features.");
-        }
-
-        let mut nickname = String::from("");
-
         if !self.use_qml_interface {
-            nickname = ask(String::from("What's yer name, captain!?"));
-        }
+            if self.get_features() {
+                println!("Supported features: {:?}", self.lobby.feature_list);
+            } else {
+                println!("No features.");
+            }
 
-        if self.login(&nickname) {
-            println!("G'day, captain {:?}!", self.lobby.player_name);
-        } else {
-            println!("Login error.");
-        }
+            let mut nickname = String::from("");
+
+            nickname = ask(String::from("What's yer name, captain!?"));
+
+            if self.login(&nickname) {
+                println!("G'day, captain {:?}!", self.lobby.player_name);
+            } else {
+                println!("Login error.");
+            }
+    }
 
         let (tx, rx) = mpsc::channel();
         let mut one_time_reader = BufReader::<TcpStream>::new(self.buff_reader.get_ref().try_clone().unwrap());
@@ -518,12 +518,16 @@ impl State {
     }
 
     pub fn update_listen_loop(&mut self, rx: Receiver<Message>) {
+        println!(">>>Starting update_listen_loop.");
         /*check-for-messages-loop*/
         loop {
+            let mut got_server_message = false;
+            let mut got_ui_message = false;
             //println!("Checking for messages.");
             let received = rx.try_recv();
             if let Ok(server_response) = received {
                 println!(">>>Oh, a message for me! MSG={:?}", server_response.clone());
+                got_server_message = true;
 
                 let outcome: Result<(), String>;
 
@@ -628,52 +632,61 @@ impl State {
                     _ => println!("Message received: {:?}", server_response),
                 }
 
-                let mut input = Err(TryRecvError::Disconnected);
-                /* Handle user input */
-                if let Some(ref mut r) = self.ui_update_receiver {
-                    let rec = r; //Safe because of if-condition!
-                    input = rec.try_recv();
-                }
-
-                if let Ok(received) = input {
-                    match received {
-                        Message::GetFeaturesRequest => {
-                            self.get_features();
-                        },
-                        Message::LoginRequest { username } => {
-                            self.login(&username);
-                        },
-                        Message::ReadyRequest => {
-                            self.ready();
-                        },
-                        Message::NotReadyRequest => {
-                            self.unready();
-                        },
-                        Message::ChallengePlayerRequest { username } => {
-                            self.challenge(&username);
-                        },
-                        Message::PlaceShipsRequest { placement } => {
-                            self.place_ships(); //FIXME incorporate transmitted placement.
-                        },
-                        Message::ShootRequest { x, y } => {
-                            self.shoot( Some(x), Some(y) );
-                        },
-                        Message::MoveAndShootRequest { id, direction, x, y } => {
-                            self.move_and_shoot( x, y, id, direction );
-                        },
-                        Message::SurrenderRequest => {
-                            self.surrender();
-                        },
-                        N => panic!("Received illegal request from client: {:?}", N),
-                    }
-                }
-
-
             } else if received == Err(TryRecvError::Empty) {
                 //println!("Nothing there =(");
-                thread::sleep(Duration::new(0, 500000000));
             } else if received == Err(TryRecvError::Disconnected) {
                 panic!("Server terminated connection. =(");
+            }
+
+            let mut input = Err(TryRecvError::Disconnected);
+            /* Handle user input */
+            if let Some(ref mut r) = self.ui_update_receiver {
+                let rec = r; //Safe because of if-condition!
+                println!(">>>Checking for UI input.");
+                input = rec.try_recv();
+            }
+
+            if let Ok(received) = input {
+                println!(">>>Found UI input.");
+                got_ui_message= true;
+                match received {
+                    Message::GetFeaturesRequest => {
+                        self.get_features();
+                    },
+                    Message::LoginRequest { username } => {
+                        self.login(&username);
+                    },
+                    Message::ReadyRequest => {
+                        self.ready();
+                    },
+                    Message::NotReadyRequest => {
+                        self.unready();
+                    },
+                    Message::ChallengePlayerRequest { username } => {
+                        self.challenge(&username);
+                    },
+                    Message::PlaceShipsRequest { placement } => {
+                        self.place_ships(); //FIXME incorporate transmitted placement.
+                    },
+                    Message::ShootRequest { x, y } => {
+                        self.shoot( Some(x), Some(y) );
+                    },
+                    Message::MoveAndShootRequest { id, direction, x, y } => {
+                        self.move_and_shoot( x, y, id, direction );
+                    },
+                    Message::SurrenderRequest => {
+                        self.surrender();
+                    },
+                    N => panic!("Received illegal request from client: {:?}", N),
+                }
+            } else {
+                println!(">>>No UI input: {:?}", input);
+            }
+
+
+            if !got_server_message && !got_ui_message {
+                println!(">>>Nothing to do.");
+                thread::sleep(Duration::new(0, 500000000));
             }
 
         }
