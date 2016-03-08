@@ -107,56 +107,56 @@ ApplicationWindow {
 
                Label {
                  id: featuresLabel
-                 text: ""
+                 text: "<none>"
                }
     }
 
-        ListView { //TODO: Needs to be filled.
-            id: userList
-            width: 200
-            Layout.fillHeight: true
-            model: ListModel {
-                ListElement {
-                    name: "Grey"
-                    colorCode: "grey"
-                }
+//        ListView { //TODO: Needs to be filled.
+//            id: userList
+//            width: 200
+//            Layout.fillHeight: true
+//            model: ListModel {
+//                ListElement {
+//                    name: "Grey"
+//                    colorCode: "grey"
+//                }
 
-                ListElement {
-                    name: "Red"
-                    colorCode: "red"
-                }
+//                ListElement {
+//                    name: "Red"
+//                    colorCode: "red"
+//                }
 
-                ListElement {
-                    name: "Blue"
-                    colorCode: "blue"
-                }
+//                ListElement {
+//                    name: "Blue"
+//                    colorCode: "blue"
+//                }
 
-                ListElement {
-                    name: "Green"
-                    colorCode: "green"
-                }
-            }
-            delegate: Item {
-                x: 5
-                width: 80
-                height: 40
-                Row {
-                    id: row1
-                    spacing: 10
-                    Rectangle {
-                        width: 40
-                        height: 40
-                        color: colorCode
-                    }
+//                ListElement {
+//                    name: "Green"
+//                    colorCode: "green"
+//                }
+//            }
+//            delegate: Item {
+//                x: 5
+//                width: 80
+//                height: 40
+//                Row {
+//                    id: row1
+//                    spacing: 10
+//                    Rectangle {
+//                        width: 40
+//                        height: 40
+//                        color: colorCode
+//                    }
 
-                    Text {
-                        text: name
-                        anchors.verticalCenter: parent.verticalCenter
-                        font.bold: true
-                    }
-                }
-            }
-        }
+//                    Text {
+//                        text: name
+//                        anchors.verticalCenter: parent.verticalCenter
+//                        font.bold: true
+//                    }
+//                }
+//            }
+//        }
     }
 
     RowLayout {
@@ -203,12 +203,16 @@ ApplicationWindow {
 
                function login() {
                   bridge.send_login_request(usernameField.text);
+                  bridge.poll_state();
               }
 
               function features() {
                   bridge.send_get_features_request();
                   bridge.poll_state();
-                  featuresLabel.text = bridge.state.lobby.feature_list;
+              }
+
+              function update_status() {
+                  Statusbar.statusLabel = bridge.get_last_message();
               }
 
               function connect() {

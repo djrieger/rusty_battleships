@@ -75,6 +75,7 @@ pub struct State {
     buff_writer : BufWriter<TcpStream>,
     use_qml_interface :  bool,
     ui_update_receiver : Option<Receiver<Message>>,
+    ui_update_sender : Option<Sender<(Status, Message)>>,
 }
 
 #[derive(Debug, Hash, Eq, PartialEq, Clone)]
@@ -99,7 +100,7 @@ pub enum Status {
 
 impl State {
 
-    pub fn new (use_qml_interface: bool, rec_ui_update: Option<Receiver<Message>>, buff_reader: BufReader<TcpStream>, buff_writer: BufWriter<TcpStream>) -> State {
+    pub fn new (use_qml_interface: bool, rec_ui_update: Option<Receiver<Message>>, tx_ui_update: Option<Sender<(Status, Message)>>, buff_reader: BufReader<TcpStream>, buff_writer: BufWriter<TcpStream>) -> State {
         State {
             lobby : ClientLobby::new(),
             opponent : String::from("None"),
@@ -113,34 +114,37 @@ impl State {
             buff_writer : buff_writer,
             use_qml_interface : use_qml_interface,
             ui_update_receiver : rec_ui_update,
+            ui_update_sender : tx_ui_update,
         }
     }
 
     pub fn get_features(&mut self) -> bool {
         send_message(Message::GetFeaturesRequest, &mut self.buff_writer);
         self.status = Status::AwaitFeatures;
-        let server_response = deserialize_message(&mut self.buff_reader);
-        if server_response.is_err() {
-            return false;
-        } else if let Ok(Message::FeaturesResponse { features: fts }) = server_response {
-            if let Ok(()) = self.handle_get_features_response(fts) {
-                return true;
-            } else {
-                println!("Something went wrong with receiving the feature list.");
-                self.status = Status::Unregistered;
-                return false;
-            }
-        } else {
-            println!("That is no FeaturesResponse! MSG={:?}", server_response);
-            self.status = Status::Unregistered;
-            return false;
-        }
+        return true;
+        // let server_response = deserialize_message(&mut self.buff_reader);
+        // if server_response.is_err() {
+        //     return false;
+        // } else if let Ok(Message::FeaturesResponse { features: fts }) = server_response {
+        //     if let Ok(()) = self.handle_get_features_response(fts) {
+        //         return true;
+        //     } else {
+        //         println!("Something went wrong with receiving the feature list.");
+        //         self.status = Status::Unregistered;
+        //         return false;
+        //     }
+        // } else {
+        //     println!("That is no FeaturesResponse! MSG={:?}", server_response);
+        //     self.status = Status::Unregistered;
+        //     return false;
+        // }
     }
 
     //FIXME: Change return value to Result<(),String)>
     pub fn login(&mut self, nickname: &str) -> bool {
         if self.status != Status::Unregistered {
             return false;
+            println!("You're already logged in!");
         }
         send_message(Message::LoginRequest { username: String::from(nickname) }, &mut self.buff_writer);
         self.status = Status::Register;
@@ -279,12 +283,12 @@ impl State {
         match self.status {
             Status::Register => {
                 self.status = Status::Available;
-                self.challenge("test2"); //FIXME ONLY FOR TESTING!
+//                self.challenge("test2"); //FIXME ONLY FOR TESTING!
                 return Ok(());
             },
             Status::AwaitGameStart => {
                 self.status = Status::PlacingShips;
-                self.place_ships(); //FIXME ONLY FOR TESING!
+//                self.place_ships(); //FIXME ONLY FOR TESING!
                 return Ok(());
             },
             Status::AwaitReady => {
@@ -316,9 +320,9 @@ impl State {
             let mut new_name = String::from("");
             if !self.use_qml_interface {
                 new_name = ask(String::from("What was yer name again?")); //FIXME: FOR TESTING ONLY!
-            }
-            send_message(Message::LoginRequest { username: String::from(new_name) }, &mut self.buff_writer); //FIXME: FOR TESTING ONLY!
+                send_message(Message::LoginRequest { username: String::from(new_name) }, &mut self.buff_writer); //FIXME: FOR TESTING ONLY!
             self.status = Status::Register; //FIXME: FOR TESTING ONLY!
+        }
         } else {
             panic!("Received a NAME_TAKEN_RESPONSE while not in Register State! STATUS={:?}", self.status);
         }
@@ -360,7 +364,7 @@ impl State {
             self.my_turn = true;
             self.status = Status::Planning;
             //FIXME: ONLY FOR TESTING! USE GUI! ----v
-            self.shoot(None, None);
+//            self.shoot(None, None);
             //FIXME: ONLY FOR TESTING! USE GUI! ----^
         } else {
             panic!("Received a ENEMY_HIT_UPDATE while not in OPPONENT_PLANNING state! STATUS={:?}", self.status);
@@ -387,7 +391,7 @@ impl State {
             self.my_turn = true;
             self.status = Status::Planning;
             //FIXME: ONLY FOR TESTING! USE GUI! ----v
-            self.shoot(None, None);
+//            self.shoot(None, None);
             //FIXME: ONLY FOR TESTING! USE GUI! ----^
         } else {
             panic!("Received a MISS_RESPONSE while not in PLANNING state! STATUS={:?}", self.status);
@@ -412,7 +416,7 @@ impl State {
             self.status = Status::Planning;
 
             //FIXME: ONLY FOR TESTING! USE GUI! ----v
-            self.shoot(None, None);
+//            self.shoot(None, None);
             //FIXME: ONLY FOR TESTING! USE GUI! ----^
 
         } else {
@@ -463,7 +467,7 @@ impl State {
             }
             self.status = Status::Planning;
             //FIXME: ONLY FOR TESTING! USE GUI! ----v
-            self.shoot(None, None);
+//            self.shoot(None, None);
             //FIXME: ONLY FOR TESTING! USE GUI! ----^
         } else {
             panic!("Received a ENEMY_AFK_UPDATE while not in OPPONENT_PLANNING state! STATUS={:?}", self.status);
@@ -532,7 +536,7 @@ impl State {
                 let outcome: Result<(), String>;
 
                 /* Handle messages from the server. */
-                match server_response {
+                match server_response.clone() {
                     // UPDATES
                     Message::PlayerJoinedUpdate {nickname: nn} => {
                         println!("Welcome our new captain {:?}", nn);
@@ -593,7 +597,7 @@ impl State {
                         self.handle_enemy_invisible_update(x, y);
                     },
                     // RESPONSES
-                    Message::OkResponse => outcome = self.handle_ok_response(server_response),
+                    Message::OkResponse => outcome = self.handle_ok_response(server_response.clone()),
                     Message::InvalidRequestResponse => {
                         println!("Received an INVALID_REQUEST_RESPONSE in state {:?}.", self.status);
                     },
@@ -629,7 +633,12 @@ impl State {
                         println!("Congratulations! You destroyed an enemy ship!");
                         self.handle_destroyed_response(x, y);
                     },
-                    _ => println!("Message received: {:?}", server_response),
+                    _ => println!(">>>RECEIVED: {:?}", server_response),
+                }
+
+                if let Some(ref mut sender) = self.ui_update_sender {
+                    println!("Transmitting to Bridge.");
+                    sender.send( (self.status.clone(), server_response.clone()) );
                 }
 
             } else if received == Err(TryRecvError::Empty) {
@@ -647,7 +656,7 @@ impl State {
             }
 
             if let Ok(received) = input {
-                println!(">>>Found UI input.");
+                println!(">>>UI input!");
                 got_ui_message= true;
                 match received {
                     Message::GetFeaturesRequest => {

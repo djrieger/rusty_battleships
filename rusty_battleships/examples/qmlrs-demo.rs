@@ -41,9 +41,15 @@ struct Bridge {
 }
 
 impl Bridge {
-    fn send_login_request(&self, username: String) {
+    fn send_login_request(&mut self, username: String) {
         println!(">>> UI: Sending login request for {} ...", username);
         self.sender.send(Message::LoginRequest { username: username });
+        println!("Polling");
+        if let Ok(tuple) = self.receiver.try_recv() {
+            println!("Success!");
+            self.state = tuple.0;
+            self.last_rcvd_msg = Some(tuple.1);
+        }
     }
 
     fn send_get_features_request(&self) {
@@ -72,6 +78,14 @@ impl Bridge {
         return match self.last_rcvd_msg {
             Some(ref msg) => format!("{:?}", msg),
             None => String::new(),
+        }
+    }
+
+    fn get_last_message(&self) -> String {
+        if let Some(ref msg) = self.last_rcvd_msg {
+            return format!("{:?}", msg);
+        } else {
+            return String::from("Nothing to display.");
         }
     }
 
@@ -109,15 +123,17 @@ impl Bridge {
 
 Q_OBJECT! { Bridge:
     slot fn send_login_request(String);
+    slot fn send_get_features_request();
     slot fn poll_state();
     slot fn poll_log();
+    slot fn get_last_message();
     slot fn connect(String);
 }
 
 fn main() {
     // Channel pair for connecting the Bridge and ???
     let (tx_main, rcv_tcp) : (mpsc::Sender<Message>, mpsc::Receiver<Message>) = mpsc::channel();
-    let (tx_tcp, rcv_main) : (mpsc::Sender<(Status, Message)>, mpsc::Receiver<(Status, Message)>) = mpsc::channel();
+    let (tx_message_update, rcv_main) : (mpsc::Sender<(Status, Message)>, mpsc::Receiver<(Status, Message)>) = mpsc::channel();
     /* From UI-Thread (this one) to Status-Update-Thread.
     Since every UI input corresponds to a Request, we can recycle message.rs for encoding user input. */
     let (tx_ui_update, rcv_ui_update) : (mpsc::Sender<Message>, mpsc::Receiver<Message>) = mpsc::channel();
@@ -155,49 +171,13 @@ fn main() {
         let mut buff_reader = BufReader::new(receiver);
 
         /* Holds the current state and provides state-based services such as shoot(), move-and-shoot() as well as state- and server-message-dependant state transitions. */
-        let mut current_state = State::new(true, Some(rcv_ui_update), buff_reader, buff_writer);
+        let mut current_state = State::new(true, Some(rcv_ui_update), Some(tx_message_update), buff_reader, buff_writer);
 
         thread::spawn(move || {
             current_state.handle_communication();
         });
-        println!("Sending FeatureRequest from UI to core.");
+        //println!("Sending FeatureRequest from UI to core.");
         //tx_ui_update.send(Message::GetFeaturesRequest);
-
-        // This thread blocks while waiting for messages from the server.
-        // Any received messages are sent to the main thread via tx_tcp
-        // let subloop = move || {
-        //     loop {
-        //         // Parse server response and send to main thread
-        //         let server_response = deserialize_message(&mut buff_reader).unwrap();
-        //         println!("Got {:?} from server", server_response);
-        //         let cloned_response = server_response.clone();
-        //         match server_response {
-        //             Message::OkResponse => current_state = State::Registered,
-        //             Message::NameTakenResponse { nickname } => current_state = State::NameTaken,
-        //             _ => {},
-        //         }
-        //         tx_tcp.send((current_state, cloned_response));
-        //     }tx_tcp
-        // };
-
-        // Spawn a TCP-Polling-Thread and a Status-Update-Thread, connected via a "Channel<Message>"
-
-
-        // Request features from server
-        // let serialized_msg = serialize_message(Message::GetFeaturesRequest);
-        // buff_writer.write(&serialized_msg[..]).unwrap();
-        // buff_writer.flush();
-
-        loop {
-            // See if main thread has any messages to be sent to the server
-            // FIXME kann hier blocken bzw kein try, sync_channel...?
-            // if let Ok(msg) = rcv_tcp.try_recv() {
-            //     let serialized_msg = serialize_message(msg);
-            //     buff_writer.write(&serialized_msg[..]).unwrap();
-            //     buff_writer.flush();
-            // }
-
-        }
     };
 
     Bridge::discover_servers();
