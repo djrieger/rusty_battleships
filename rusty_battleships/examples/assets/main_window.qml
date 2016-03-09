@@ -49,67 +49,17 @@ ApplicationWindow {
                 anchors.centerIn: parent
                 width: Math.min(fieldContainer.height, fieldContainer.width)
                 height: width
-                rows: 10
-                columns: 10
+                rows: 5
+                columns: 5
             }
         }
 
-        ColumnLayout {
-            RowLayout { //Host connect field
-                TextField {
-                    id: hostnameField
-                    Layout.fillWidth: true
-
-                    placeholderText: "Enter host"
-                    focus: true
-
-                    onAccepted: connect()
-                }
-
-                Button {
-                    text: "Connect"
-
-                    onClicked: connect()
-                }
-            }
-
-            RowLayout { //Login field
-                TextField {
-                    id: usernameField
-                    Layout.fillWidth: true
-
-                    placeholderText: "Enter nickname"
-                    focus: true
-
-                    onAccepted: login()
-                }
-
-                Button {
-                    text: "Login"
-
-                    onClicked: login()
-                }
-            }
-
-            Label {
-                id: infoLabel
-                text: ""
-            }
-
-            RowLayout { //Features Button
-
-                Button {
-                    text: "GetFeatures"
-
-                    onClicked: features()
-                }
-            }
-
-            Label {
-                id: featuresLabel
-                text: "<none>"
-            }
-        }
+        // ColumnLayout {
+            // Label {
+            //     id: infoLabel
+            //     text: ""
+            // }
+        // }
 
         ListView { //TODO: Needs to be filled.
             id: userList
