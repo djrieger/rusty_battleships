@@ -227,9 +227,13 @@ impl Bridge {
             for x in 0..W {
                 match board.state[x][y].ship_index {
                     Some(index) => result.push_str(&index.to_string()),
-                    None => result.push_str("")
+                    None => result.push_str(" ")
                 }
-                result.push_str("|");
+                if x == W-1 {
+                    result.push_str("|\n");
+                } else {
+                    result.push_str("|");
+                }
             }
         }
         println!("{}", result);
