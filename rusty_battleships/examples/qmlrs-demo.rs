@@ -97,7 +97,10 @@ impl Bridge {
         }
     }
 
-    fn connect(&self, hostname: String) {
+    fn connect(&self, hostname: String, port: u16, nickname: String) {
+    }
+
+    fn connect_to_discovered(&self, server_index: u16, nickname: String) {
     }
 
     fn discover_servers() {
