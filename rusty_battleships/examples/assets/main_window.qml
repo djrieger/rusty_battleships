@@ -139,6 +139,9 @@ ApplicationWindow {
                             font.pointSize: 10
                             anchors.centerIn: parent
                         }
+                        onClicked: {
+                            bridge.on_clicked_my_board(index);
+                        }
                     }
                 }
             }
@@ -158,6 +161,9 @@ ApplicationWindow {
                         Text { text: "X" //index
                             font.pointSize: 10
                             anchors.centerIn: parent
+                        }
+                        onClicked: {
+                            bridge.on_clicked_opp_board(index);
                         }
                     }
                 }
