@@ -127,7 +127,7 @@ ApplicationWindow {
         } else {
             bridge.connect(serverListModel.get(serverList.currentIndex).ip, serverListModel.get(serverList.currentIndex).port, nicknameField.text);
         }
-        var component = Qt.createQmlObject(bridge.get_main_window(), connectWindow, "main_window");
+        var component = Qt.createQmlObject(assets.get_main_window(), connectWindow, "main_window");
         component.show();
     }
 }

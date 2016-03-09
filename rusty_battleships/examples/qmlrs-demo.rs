@@ -30,13 +30,26 @@ macro_rules! description {
 macro_rules! version {
     () => ( env!("CARGO_PKG_VERSION") )
 }
-macro_rules! version_string {            // Like this (with a literal instead of a String variable), everything works just fine:
-
+macro_rules! version_string {
     () => ( concat!(description!(), " v", version!()) )
 }
 
-static WINDOW: &'static str = include_str!("assets/main_window.qml");
+
 static CONNECT_WINDOW: &'static str = include_str!("assets/connect_window.qml");
+static MAIN_WINDOW: &'static str = include_str!("assets/main_window.qml");
+
+
+struct Assets;
+
+impl Assets {
+    fn get_main_window(&self) -> String {
+        MAIN_WINDOW.to_owned()
+    }
+}
+
+Q_OBJECT! { Assets:
+    slot fn get_main_window();
+}
 
 
 struct Bridge {
@@ -97,10 +110,6 @@ impl Bridge {
 
     fn send_get_features_request(&mut self) {
         self.ui_sender.as_mut().unwrap().send(Message::GetFeaturesRequest);
-    }
-
-    fn get_main_window(&self) -> String {
-        WINDOW.to_owned()
     }
 
     fn update_lobby(&mut self) {
@@ -266,7 +275,6 @@ impl Bridge {
 
 Q_OBJECT! { Bridge:
     slot fn send_login_request(String);
-    slot fn get_main_window();
     slot fn send_get_features_request();
     slot fn send_challenge(String);
     slot fn poll_state();
@@ -347,6 +355,7 @@ fn main() {
 
     let tcp_thread = thread::spawn(tcp_loop);
     let mut engine = qmlrs::Engine::new();
+    let assets = Assets;
     let mut bridge = Bridge {
         state: Status::Unregistered,
         ui_sender: None,
@@ -362,6 +371,7 @@ fn main() {
         features_list : Vec::<String>::new(),
     };
     bridge.state = Status::Unregistered;
+    engine.set_property("assets", assets);
     engine.set_property("bridge", bridge);
     engine.load_data(CONNECT_WINDOW);
     engine.exec();
