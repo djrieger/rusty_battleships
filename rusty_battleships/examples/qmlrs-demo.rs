@@ -32,6 +32,7 @@ macro_rules! version_string {            // Like this (with a literal instead of
 }
 
 static WINDOW: &'static str = include_str!("assets/main_window.qml");
+static CONNECT_WINDOW: &'static str = include_str!("assets/connect_window.qml");
 
 struct Bridge {
     sender: mpsc::Sender<Message>,
@@ -201,5 +202,6 @@ fn main() {
     bridge.state = Status::Unregistered;
     engine.set_property("bridge", bridge);
     engine.load_data(WINDOW);
+    engine.load_data(CONNECT_WINDOW);
     engine.exec();
 }
