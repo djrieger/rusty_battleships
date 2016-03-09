@@ -288,7 +288,7 @@ fn main() {
     };
     bridge.state = Status::Unregistered;
     engine.set_property("bridge", bridge);
-    engine.load_data(WINDOW);
+    // engine.load_data(WINDOW);
     engine.load_data(CONNECT_WINDOW);
     engine.exec();
 }

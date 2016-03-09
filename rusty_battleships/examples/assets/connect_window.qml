@@ -4,6 +4,9 @@ import QtQuick.Layouts 1.0
 import QtQuick.Dialogs 1.1
 
 ApplicationWindow {
+    id: connectWindow
+    property variant win;
+
     visible: true
     title: "Verbinden"
 
@@ -119,10 +122,14 @@ ApplicationWindow {
     }
 
     function connect() {
+        hide();
         if (hostnameField.text != "") {
             bridge.connect(hostnameField.text, parseInt(portField.text), nicknameField.text);
         } else {
             bridge.connect(serverListModel.get(serverList.currentIndex).ip, serverListModel.get(serverList.currentIndex).port, nicknameField.text);
         }
+        var component = Qt.createComponent("../examples/assets/main_window.qml");
+        win = component.createObject(connectWindow);
+        win.show();
     }
 }
