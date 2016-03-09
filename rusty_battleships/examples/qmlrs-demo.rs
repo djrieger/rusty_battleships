@@ -254,15 +254,9 @@ Q_OBJECT! { Bridge:
 fn tcp_loop(hostname: String, port: i64, rcv_ui_update: mpsc::Receiver<Message>,
     tx_message_update: mpsc::Sender<(Status, Message)>, tx_lobby_update: mpsc::Sender<Message>) {
 
-    let mut port:u16 = port as u16;
-    let mut ip = "127.0.0.1";
-
-    println!("Operating as client on port {}.", port);
-    println!("Connecting to {}.", ip);
-
     //Connect to the specified address and port.
     let mut sender;
-    match TcpStream::connect((&hostname[..], port)) {
+    match TcpStream::connect((&hostname[..], port as u16)) {
         Ok(foo) => sender = foo,
         Err(why) => {
             println!("{:?}", why);
