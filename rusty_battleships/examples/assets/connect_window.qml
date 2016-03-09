@@ -5,7 +5,6 @@ import QtQuick.Dialogs 1.1
 
 ApplicationWindow {
     id: connectWindow
-    property variant win;
 
     visible: true
     title: "Verbinden"
