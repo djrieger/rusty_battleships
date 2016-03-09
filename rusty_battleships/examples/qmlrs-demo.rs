@@ -219,7 +219,8 @@ impl Bridge {
         ships.push(Ship { x: 0, y: 2, length: 3, horizontal:true, health_points: 3});
         ships.push(Ship { x: 0, y: 3, length: 4, horizontal:true, health_points: 4});
         ships.push(Ship { x: 0, y: 4, length: 5, horizontal:true, health_points: 5});
-        let board = Board::new(ships, true);
+        let mut board = Board::new(ships, true);
+        board.compute_state();
 
         let mut result = String::new();
         for x in 0..W {
