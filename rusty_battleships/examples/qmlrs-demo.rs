@@ -123,11 +123,11 @@ impl Bridge {
     }
 
     fn get_ready_players(&self) -> String {
-        return String::new();
+        return format!("{:?}", self.ready_players_list);
     }
 
     fn get_available_players(&self) -> String {
-        return String::new();
+        return format!("{:?}", self.available_players_list);
     }
 
     fn get_features_list(&self) -> String {

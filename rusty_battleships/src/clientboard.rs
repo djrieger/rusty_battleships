@@ -1,5 +1,6 @@
 use board::{CellState};
 use ship::Ship;
+use message::Message;
 
 pub const W: usize = 16;
 pub const H: usize = 10;
@@ -96,5 +97,79 @@ impl Board {
         } else {
             self.state[x][y] = CellState {visible: true, ship_index: None};
         }
+    }
+
+    // pub fn reload_own_cell_states(&mut self) {
+    //     if !self.mine {
+    //         return;
+    //     }
+    //
+    //     for s in self.ships.clone() {
+    //         let index = self.ships.clone().binary_search(&s);
+    //         if s.horizontal {
+    //             for i in 0..s.length {
+    //                 let visibility = self.state[s.x+i][s.y].visible;
+    //                 self.state[s.x + i][s.y] = CellState {visible: visibility, ship_index: Some(index.unwrap() as u8)}
+    //             }
+    //         } else {
+    //             for i in 0..s.length {
+    //                 let visibility = self.state[(s.x as usize) + i ][(s.y as usize)].visible;
+    //                 self.state[(s.x as usize)][(s.y as usize) + i] = CellState {visible: visibility, ship_index: Some(index.unwrap() as u8)}
+    //             }
+    //         }
+    //     }
+    // }
+
+    pub fn compute_state(&mut self) -> (bool, Vec<Message>) {
+        let mut new_state = [[CellState::new(); H]; W];
+        let mut visibility_updates = vec![];
+
+        for (ship_index, ship) in self.ships.iter().filter(|ship| !ship.is_dead()).enumerate() {
+            for i in 0..ship.length  {
+                let (dest_x, dest_y) = Board::get_ship_dest_coords(ship, i);
+                if !self.coords_valid(dest_x, dest_y) || new_state[dest_x][dest_y].has_ship() {
+                    // coordinates are invalid or there is another ship at these coordinates
+                    return (false, vec![]);
+                } else {
+                    let ref cell = self.state[dest_x][dest_y];
+                    if cell.visible && cell.has_ship() {
+                        // no ship was here before but now this ship occupies this cell
+                        visibility_updates.push(Message::EnemyVisibleUpdate { x: dest_x as u8, y: dest_y as u8 });
+                    }
+                    new_state[dest_x as usize][dest_y as usize].set_ship((ship_index + 1) as u8);
+                }
+            }
+        }
+
+        // Find all cells that had ships in old state (self.state) but no longer in new_state ->
+        // some ship moved out of some cell
+        for x in 0..W {
+            for y in 0..H {
+                let ref old_cell = self.state[x][y];
+                let ref mut new_cell = new_state[x][y];
+                // copy visibility information to new state
+                new_cell.visible = old_cell.visible;
+                if old_cell.visible && old_cell.has_ship() && !new_cell.has_ship() {
+                    visibility_updates.push(Message::EnemyInvisibleUpdate { x: x as u8, y: y as u8 });
+                }
+            }
+        }
+
+        self.state = new_state;
+        return (true, visibility_updates);
+    }
+
+    fn coords_valid(&self, x: usize, y: usize) -> bool {
+        return !(x < 0 || y < 0 || x >= (W as usize) - 1 || y >= (H as usize) - 1);
+    }
+
+    fn get_ship_dest_coords(ship: &Ship, i: usize) -> (usize, usize) {
+        let mut dest = (ship.x, ship.y);
+        if ship.horizontal {
+            dest.0 += i as isize;
+        } else {
+            dest.1 += i as isize;
+        }
+        return (dest.0 as usize, dest.1 as usize);
     }
 }

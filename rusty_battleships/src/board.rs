@@ -43,7 +43,7 @@ pub struct CellState {
     pub visible: bool,
     pub ship_index: Option<u8>,
 }
- 
+
 pub enum HitResult {
     Hit,
     Miss,
@@ -51,7 +51,7 @@ pub enum HitResult {
 }
 
 impl CellState {
-    fn new() -> CellState {
+    pub fn new() -> CellState {
         CellState { visible: false, ship_index: None }
     }
 
@@ -108,12 +108,12 @@ impl Board {
         let mut dest = (ship.x, ship.y);
         if ship.horizontal {
             dest.0 += i as isize;
-        } else { 
+        } else {
             dest.1 += i as isize;
         }
         return (dest.0 as usize, dest.1 as usize);
     }
-        
+
     /**
      * Compute new board state.
      * @return.0 true if board state is valid, false otherwise (if ships overlap or are outside board
