@@ -32,6 +32,7 @@ macro_rules! version_string {            // Like this (with a literal instead of
 }
 
 static WINDOW: &'static str = include_str!("assets/main_window.qml");
+static CONNECT_WINDOW: &'static str = include_str!("assets/connect_window.qml");
 
 struct Bridge {
     sender: mpsc::Sender<Message>,
@@ -97,7 +98,10 @@ impl Bridge {
         }
     }
 
-    fn connect(&self, hostname: String) {
+    fn connect(&self, hostname: String, port: u16, nickname: String) {
+    }
+
+    fn connect_to_discovered(&self, server_index: u16, nickname: String) {
     }
 
     fn discover_servers() {
@@ -204,5 +208,6 @@ fn main() {
     bridge.state = Status::Unregistered;
     engine.set_property("bridge", bridge);
     engine.load_data(WINDOW);
+    engine.load_data(CONNECT_WINDOW);
     engine.exec();
 }
