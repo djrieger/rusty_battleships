@@ -49,65 +49,8 @@ ApplicationWindow {
                 anchors.centerIn: parent
                 width: Math.min(fieldContainer.height, fieldContainer.width)
                 height: width
-                rows: 10
-                columns: 10
-            }
-        }
-
-        ColumnLayout {
-            RowLayout { //Host connect field
-                TextField {
-                    id: hostnameField
-                    Layout.fillWidth: true
-
-                    placeholderText: "Enter host"
-                    focus: true
-
-                    onAccepted: connect()
-                }
-
-                Button {
-                    text: "Connect"
-
-                    onClicked: connect()
-                }
-            }
-
-            RowLayout { //Login field
-                TextField {
-                    id: usernameField
-                    Layout.fillWidth: true
-
-                    placeholderText: "Enter nickname"
-                    focus: true
-
-                    onAccepted: login()
-                }
-
-                Button {
-                    text: "Login"
-
-                    onClicked: login()
-                }
-            }
-
-            Label {
-                id: infoLabel
-                text: ""
-            }
-
-            RowLayout { //Features Button
-
-                Button {
-                    text: "GetFeatures"
-
-                    onClicked: features()
-                }
-            }
-
-            Label {
-                id: featuresLabel
-                text: "<none>"
+                rows: 5
+                columns: 5
             }
         }
 
@@ -196,6 +139,9 @@ ApplicationWindow {
                             font.pointSize: 10
                             anchors.centerIn: parent
                         }
+                        onClicked: {
+                            bridge.on_clicked_my_board(index);
+                        }
                     }
                 }
             }
@@ -216,9 +162,42 @@ ApplicationWindow {
                             font.pointSize: 10
                             anchors.centerIn: parent
                         }
+                        onClicked: {
+                            bridge.on_clicked_opp_board(index);
+                        }
                     }
                 }
             }
+        }
+    }
+
+    ColumnLayout {
+        Button {
+            id: moveLeftBtn
+            width: 30
+            height: 30
+            Text { text: "<" }
+        }
+        Button {
+            id: moveRightBtn
+            width: 30
+            height: 30
+            Text { text: ">" }
+        }
+        Button {
+            id: moveUpBtn
+            width: 30
+            height: 30
+            Text { text: "Up" }
+        }
+        Button {
+            id: moveDownBtn
+            width: 30
+            height: 30
+            Text { text: "Down" }
+        }
+        CheckBox {
+            text: "Bereit"
         }
     }
 

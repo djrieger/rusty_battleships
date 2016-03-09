@@ -190,6 +190,20 @@ impl Bridge {
         }
         return String::from(result.to_owned().trim());
     }
+
+    fn get_coords_from_button_index(button_index: i64) -> (u8, u8) {
+        ((button_index % 10) as u8, (button_index / 10) as u8)
+    }
+
+    fn on_clicked_my_board(&mut self, button_index: i64) {
+        let (x, y) = Bridge::get_coords_from_button_index(button_index);
+        println!("Button clicked at {}, {}", x, y);
+    }
+
+    fn on_clicked_opp_board(&mut self, button_index: i64) {
+        let (x, y) = Bridge::get_coords_from_button_index(button_index);
+        println!("Button clicked at {}, {}", x, y);
+    }
 }
 
 Q_OBJECT! { Bridge:
@@ -205,6 +219,8 @@ Q_OBJECT! { Bridge:
     slot fn get_ready_players();
     slot fn get_available_players();
     slot fn get_features_list();
+    slot fn on_clicked_my_board(i64);
+    slot fn on_clicked_opp_board(i64);
 }
 
 fn tcp_loop(hostname: String, port: i64, rcv_ui_update: mpsc::Receiver<Message>,
@@ -293,7 +309,7 @@ fn main() {
     };
     bridge.state = Status::Unregistered;
     engine.set_property("bridge", bridge);
-    engine.load_data(WINDOW);
+    // engine.load_data(WINDOW);
     engine.load_data(CONNECT_WINDOW);
     engine.exec();
 }
