@@ -45,14 +45,14 @@ ApplicationWindow {
             text: "Gefundene Server:"
         }
 
-        ListView { 
+        ListView {
             id: serverList
             width: 200
             height: 200
             /* Layout.fillHeight: true */
             model: ListModel {
-                id: "serverListModel"
-                ListElement { 
+                id: serverListModel
+                ListElement {
                     ip: "0.0.0.0"
                     port: 0
                     name: "Warte auf Server..."
@@ -83,7 +83,7 @@ ApplicationWindow {
                             anchors.fill: parent
 
                             onClicked:{
-                                serverList.currentIndex = index 
+                                serverList.currentIndex = index
                                 hostnameField.text = ""
                                 portField.text = ""
                                 console.log("Chose server " + index);
@@ -101,7 +101,7 @@ ApplicationWindow {
             focus: true
         }
 
-        RowLayout { 
+        RowLayout {
             TextField {
                 id: hostnameField
                 Layout.fillWidth: true
@@ -128,8 +128,7 @@ ApplicationWindow {
         } else {
             bridge.connect(serverListModel.get(serverList.currentIndex).ip, serverListModel.get(serverList.currentIndex).port, nicknameField.text);
         }
-        var component = Qt.createComponent("../examples/assets/main_window.qml");
-        win = component.createObject(connectWindow);
-        win.show();
+        var component = Qt.createQmlObject(bridge.get_main_window(), connectWindow, "main_window");
+        component.show();
     }
 }

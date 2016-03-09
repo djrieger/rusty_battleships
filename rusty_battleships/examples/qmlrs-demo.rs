@@ -99,6 +99,10 @@ impl Bridge {
         self.ui_sender.as_mut().unwrap().send(Message::GetFeaturesRequest);
     }
 
+    fn get_main_window(&self) -> String {
+        WINDOW.to_owned()
+    }
+
     fn update_lobby(&mut self) {
         let mut response = Err(TryRecvError::Disconnected);
         let mut available = Vec::<String>::new();
@@ -235,6 +239,7 @@ impl Bridge {
 
 Q_OBJECT! { Bridge:
     slot fn send_login_request(String);
+    slot fn get_main_window();
     slot fn send_get_features_request();
     slot fn send_challenge(String);
     slot fn poll_state();
@@ -331,7 +336,6 @@ fn main() {
     };
     bridge.state = Status::Unregistered;
     engine.set_property("bridge", bridge);
-    // engine.load_data(WINDOW);
     engine.load_data(CONNECT_WINDOW);
     engine.exec();
 }
