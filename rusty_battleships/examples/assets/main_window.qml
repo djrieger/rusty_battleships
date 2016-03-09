@@ -54,13 +54,6 @@ ApplicationWindow {
             }
         }
 
-        // ColumnLayout {
-            // Label {
-            //     id: infoLabel
-            //     text: ""
-            // }
-        // }
-
         ListView { //TODO: Needs to be filled.
             id: userList
             width: 200
@@ -169,6 +162,36 @@ ApplicationWindow {
                     }
                 }
             }
+        }
+    }
+
+    ColumnLayout {
+        Button {
+            id: moveLeftBtn
+            width: 30
+            height: 30
+            Text { text: "<" }
+        }
+        Button {
+            id: moveRightBtn
+            width: 30
+            height: 30
+            Text { text: ">" }
+        }
+        Button {
+            id: moveUpBtn
+            width: 30
+            height: 30
+            Text { text: "Up" }
+        }
+        Button {
+            id: moveDownBtn
+            width: 30
+            height: 30
+            Text { text: "Down" }
+        }
+        CheckBox {
+            text: "Bereit"
         }
     }
 
