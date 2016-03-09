@@ -7,6 +7,7 @@ use std::io::{BufReader, BufWriter, Write};
 use std::option::Option::None;
 use std::collections::HashMap;
 use std::sync::mpsc;
+use std::sync::mpsc::{RecvError, TryRecvError};
 use std::thread;
 
 #[macro_use]
@@ -44,20 +45,81 @@ struct Bridge {
 
     udp_discovery_receiver: mpsc::Receiver<(Ipv4Addr, u16, String)>,
     discovered_servers: HashMap<(Ipv4Addr, u16), String>,
+    available_players_list: Vec<String>,
+    ready_players_list: Vec<String>,
+    features_list: Vec<String>,
 }
 
 impl Bridge {
     fn send_login_request(&mut self, username: String) {
         println!(">>> UI: Sending login request for {} ...", username);
         self.sender.send(Message::LoginRequest { username: username });
-        if let Ok(tuple) = self.receiver.try_recv() {
-            self.state = tuple.0;
-            self.last_rcvd_msg = Some(tuple.1);
+        // Wait for a OkResponse from the server, discard player state updates.
+        let mut response_received = false;
+        while !response_received {
+            //Block while receiving! At some point there MUST be an OkResponse or a NameTakenResponse
+            let resp = self.receiver.recv();
+            if let Ok(tuple) = resp {
+                match tuple.1.clone() {
+                    Message::OkResponse => {
+                        println!("Loggresp.unwrap()ed in.");
+                        response_received = true;
+                        self.state = tuple.0;
+                        self.last_rcvd_msg = Some(tuple.1.clone());
+                    },
+                    Message::NameTakenResponse { nickname } => {
+                        println!("Name taken: {:?}", nickname.clone());
+                        response_received = true;
+                        self.state = tuple.0;
+                        self.last_rcvd_msg = Some(tuple.1.clone());
+                    }
+                    Message::PlayerReadyUpdate{..} | Message::PlayerJoinedUpdate{..}
+                    | Message::PlayerNotReadyUpdate{..} | Message::PlayerLeftUpdate{..} => continue,
+                    x => {
+                        println!("Received illegal response: {:?}", x);
+                        break;
+                    },
+                }
+            } else {
+                println!("UI update channel hung up!");
+            }
         }
+
     }
 
     fn send_get_features_request(&self) {
         self.sender.send(Message::GetFeaturesRequest);
+    }
+
+    fn update_lobby(&mut self) {
+        let mut response = Err(TryRecvError::Disconnected);
+        let mut available = Vec::<String>::new();
+        let mut ready = Vec::<String>::new();
+        while response != Err(TryRecvError::Empty) {
+            response = self.lobby_receiver.try_recv();
+            if let Ok(Message::LobbyList {ref available_players, ref ready_players}) = response {
+                available = available_players.clone();
+                ready = ready_players.clone();
+            } else if let Err(TryRecvError::Disconnected) = response {
+                panic!("Lobby update list was closed. Probably because the sender thread died.");
+            } /*else {
+                panic!("You shall not pass Non-LobbyList messages via the lobby update channel!");
+            }*/
+            self.available_players_list = available.clone();
+            self.ready_players_list = ready.clone();
+        }
+    }
+
+    fn get_ready_players(&self) -> String {
+        return String::new();
+    }
+
+    fn get_available_players(&self) -> String {
+        return String::new();
+    }
+
+    fn get_features_list(&self) -> String {
+        return format!("{:?}", self.features_list);
     }
 
     fn send_challenge(&mut self, username: String) {
@@ -124,10 +186,14 @@ Q_OBJECT! { Bridge:
     slot fn send_get_features_request();
     slot fn send_challenge(String);
     slot fn poll_state();
+    slot fn update_lobby();
     slot fn poll_log();
     slot fn get_last_message();
     slot fn connect(String, i64, String);
     slot fn discover_servers();
+    slot fn get_ready_players();
+    slot fn get_available_players();
+    slot fn get_features_list();
 }
 
 fn main() {
@@ -216,6 +282,9 @@ fn main() {
         lobby_receiver: rcv_lobby_update,
         udp_discovery_receiver: rcv_udp_discovery,
         discovered_servers: HashMap::new(),
+        ready_players_list : Vec::<String>::new(),
+        available_players_list : Vec::<String>::new(),
+        features_list : Vec::<String>::new(),
     };
     bridge.state = Status::Unregistered;
     engine.set_property("bridge", bridge);

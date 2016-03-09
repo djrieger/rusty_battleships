@@ -62,6 +62,7 @@ ApplicationWindow {
                 Row {
                     id: row1
                     spacing: 10
+                    anchors.verticalCenter: parent.verticalCenter
                     Rectangle {
                         width: 200
                         height: 15

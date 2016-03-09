@@ -96,29 +96,6 @@ ApplicationWindow {
                 text: ""
             }
 
-            RowLayout { //Challenge field
-                TextField {
-                    id: challengeField
-                    Layout.fillWidth: true
-
-                    placeholderText: "Enter enemy nickname"
-                    focus: true
-
-                    onAccepted: challenge()
-                }
-
-                Button {
-                    text: "Challenge"
-
-                    onClicked: challenge()
-                }
-            }
-
-            Label {
-                id: challengeLabel
-                text: ""
-            }
-
             RowLayout { //Features Button
 
                 Button {
@@ -132,55 +109,75 @@ ApplicationWindow {
                 id: featuresLabel
                 text: "<none>"
             }
-
         }
 
-        //        ListView { //TODO: Needs to be filled.
-        //            id: userList
-        //            width: 200
-        //            Layout.fillHeight: true
-        //            model: ListModel {
-        //                ListElement {
-        //                    name: "Grey"
-        //                    colorCode: "grey"
-        //                }
+        ListView { //TODO: Needs to be filled.
+            id: userList
+            width: 200
+            Layout.fillHeight: true
+            model: ListModel {
+                ListElement {
+                    name: "Captain Kirk"
+                    colorCode: "lightgrey"
+                }
 
-        //                ListElement {
-        //                    name: "Red"
-        //                    colorCode: "red"
-        //                }
+                ListElement {
+                    name: "Captain Nemo"
+                    colorCode: "lime"
+                }
 
-        //                ListElement {
-        //                    name: "Blue"
-        //                    colorCode: "blue"
-        //                }
+                ListElement {
+                    name: "Admiral Ackbar"
+                    colorCode: "lightgrey"
+                }
 
-        //                ListElement {
-        //                    name: "Green"
-        //                    colorCode: "green"
-        //                }
-        //            }
-        //            delegate: Item {
-        //                x: 5
-        //                width: 80
-        //                height: 40
-        //                Row {
-        //                    id: row1
-        //                    spacing: 10
-        //                    Rectangle {
-        //                        width: 40
-        //                        height: 40
-        //                        color: colorCode
-        //                    }
+                ListElement {
+                    name: "Captain Balou"
+                    colorCode: "lightgrey"
+                }
+            }
+            delegate: Item {
+                x: 5
+                width: 80
+                height: 15
+                Row {
+                    id: row1
+                    anchors.verticalCenter: parent.verticalCenter
+                    spacing: 3
 
-        //                    Text {
-        //                        text: name
-        //                        anchors.verticalCenter: parent.verticalCenter
-        //                        font.bold: true
-        //                    }
-        //                }
-        //            }
-        //        }
+                    Rectangle {
+                        width: 200
+                        height: 15
+                        color: "transparent"
+
+                        Rectangle {
+                            width: 15
+                            height: 15
+                            color: colorCode
+                            anchors.left: parent.left
+
+                            Text {
+                                text: name
+                                anchors.left: parent.right
+                                font.bold: false
+                            }
+                        }
+
+                        MouseArea {
+                            id: mouse_area1
+                            z: 1
+                            hoverEnabled: true
+                            anchors.fill: parent
+
+                            onClicked:{
+                                userList.currentIndex = index
+                                console.log("Challenged player " + index);
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 
     RowLayout {
@@ -233,11 +230,7 @@ ApplicationWindow {
     function features() {
         bridge.send_get_features_request();
         bridge.poll_state();
-    }
-
-    function challenge() {
-        bridge.send_challenge(challengeField.text);
-        bridge.poll_state();
+        featuresLabel.text = bridge.get_features_list();
     }
 
     function update_status() {
@@ -246,5 +239,11 @@ ApplicationWindow {
 
     function connect() {
         bridge.connect(hostnameField.text);
+    }
+
+    function update_lobby() {
+        bridge.get_ready_players();
+        bridge.get_available_players();
+        //^-- verwursten in list items!
     }
 }
