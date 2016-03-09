@@ -19,6 +19,9 @@ use argparse::{ArgumentParser, Print, Store};
 extern crate rusty_battleships;
 use rusty_battleships::message::{serialize_message, deserialize_message, Message};
 use rusty_battleships::clientstate::{State, Status, tcp_poll};
+use rusty_battleships::clientboard::{Board};
+use rusty_battleships::board::{W, H};
+use rusty_battleships::ship::Ship;
 
 // http://stackoverflow.com/questions/35157399/how-to-concatenate-static-strings-in-rust/35159310
 macro_rules! description {
@@ -193,6 +196,30 @@ impl Bridge {
         let (x, y) = Bridge::get_coords_from_button_index(button_index);
         println!("Button clicked at {}, {}", x, y);
     }
+
+    fn get_boards(&self) -> String {
+        let mut ships = Vec::<Ship>::new();
+        ships.push(Ship { x: 0, y: 0, length: 2, horizontal:true, health_points: 2});
+        ships.push(Ship { x: 0, y: 1, length: 2, horizontal:true, health_points: 2});
+        ships.push(Ship { x: 0, y: 2, length: 3, horizontal:true, health_points: 3});
+        ships.push(Ship { x: 0, y: 3, length: 4, horizontal:true, health_points: 4});
+        ships.push(Ship { x: 0, y: 4, length: 5, horizontal:true, health_points: 5});
+        let board = Board::new(ships, true);
+
+        let mut result = String::new();
+        for x in 0..W {
+            for y in 0..H {
+                match board.state[x][y].ship_index {
+                    Some(index) => result.push_str(&index.to_string()),
+                    None => result.push_str("")
+                }
+                result.push_str("|");
+            }
+        }
+        println!("{}", result);
+
+        return result;
+    }
 }
 
 Q_OBJECT! { Bridge:
@@ -210,6 +237,7 @@ Q_OBJECT! { Bridge:
     slot fn get_features_list();
     slot fn on_clicked_my_board(i64);
     slot fn on_clicked_opp_board(i64);
+    slot fn get_boards();
 }
 
 fn main() {

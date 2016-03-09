@@ -164,6 +164,8 @@ ApplicationWindow {
                         }
                         onClicked: {
                             bridge.on_clicked_opp_board(index);
+                            // TODO: remove, just for testing:
+                            bridge.get_boards();
                         }
                     }
                 }
