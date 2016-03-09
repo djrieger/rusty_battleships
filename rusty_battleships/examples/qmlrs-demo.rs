@@ -36,6 +36,7 @@ static WINDOW: &'static str = include_str!("assets/main_window.qml");
 struct Bridge {
     sender: mpsc::Sender<Message>,
     receiver: mpsc::Receiver<(Status, Message)>,
+    lobby_receiver: mpsc::Receiver<Message>,
     state: Status,
     last_rcvd_msg: Option<Message>,
 }
@@ -145,6 +146,7 @@ fn main() {
     /* From UI-Thread (this one) to Status-Update-Thread.
     Since every UI input corresponds to a Request, we can recycle message.rs for encoding user input. */
     let (tx_ui_update, rcv_ui_update) : (mpsc::Sender<Message>, mpsc::Receiver<Message>) = mpsc::channel();
+    let (tx_lobby_update, rcv_lobby_update) : (mpsc::Sender<Message>, mpsc::Receiver<Message>) = mpsc::channel();
 
     let tcp_loop = move || {
         let mut port:u16 = 5000;
@@ -179,7 +181,7 @@ fn main() {
         let mut buff_reader = BufReader::new(receiver);
 
         /* Holds the current state and provides state-based services such as shoot(), move-and-shoot() as well as state- and server-message-dependant state transitions. */
-        let mut current_state = State::new(true, Some(rcv_ui_update), Some(tx_message_update), buff_reader, buff_writer);
+        let mut current_state = State::new(true, Some(rcv_ui_update), Some(tx_message_update), Some(tx_lobby_update), buff_reader, buff_writer);
 
         thread::spawn(move || {
             current_state.handle_communication();
@@ -197,6 +199,7 @@ fn main() {
         sender: tx_ui_update,
         receiver: rcv_main,
         last_rcvd_msg: None,
+        lobby_receiver: rcv_lobby_update,
     };
     bridge.state = Status::Unregistered;
     engine.set_property("bridge", bridge);

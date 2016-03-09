@@ -51,7 +51,7 @@ fn main() {
     let buff_writer = BufWriter::new(sender);
     let buff_reader = BufReader::new(receiver);
 
-    let mut state = State::new(false, None, None, buff_reader, buff_writer);
+    let mut state = State::new(false, None, None, None, buff_reader, buff_writer);
     println!("Current name is {:?}", state.lobby.player_name);
 
     state.handle_communication();

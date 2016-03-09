@@ -76,6 +76,7 @@ pub struct State {
     use_qml_interface :  bool,
     ui_update_receiver : Option<Receiver<Message>>,
     ui_update_sender : Option<Sender<(Status, Message)>>,
+    lobby_update_sender : Option<Sender<Message>>,
 }
 
 #[derive(Debug, Hash, Eq, PartialEq, Clone)]
@@ -100,7 +101,12 @@ pub enum Status {
 
 impl State {
 
-    pub fn new (use_qml_interface: bool, rec_ui_update: Option<Receiver<Message>>, tx_ui_update: Option<Sender<(Status, Message)>>, buff_reader: BufReader<TcpStream>, buff_writer: BufWriter<TcpStream>) -> State {
+    pub fn new(use_qml_interface: bool,
+                rec_ui_update: Option<Receiver<Message>>,
+                tx_ui_update: Option<Sender<(Status, Message)>>,
+                tx_lobby_update: Option<Sender<Message>>,
+                buff_reader: BufReader<TcpStream>,
+                buff_writer: BufWriter<TcpStream>) -> State {
         State {
             lobby : ClientLobby::new(),
             opponent : String::from("None"),
@@ -115,6 +121,7 @@ impl State {
             use_qml_interface : use_qml_interface,
             ui_update_receiver : rec_ui_update,
             ui_update_sender : tx_ui_update,
+            lobby_update_sender : tx_lobby_update,
         }
     }
 
@@ -122,22 +129,6 @@ impl State {
         send_message(Message::GetFeaturesRequest, &mut self.buff_writer);
         self.status = Status::AwaitFeatures;
         return true;
-        // let server_response = deserialize_message(&mut self.buff_reader);
-        // if server_response.is_err() {
-        //     return false;
-        // } else if let Ok(Message::FeaturesResponse { features: fts }) = server_response {
-        //     if let Ok(()) = self.handle_get_features_response(fts) {
-        //         return true;
-        //     } else {
-        //         println!("Something went wrong with receiving the feature list.");
-        //         self.status = Status::Unregistered;
-        //         return false;
-        //     }
-        // } else {
-        //     println!("That is no FeaturesResponse! MSG={:?}", server_response);
-        //     self.status = Status::Unregistered;
-        //     return false;
-        // }
     }
 
     //FIXME: Change return value to Result<(),String)>
@@ -525,6 +516,15 @@ impl State {
         self.update_listen_loop(rx);
     }
 
+    fn send_updated_lobby(&mut self, sender: &mut Sender<Message>) {
+        let l = &self.lobby;
+        sender.send(
+            Message::LobbyList {
+                available_players: l.player_list.clone(),
+                ready_players: l.ready_players.clone(),
+            });
+    }
+
     pub fn update_listen_loop(&mut self, rx: Receiver<Message>) {
         println!(">>>Starting update_listen_loop.");
         /*check-for-messages-loop*/
@@ -539,24 +539,38 @@ impl State {
 
                 let outcome: Result<(), String>;
 
+
+
                 /* Handle messages from the server. */
                 match server_response.clone() {
                     // UPDATES
                     Message::PlayerJoinedUpdate {nickname: nn} => {
                         println!("Welcome our new captain {:?}", nn);
                         self.lobby.add_player(&nn.clone());
+                        if let Some(mut sender) = self.lobby_update_sender.clone() {
+                            self.send_updated_lobby(&mut sender);
+                        }
                     },
                     Message::PlayerLeftUpdate {nickname: nn} => {
                         println!("Say goodbye to captain {:?}", nn);
                         self.lobby.remove_player(&nn.clone());
+                        if let Some(mut sender) = self.lobby_update_sender.clone() {
+                            self.send_updated_lobby(&mut sender);
+                        }
                     }
                     Message::PlayerReadyUpdate {nickname: nn} => {
                         println!("Captain {:?} is now ready to be challenged.", nn);
                         self.lobby.ready_player(&nn.clone());
+                        if let Some(mut sender) = self.lobby_update_sender.clone() {
+                            self.send_updated_lobby(&mut sender);
+                        }
                     },
                     Message::PlayerNotReadyUpdate {nickname : nn} => {
                         println!("Captain {:?} is not ready.", nn);
                         self.lobby.unready_player(&nn.clone());
+                        if let Some(mut sender) = self.lobby_update_sender.clone() {
+                            self.send_updated_lobby(&mut sender);
+                        }
                     },
                     Message::GameStartUpdate {nickname: nn} => {
                         println!("Received a challenge by captain {:?}", nn);
@@ -667,12 +681,12 @@ impl State {
                 /* Handle user input */
                 if let Some(ref mut r) = self.ui_update_receiver {
                     let rec = r; //Safe because of if-condition!
-                    println!(">>>Checking for UI input.");
+//                    println!(">>>Checking for UI input.");
                     input = rec.try_recv();
                 }
 
                 if let Ok(received) = input {
-                    println!(">>>UI input!");
+//                    println!(">>>UI input!");
                     got_ui_message= true;
                     match received {
                         Message::GetFeaturesRequest => {
@@ -705,12 +719,12 @@ impl State {
                         N => panic!("Received illegal request from client: {:?}", N),
                     }
                 } else {
-                    println!(">>>No UI input: {:?}", input);
+//                    println!(">>>No UI input: {:?}", input);
                 }
 
 
                 if !got_server_message && !got_ui_message {
-                    println!(">>>Nothing to do.");
+//                    println!(">>>Nothing to do.");
                     thread::sleep(Duration::new(0, 500000000));
                 }
 
