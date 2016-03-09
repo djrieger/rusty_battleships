@@ -1,11 +1,11 @@
-use std::net::{Ipv4Addr, TcpStream};
-use std::net::UdpSocket;
+use std::net::{Ipv4Addr, TcpStream, UdpSocket, SocketAddr, SocketAddrV4};
 
 extern crate byteorder;
-use byteorder::{BigEndian, ReadBytesExt};
+use byteorder::{ByteOrder, BigEndian, ReadBytesExt};
 
 use std::io::{BufReader, BufWriter, Write};
 use std::option::Option::None;
+use std::collections::HashMap;
 use std::sync::mpsc;
 use std::thread;
 
@@ -34,12 +34,16 @@ macro_rules! version_string {            // Like this (with a literal instead of
 static WINDOW: &'static str = include_str!("assets/main_window.qml");
 static CONNECT_WINDOW: &'static str = include_str!("assets/connect_window.qml");
 
+
 struct Bridge {
     sender: mpsc::Sender<Message>,
     receiver: mpsc::Receiver<(Status, Message)>,
     lobby_receiver: mpsc::Receiver<Message>,
     state: Status,
     last_rcvd_msg: Option<Message>,
+
+    udp_discovery_receiver: mpsc::Receiver<(Ipv4Addr, u16, String)>,
+    discovered_servers: HashMap<(Ipv4Addr, u16), String>,
 }
 
 impl Bridge {
@@ -98,38 +102,20 @@ impl Bridge {
         }
     }
 
-    fn connect(&self, hostname: String, port: u16, nickname: String) {
+    fn connect(&self, hostname: String, port: i64, nickname: String) {
+        println!("Connecting to {}, {}, {}", hostname, port, nickname);
     }
 
-    fn connect_to_discovered(&self, server_index: u16, nickname: String) {
-    }
+    fn discover_servers(&mut self) -> String {
+        if let Ok((ip, port, server_name)) = self.udp_discovery_receiver.try_recv() {
+            self.discovered_servers.insert((ip, port), server_name);
+        }
 
-    fn discover_servers() {
-        let socket = UdpSocket::bind("0.0.0.0:0").unwrap();
-        let response = vec![];
-        socket.send_to(&response[..], &(Ipv4Addr::new(224, 0, 0, 250), 49001 as u16));
-        let udp_discovery_loop = move || {
-            let mut buf = [0; 2048];
-            loop {
-                match socket.recv_from(&mut buf) {
-                    Ok((num_bytes, src)) => {
-                        if num_bytes < 2 {
-                            panic!("Received invalid response from {} to UDP discovery request", src);
-                        }
-                        // println!("num_bytes: {}", num_bytes);
-                        // println!("src: {}", src);
-                        // Wozu Port?
-                        // let port = BigEndian::read_u16(&buf[0..1]);
-                        let server_name = std::str::from_utf8(&buf[2..]).unwrap_or("");
-                        println!("Found server '{}' listening on {}", server_name, src);
-                    },
-                    Err(e) => {
-                        println!("couldn't recieve a datagram: {}", e);
-                    }
-                }
-            }
-        };
-        thread::spawn(udp_discovery_loop);
+        let mut result = String::new();
+        for (&(ip, port), server_name) in &self.discovered_servers {
+            result.push_str(&format!("{},{},{}\n", ip, port, server_name));
+        }
+        return String::from(result.to_owned().trim());
     }
 }
 
@@ -140,7 +126,8 @@ Q_OBJECT! { Bridge:
     slot fn poll_state();
     slot fn poll_log();
     slot fn get_last_message();
-    slot fn connect(String);
+    slot fn connect(String, i64, String);
+    slot fn discover_servers();
 }
 
 fn main() {
@@ -148,9 +135,10 @@ fn main() {
     let (tx_main, rcv_tcp) : (mpsc::Sender<Message>, mpsc::Receiver<Message>) = mpsc::channel();
     let (tx_message_update, rcv_main) : (mpsc::Sender<(Status, Message)>, mpsc::Receiver<(Status, Message)>) = mpsc::channel();
     /* From UI-Thread (this one) to Status-Update-Thread.
-    Since every UI input corresponds to a Request, we can recycle message.rs for encoding user input. */
+       Since every UI input corresponds to a Request, we can recycle message.rs for encoding user input. */
     let (tx_ui_update, rcv_ui_update) : (mpsc::Sender<Message>, mpsc::Receiver<Message>) = mpsc::channel();
     let (tx_lobby_update, rcv_lobby_update) : (mpsc::Sender<Message>, mpsc::Receiver<Message>) = mpsc::channel();
+    let (tx_udp_discovery, rcv_udp_discovery) = mpsc::channel();
 
     let tcp_loop = move || {
         let mut port:u16 = 5000;
@@ -194,7 +182,29 @@ fn main() {
         //tx_ui_update.send(Message::GetFeaturesRequest);
     };
 
-    Bridge::discover_servers();
+    let socket = UdpSocket::bind("0.0.0.0:0").unwrap();
+    let response = vec![];
+    socket.send_to(&response[..], &(Ipv4Addr::new(224, 0, 0, 250), 49001 as u16));
+    let udp_discovery_loop = move || {
+        let mut buf = [0; 2048];
+        loop {
+            match socket.recv_from(&mut buf) {
+                Ok((num_bytes, SocketAddr::V4(src))) => {
+                    if num_bytes < 2 {
+                        panic!("Received invalid response from {} to UDP discovery request", src);
+                    }
+                    let port = BigEndian::read_u16(&buf[0..2]);
+                    let server_name = std::str::from_utf8(&buf[2..]).unwrap_or("");
+                    tx_udp_discovery.send((*src.ip(), port, String::from(server_name)));
+                },
+                Ok((num_bytes, SocketAddr::V6(_))) => panic!("Currently not supporting Ipv6"),
+                Err(e) => {
+                    println!("couldn't recieve a datagram: {}", e);
+                }
+            }
+        }
+    };
+    thread::spawn(udp_discovery_loop);
 
     let tcp_thread = thread::spawn(tcp_loop);
     let mut engine = qmlrs::Engine::new();
@@ -204,6 +214,8 @@ fn main() {
         receiver: rcv_main,
         last_rcvd_msg: None,
         lobby_receiver: rcv_lobby_update,
+        udp_discovery_receiver: rcv_udp_discovery,
+        discovered_servers: HashMap::new(),
     };
     bridge.state = Status::Unregistered;
     engine.set_property("bridge", bridge);

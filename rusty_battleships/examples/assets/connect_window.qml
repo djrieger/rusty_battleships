@@ -12,11 +12,23 @@ ApplicationWindow {
     minimumHeight: 300 + 2 * margin
 
     Timer {
-        interval: 50
+        interval: 1000
         running: true
         repeat: true
         onTriggered: {
-            // TODO: Read servers from bridge
+            var rawResponse = bridge.discover_servers();
+            var lines = rawResponse.split("\n");
+            serverListModel.clear();
+            lines.map(function (line) {
+                var parts = line.split(",", 3);
+                if (parts.length == 3) {
+                    serverListModel.append({
+                        ip: parts[0],
+                        port: parseInt(parts[1]),
+                        name: parts[2]
+                    });
+                }
+            });
         }
     }
 
@@ -36,10 +48,12 @@ ApplicationWindow {
             height: 200
             /* Layout.fillHeight: true */
             model: ListModel {
-                ListElement { name: "Server1" }
-                ListElement { name: "Server2" }
-                ListElement { name: "Server3" }
-                ListElement { name: "Server4" }
+                id: "serverListModel"
+                ListElement { 
+                    ip: "0.0.0.0"
+                    port: 0
+                    name: "Warte auf Server..."
+                }
             }
             delegate: Item {
                 x: 5
@@ -53,7 +67,7 @@ ApplicationWindow {
                         height: 15
 
                         Text {
-                            text: name
+                            text: name + " (" + ip + ":" + port + ")"
                             anchors.verticalCenter: parent.verticalCenter
                             font.bold: true
                         }
@@ -105,11 +119,9 @@ ApplicationWindow {
 
     function connect() {
         if (hostnameField.text != "") {
-            console.log("Connecting to " + hostnameField.text + ":" + portField.text);
-            bridge.connect(hostnameField.text, portField.text, nicknameField.text);
+            bridge.connect(hostnameField.text, parseInt(portField.text), nicknameField.text);
         } else {
-            console.log("Connecting to discovered server " + serverList.currentIndex);
-            bridge.connect_to_discovered(serverList.currentIndex, nicknameField.text);
+            bridge.connect(serverListModel.get(serverList.currentIndex).ip, serverListModel.get(serverList.currentIndex).port, nicknameField.text);
         }
     }
 }
