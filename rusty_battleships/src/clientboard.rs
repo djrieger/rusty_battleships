@@ -1,6 +1,6 @@
 use board::{CellState};
 use ship::Ship;
-use message::Message;
+use message::{Message, Direction};
 
 pub const W: usize = 16;
 pub const H: usize = 10;
@@ -99,26 +99,15 @@ impl Board {
         }
     }
 
-    // pub fn reload_own_cell_states(&mut self) {
-    //     if !self.mine {
-    //         return;
-    //     }
-    //
-    //     for s in self.ships.clone() {
-    //         let index = self.ships.clone().binary_search(&s);
-    //         if s.horizontal {
-    //             for i in 0..s.length {
-    //                 let visibility = self.state[s.x+i][s.y].visible;
-    //                 self.state[s.x + i][s.y] = CellState {visible: visibility, ship_index: Some(index.unwrap() as u8)}
-    //             }
-    //         } else {
-    //             for i in 0..s.length {
-    //                 let visibility = self.state[(s.x as usize) + i ][(s.y as usize)].visible;
-    //                 self.state[(s.x as usize)][(s.y as usize) + i] = CellState {visible: visibility, ship_index: Some(index.unwrap() as u8)}
-    //             }
-    //         }
-    //     }
-    // }
+    pub fn move_ship(&mut self, ship_id: usize, dir: Direction) {
+        if ship_id >= 5 {
+            panic!("ship_id out of bounds: {}", ship_id);
+        }
+        if let Some(ref mut ship) = self.ships.get_mut(ship_id) {
+            ship.move_me(dir);
+        }
+        self.compute_state();
+    }
 
     pub fn compute_state(&mut self) -> (bool, Vec<Message>) {
         let mut new_state = [[CellState::new(); H]; W];

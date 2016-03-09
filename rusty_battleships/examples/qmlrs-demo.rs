@@ -17,7 +17,7 @@ extern crate argparse;
 use argparse::{ArgumentParser, Print, Store};
 
 extern crate rusty_battleships;
-use rusty_battleships::message::{serialize_message, deserialize_message, Message};
+use rusty_battleships::message::{serialize_message, deserialize_message, Message, Direction};
 use rusty_battleships::clientstate::{State, Status, tcp_poll};
 use rusty_battleships::clientboard::{Board};
 use rusty_battleships::board::{W, H};
@@ -223,20 +223,42 @@ impl Bridge {
         board.compute_state();
 
         let mut result = String::new();
-        for y in 0..H {
-            for x in 0..W {
-                match board.state[x][y].ship_index {
-                    Some(index) => result.push_str(&index.to_string()),
-                    None => result.push_str(" ")
-                }
-                if x == W-1 {
-                    result.push_str("|\n");
-                } else {
-                    result.push_str("|");
+        {
+            for y in 0..H {
+                for x in 0..W {
+                    match board.state[x][y].ship_index {
+                        Some(index) => result.push_str(&index.to_string()),
+                        None => result.push_str(" ")
+                    }
+                    if x == W-1 {
+                        result.push_str("|\n");
+                    } else {
+                        result.push_str("|");
+                    }
                 }
             }
+            println!("{}", result);
         }
-        println!("{}", result);
+
+        board.move_ship(0, Direction::East);
+        {
+            result = String::new();
+            for y in 0..H {
+                for x in 0..W {
+                    match board.state[x][y].ship_index {
+                        Some(index) => result.push_str(&index.to_string()),
+                        None => result.push_str(" ")
+                    }
+                    if x == W-1 {
+                        result.push_str("|\n");
+                    } else {
+                        result.push_str("|");
+                    }
+                }
+            }
+            println!("{}", result);
+        }
+
 
         return result;
     }

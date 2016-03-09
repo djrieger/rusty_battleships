@@ -18,8 +18,8 @@ impl Ship {
         }
         match direction {
             Direction::North => self.y -= 1,
-            Direction::East => self.x = 1,
-            Direction::South => self.y = 1,
+            Direction::East => self.x += 1,
+            Direction::South => self.y += 1,
             Direction::West => self.x -= 1,
         }
         return true;
