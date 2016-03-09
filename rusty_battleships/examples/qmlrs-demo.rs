@@ -223,8 +223,8 @@ impl Bridge {
         board.compute_state();
 
         let mut result = String::new();
-        for x in 0..W {
-            for y in 0..H {
+        for y in 0..H {
+            for x in 0..W {
                 match board.state[x][y].ship_index {
                     Some(index) => result.push_str(&index.to_string()),
                     None => result.push_str("")
