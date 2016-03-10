@@ -29,4 +29,12 @@ impl Ship {
     pub fn is_dead(&self) -> bool {
         self.health_points == 0
     }
+
+    pub fn is_horizontal(&self) -> bool {
+        self.direction == Direction::East || self.direction == Direction::West
+    }
+
+    pub fn is_reverse(&self) -> bool {
+        self.direction == Direction::West || self.direction == Direction::North
+    }
 }
