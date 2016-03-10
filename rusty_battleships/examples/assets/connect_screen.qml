@@ -3,32 +3,12 @@ import QtQuick.Controls 1.2
 import QtQuick.Layouts 1.0
 import QtQuick.Dialogs 1.1
 
-ApplicationWindow {
-    id: connectWindow
+Item {
+    id: screen
 
-    visible: true
-    title: "Verbinden"
+    visible: false
 
-    property int margin: 11
-    minimumWidth: 400 + 2 * margin
-    minimumHeight: 300 + 2 * margin
-
-    Timer {
-        interval: 1000
-        running: true
-        repeat: true
-        onTriggered: {
-            var servers = eval(bridge.discover_servers());
-            serverListModel.clear();
-            servers.map(function (server) {
-                serverListModel.append({
-                    ip: server.ip.join("."),
-                    port: server.port,
-                    name: server.name
-                });
-            });
-        }
-    }
+    signal connected();
 
     ColumnLayout {
         id: mainLayout
@@ -112,18 +92,57 @@ ApplicationWindow {
 
         Button {
             text: "Verbinden"
-            onClicked: connect()
+            onClicked: {
+              // FIXME: validate inputs, handle errors
+              connect();
+            }
         }
     }
 
+    function login() {
+        bridge.send_login_request(usernameField.text);
+        bridge.poll_state();
+    }
+
+    function features() {
+        bridge.send_get_features_request();
+        bridge.poll_state();
+        featuresLabel.text = bridge.get_features_list();
+    }
+
     function connect() {
-        hide();
         if (hostnameField.text != "") {
-            bridge.connect(hostnameField.text, parseInt(portField.text), nicknameField.text);
+          bridge.connect(hostnameField.text, parseInt(portField.text, 10), nicknameField.text);
         } else {
-            bridge.connect(serverListModel.get(serverList.currentIndex).ip, serverListModel.get(serverList.currentIndex).port, nicknameField.text);
+          var server = serverListModel.get(serverList.currentIndex);
+          bridge.connect(server.ip, parseInt(server.port, 10), nicknameField.text);
         }
-        var component = Qt.createQmlObject(assets.get_main_window(), connectWindow, "main_window");
-        component.show();
+
+        // TODO: wait for response, handle errors
+
+        screen.connected();
+    }
+
+
+    function updateServers() {
+        var servers = eval(bridge.discover_servers());
+        serverListModel.clear();
+        servers.map(function (server) {
+            serverListModel.append({
+                ip: server.ip.join("."),
+                port: server.port,
+                name: server.name
+            });
+        });
+    }
+
+    function activate() {
+      timer.triggered.connect(updateServers);
+      visible = true;
+    }
+
+    function deactivate() {
+      timer.triggered.disconnect(updateServers);
+      visible = false;
     }
 }

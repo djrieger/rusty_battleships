@@ -38,20 +38,32 @@ macro_rules! version_string {
 }
 
 
-static CONNECT_WINDOW: &'static str = include_str!("assets/connect_window.qml");
-static MAIN_WINDOW: &'static str = include_str!("assets/main_window.qml");
+static CONNECT_SCREEN: &'static str = include_str!("assets/connect_screen.qml");
+static GAME_SCREEN: &'static str = include_str!("assets/game_screen.qml");
+static LOBBY_SCREEN: &'static str = include_str!("assets/lobby_screen.qml");
+static MAIN_WINDOW: &'static str = include_str!("assets/main.qml");
 
 
 struct Assets;
 
 impl Assets {
-    fn get_main_window(&self) -> String {
-        MAIN_WINDOW.to_owned()
+    fn get_connect_screen(&self) -> String {
+        CONNECT_SCREEN.to_owned()
+    }
+
+    fn get_game_screen(&self) -> String {
+        GAME_SCREEN.to_owned()
+    }
+
+    fn get_lobby_screen(&self) -> String {
+        LOBBY_SCREEN.to_owned()
     }
 }
 
 Q_OBJECT! { Assets:
-    slot fn get_main_window();
+    slot fn get_connect_screen();
+    slot fn get_game_screen();
+    slot fn get_lobby_screen();
 }
 
 
@@ -235,11 +247,11 @@ impl Bridge {
 
     fn get_boards(&self) -> String {
         let mut ships = Vec::<Ship>::new();
-        ships.push(Ship { x: 0, y: 0, length: 2, horizontal:true, health_points: 2});
-        ships.push(Ship { x: 0, y: 1, length: 2, horizontal:true, health_points: 2});
-        ships.push(Ship { x: 0, y: 2, length: 3, horizontal:true, health_points: 3});
-        ships.push(Ship { x: 0, y: 3, length: 4, horizontal:true, health_points: 4});
-        ships.push(Ship { x: 0, y: 4, length: 5, horizontal:true, health_points: 5});
+        ships.push(Ship { x: 0, y: 0, length: 2, direction: Direction::East, health_points: 2});
+        ships.push(Ship { x: 0, y: 1, length: 2, direction: Direction::East, health_points: 2});
+        ships.push(Ship { x: 0, y: 2, length: 3, direction: Direction::East, health_points: 3});
+        ships.push(Ship { x: 0, y: 3, length: 4, direction: Direction::East, health_points: 4});
+        ships.push(Ship { x: 0, y: 4, length: 5, direction: Direction::East, health_points: 5});
         let mut board = Board::new(ships, true);
         board.compute_state();
 
@@ -388,6 +400,6 @@ fn main() {
     bridge.state = Status::Unregistered;
     engine.set_property("assets", assets);
     engine.set_property("bridge", bridge);
-    engine.load_data(CONNECT_WINDOW);
+    engine.load_data(MAIN_WINDOW);
     engine.exec();
 }
