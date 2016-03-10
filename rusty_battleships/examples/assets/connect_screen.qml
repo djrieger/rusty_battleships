@@ -45,16 +45,21 @@ Item {
                     property bool serverSelected: currentIndex !== count - 1
                     textRole: "name"
 
-                    property string previousValue;
+                    property string previousValue
                     onEnabledChanged: {
                         // remember previous value during an update
                         if (enabled) {
-                            if (previousValue && find(previousValue) !== -1) {
-                                currentIndex = find(previousValue)
+                            if (previousValue) {
+                                if (find(previousValue) !== -1) {
+                                    currentIndex = find(previousValue);
+                                } else {
+                                    // choose "Other server…" when server has disappeared
+                                    currentIndex = count - 1;
+                                }
                             }
                         } else {
                             if (currentIndex !== -1) {
-                                previousValue = currentText
+                                previousValue = currentText;
                             }
                         }
                     }
