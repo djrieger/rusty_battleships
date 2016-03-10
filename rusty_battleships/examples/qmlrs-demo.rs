@@ -1,20 +1,23 @@
-use std::net::{Ipv4Addr, TcpStream, UdpSocket, SocketAddr, SocketAddrV4};
-
-extern crate byteorder;
-use byteorder::{ByteOrder, BigEndian, ReadBytesExt};
-
+use std::collections::{BTreeMap, HashMap};
 use std::io::{BufReader, BufWriter, Write};
-use std::option::Option::None;
-use std::collections::HashMap;
+use std::net::{Ipv4Addr, TcpStream, UdpSocket, SocketAddr, SocketAddrV4};
 use std::sync::mpsc;
 use std::sync::mpsc::{RecvError, TryRecvError};
 use std::thread;
 
+extern crate argparse;
+use argparse::{ArgumentParser, Print, Store};
+
+extern crate byteorder;
+use byteorder::{ByteOrder, BigEndian, ReadBytesExt};
+
 #[macro_use]
 extern crate qmlrs;
 
-extern crate argparse;
-use argparse::{ArgumentParser, Print, Store};
+extern crate rustc_serialize;
+use rustc_serialize::Encodable;
+use rustc_serialize::json;
+use rustc_serialize::json::{ToJson, Json};
 
 extern crate rusty_battleships;
 use rusty_battleships::message::{serialize_message, deserialize_message, Message, Direction};
@@ -52,6 +55,14 @@ Q_OBJECT! { Assets:
 }
 
 
+#[derive(RustcEncodable)]
+struct Server {
+    ip: [u8; 4],
+    port: u16,
+    name: String
+}
+
+
 struct Bridge {
     ui_sender: Option<mpsc::Sender<Message>>,
 
@@ -68,7 +79,7 @@ struct Bridge {
     available_players_list: Vec<String>,
 
     udp_discovery_receiver: mpsc::Receiver<(Ipv4Addr, u16, String)>,
-    discovered_servers: HashMap<(Ipv4Addr, u16), String>,
+    discovered_servers: Vec<Server>,
 }
 
 impl Bridge {
@@ -83,7 +94,7 @@ impl Bridge {
             if let Ok(tuple) = resp {
                 match tuple.1.clone() {
                     Message::OkResponse => {
-                        println!("Loggresp.unwrap()ed in.");
+                        println!("Logged in.");
                         response_received = true;
                         self.state = tuple.0;
                         self.last_rcvd_msg = Some(tuple.1.clone());
@@ -197,14 +208,10 @@ impl Bridge {
 
     fn discover_servers(&mut self) -> String {
         if let Ok((ip, port, server_name)) = self.udp_discovery_receiver.try_recv() {
-            self.discovered_servers.insert((ip, port), server_name);
+            self.discovered_servers.push(Server { ip: ip.octets(), port: port, name: server_name });
         }
 
-        let mut result = String::new();
-        for (&(ip, port), server_name) in &self.discovered_servers {
-            result.push_str(&format!("{},{},{}\n", ip, port, server_name));
-        }
-        return String::from(result.to_owned().trim());
+        return json::encode(&self.discovered_servers).unwrap();
     }
 
     fn get_coords_from_button_index(button_index: i64) -> (u8, u8) {
@@ -365,7 +372,7 @@ fn main() {
         lobby_receiver: rcv_lobby_update,
         last_rcvd_msg: None,
         udp_discovery_receiver: rcv_udp_discovery,
-        discovered_servers: HashMap::new(),
+        discovered_servers: Vec::<Server>::new(),
         ready_players_list : Vec::<String>::new(),
         available_players_list : Vec::<String>::new(),
         features_list : Vec::<String>::new(),

@@ -18,18 +18,14 @@ ApplicationWindow {
         running: true
         repeat: true
         onTriggered: {
-            var rawResponse = bridge.discover_servers();
-            var lines = rawResponse.split("\n");
+            var servers = eval(bridge.discover_servers());
             serverListModel.clear();
-            lines.map(function (line) {
-                var parts = line.split(",", 3);
-                if (parts.length == 3) {
-                    serverListModel.append({
-                        ip: parts[0],
-                        port: parseInt(parts[1]),
-                        name: parts[2]
-                    });
-                }
+            servers.map(function (server) {
+                serverListModel.append({
+                    ip: server.ip.join("."),
+                    port: server.port,
+                    name: server.name
+                });
             });
         }
     }

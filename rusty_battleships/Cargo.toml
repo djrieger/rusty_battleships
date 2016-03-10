@@ -6,8 +6,9 @@ authors = ["Moritz Baumann <moritz.baumann@student.kit.edu>", "David Rieger <dav
 [dependencies]
 ansi_term = "0.7"
 argparse = "0.2.1"
+byteorder = "0.4.2"
+net2 = "0.2"
 qmlrs = { git = "git://github.com/Landkeks/qmlrs.git" }
 rand = "0.3"
+rustc-serialize = "0.3"
 time = "0.1"
-net2 = "*"
-byteorder = "0.4.2"
