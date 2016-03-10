@@ -154,10 +154,11 @@ impl Board {
 
     fn get_ship_dest_coords(ship: &Ship, i: usize) -> (usize, usize) {
         let mut dest = (ship.x, ship.y);
-        if ship.horizontal {
-            dest.0 += i as isize;
-        } else {
-            dest.1 += i as isize;
+        match ship.direction {
+            Direction::East => dest.0 += i as isize,
+            Direction::South => dest.1 += i as isize,
+            Direction::West => dest.0 -= i as isize,
+            Direction::North => dest.1 -= i as isize,
         }
         return (dest.0 as usize, dest.1 as usize);
     }
