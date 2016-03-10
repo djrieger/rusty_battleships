@@ -353,11 +353,11 @@ pub fn handle_place_ships_request(placement: [ShipPlacement; 5], player_name: &S
             let mut game_ref = (*game).borrow_mut();
             if game_ref.player1 == *player_name {
                 game_ref.board1.ships = ships;
-                new_board_valid = game_ref.board1.compute_state().0;
+                new_board_valid = game_ref.board1.compute_state();
                 opponent_ready = game_ref.board2.ships.len() > 0;
             } else {
                 game_ref.board2.ships = ships;
-                new_board_valid = game_ref.board2.compute_state().0;
+                new_board_valid = game_ref.board2.compute_state();
                 opponent_ready = game_ref.board1.ships.len() > 0;
             };
         }
@@ -388,39 +388,21 @@ pub fn handle_place_ships_request(placement: [ShipPlacement; 5], player_name: &S
  * If the movement was invalid (invalid ship index, out of bounds etc.) None is returned
  * Otherwise Some is returned with a vector of visibility updates
  */
-fn handle_move(game: &mut Game, player_name: &String, movement: (usize, Direction)) -> Option<Vec<Message>> {
+fn handle_move(game: &mut Game, player_name: &String, movement: (usize, Direction)) -> bool {
     let (ship_index, direction) = movement;
     if ship_index < 0 || ship_index > 4 {
         // ship index is out of bounds
-        println!("hispindex out of b");
-        return None;
+        println!("ship index out of b");
+        return false;
     }
 
-    let movement_allowed;
     let ref mut my_board = if *game.player1 == *player_name { &mut game.board1 } else { &mut game.board2 };
-    {
-        let ref mut my_ship = my_board.ships[ship_index];
-        movement_allowed = my_ship.move_me(direction);
-    }
-
-    if !movement_allowed {
-        println!("this ship cannot move.");
-        return None;
-    }
-
-    println!("Computing state after movement of ship {} for {}:", ship_index, player_name);
-    let (state_valid, visibility_updates) = my_board.compute_state();
-    if !state_valid {
-        println!("compute_state sagt NEIN");
-        return None;
-    }
-
-    return Some(visibility_updates);
+    return my_board.move_ship(ship_index as u8, direction);
 }
 
 fn handle_shoot(games: &mut Vec<Rc<RefCell<Game>>>, game: Rc<RefCell<Game>>,
         lobby: &mut HashMap<String, Player>, player_name: &String, target_x: u8,
-        target_y: u8, move_visibility_updates: Vec<Message>) -> Result {
+        target_y: u8) -> Result {
     let game_over;
     let hit_result;
     let response_msg;
@@ -431,7 +413,6 @@ fn handle_shoot(games: &mut Vec<Rc<RefCell<Game>>>, game: Rc<RefCell<Game>>,
     {
         let mut game_ref = (*game).borrow_mut();
         opponent_name = game_ref.get_opponent_name(player_name).to_owned();
-        updates = hashmap![opponent_name.clone() => move_visibility_updates];
 
         {
             let ref mut opponent_board = if game_ref.player1 == *player_name {
@@ -441,8 +422,7 @@ fn handle_shoot(games: &mut Vec<Rc<RefCell<Game>>>, game: Rc<RefCell<Game>>,
             };
             println!("Shooting on {}'s board at {}:{}:", opponent_name, target_x, target_y);
             hit_result = opponent_board.hit(target_x as usize, target_y as usize);
-            let shoot_visibility_changes = opponent_board.compute_state().1;
-            merge_updates(&mut updates, hashmap![opponent_name.clone() => shoot_visibility_changes]);
+            updates = hashmap![opponent_name.clone() => opponent_board.pop_updates()];
             game_over = opponent_board.is_dead();
         }
 
@@ -490,8 +470,6 @@ pub fn handle_move_shoot_request(target_coords: (u8, u8),
         game = active_game.as_ref().unwrap().clone();
     }
 
-    let mut visibility_updates = vec![];
-
     {
         // check if in valid state and handle move, if requested
         let mut game_ref = (*game).borrow_mut();
@@ -506,15 +484,15 @@ pub fn handle_move_shoot_request(target_coords: (u8, u8),
 
         // move if requested
         if let Some(movement) = ship_movement {
-            match handle_move(&mut game_ref, player_name, movement) {
-                Some(updates) => visibility_updates = updates,
-                None => return Result::respond(Message::InvalidRequestResponse, false),
+            if !handle_move(&mut game_ref, player_name, movement) {
+                // Some(updates) => visibility_updates = updates,
+                return Result::respond(Message::InvalidRequestResponse, false);
             }
         }
     }
 
     // handle shot
-    return handle_shoot(games, game, lobby, player_name, target_coords.0, target_coords.1, visibility_updates);
+    return handle_shoot(games, game, lobby, player_name, target_coords.0, target_coords.1);
 }
 
 pub fn handle_afk(game: Rc<RefCell<Game>>, lobby: &mut HashMap<String, Player>,

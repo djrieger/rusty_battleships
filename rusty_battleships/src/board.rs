@@ -70,27 +70,43 @@ impl CellState {
 pub struct Board {
     pub ships: Vec<Ship>,
     pub state: [[CellState; H]; W],
+    old_state: [[CellState; H]; W],
+    visibility_updates: Vec<Message>,
 }
 
 impl Board {
     pub fn new(ships: Vec<Ship>) -> Board {
         Board {
             state: [[CellState::new(); H]; W],
+            old_state: [[CellState::new(); H]; W],
             ships: ships,
+            visibility_updates: vec![],
         }
     }
 
     fn clear(&mut self) -> () {
-        self.state =  [[CellState::new(); H]; W];
+        self.state = [[CellState::new(); H]; W];
+        self.old_state = [[CellState::new(); H]; W];
+        self.visibility_updates = vec![];
+    }
+
+    pub fn move_ship(&mut self, ship_index: u8, direction: Direction) -> bool {
+        if self.ships[ship_index as usize].move_me(direction) &&
+            self.compute_state() {
+                self.compute_visibility_updates();
+                return true;
+            } else {
+                return false;
+            }
     }
 
     pub fn hit(&mut self, x: usize, y: usize) -> HitResult {
-        self.compute_state();
+        // self.compute_state();
         if x >= W || y >= H {
             return HitResult::Miss;
         }
         self.state[x][y].visible = true;
-        return match self.state[x][y].ship_index {
+        let hit_result = match self.state[x][y].ship_index {
             // no ship
             None => HitResult::Miss,
             Some(ship_index) => {
@@ -101,7 +117,10 @@ impl Board {
                     _ => HitResult::Hit
                 }
             }
-        }
+        };
+        self.compute_state();
+        self.compute_visibility_updates();
+        return hit_result;
     }
 
     fn coords_valid(&self, x: isize, y: isize) -> bool {
@@ -119,27 +138,37 @@ impl Board {
         return (dest.0, dest.1);
     }
 
-    fn print_me(&self, state: &[[CellState; H]; W]) {
-        let mut result = String::new();
-        {
-            for y in 0..H {
-                for x in 0..W {
-                    let character = match state[x][y].ship_index {
-                        Some(index) => String::from(index.to_string()),
-                        None => String::from("-"),
-                    };
-                    if state[x][y].visible {
-                        result.push_str(&format!("{}", Black.on(Green).paint(character)));
-                    } else {
-                        result.push_str(&character);
-                    }
-                    if x == W-1 {
-                        result.push_str("\n");
-                    } 
+    fn print_state(state: &[[CellState; H]; W]) -> Vec<String> {
+        let mut lines = vec![];
+        for y in 0..H {
+            let mut line = String::new();
+            for x in 0..W {
+                let character = match state[x][y].ship_index {
+                    Some(index) => String::from(index.to_string()),
+                    None => String::from("-"),
+                };
+                if state[x][y].visible {
+                    line.push_str(&format!("{}", Black.on(Green).paint(character)));
+                } else {
+                    line.push_str(&character);
                 }
+                // if x == W-1 {
+                //     result.push_str("\n");
+                // } 
             }
-            println!("{}", result);
+            lines.push(line);
         }
+        return lines;
+    }
+
+    fn print_me(&self, old_state: &[[CellState; H]; W], new_state: &[[CellState; H]; W]) {
+        let left_lines = Board::print_state(&old_state);
+        let right_lines = Board::print_state(&new_state);
+        println!("Printing state");
+        for (left_line, right_line) in left_lines.iter().zip(right_lines.iter()) {
+            println!("{} | {}", left_line, right_line);
+        }
+        println!("");
     }
 
     /**
@@ -148,9 +177,8 @@ impl Board {
      * boarders)
      * @return.1 a list of visibility updates caused by recent movement
      */
-    pub fn compute_state(&mut self) -> (bool, Vec<Message>) {
+    pub fn compute_state(&mut self) -> bool {
         let mut new_state = [[CellState::new(); H]; W];
-        let mut visibility_updates = vec![];
 
         for (ship_index, ship) in self.ships.iter().enumerate() {
             if ship.is_dead() {
@@ -161,39 +189,48 @@ impl Board {
                 if !self.coords_valid(dest_x, dest_y) || new_state[dest_x as usize][dest_y as usize].has_ship() {
                     // coordinates are invalid or there is another ship at these coordinates
                     println!("Collision detected at {}:{}, new ship index {}", dest_x, dest_y, ship_index);
-                    self.print_me(&new_state);
-                    return (false, vec![]);
+                    self.print_me(&self.state, &new_state);
+                    return false;
                 } else {
-                    let ref cell = self.state[dest_x as usize][dest_y as usize];
-                    if cell.visible && cell.has_ship() {
-                        // no ship was here before but now this ship occupies this cell
-                        visibility_updates.push(Message::EnemyVisibleUpdate { x: dest_x as u8, y: dest_y as u8 });
-                    }
                     new_state[dest_x as usize][dest_y as usize].set_ship((ship_index) as u8);
                 }
             }
         }
 
+        self.old_state = self.state;
+        self.state = new_state;
+        return true;
+    }
+
+    fn compute_visibility_updates(&mut self) {
         // Find all cells that had ships in old state (self.state) but no longer in new_state ->
         // some ship moved out of some cell
         for x in 0..W {
             for y in 0..H {
-                let ref old_cell = self.state[x][y];
-                let ref mut new_cell = new_state[x][y];
+                let ref old_cell = self.old_state[x][y];
+                let ref mut new_cell = self.state[x][y];
                 // copy visibility information to new state
-                new_cell.visible = old_cell.visible;
-                if old_cell.visible && old_cell.has_ship() && !new_cell.has_ship() {
-                    visibility_updates.push(Message::EnemyInvisibleUpdate { x: x as u8, y: y as u8 });
+                new_cell.visible = new_cell.visible || old_cell.visible;
+                if old_cell.visible {
+                    if old_cell.has_ship() && !new_cell.has_ship() {
+                        self.visibility_updates.push(Message::EnemyInvisibleUpdate { x: x as u8, y: y as u8 });
+                    } else if !old_cell.has_ship() && new_cell.has_ship() {
+                        self.visibility_updates.push(Message::EnemyVisibleUpdate { x: x as u8, y: y as u8 });
+                    }
                 }
             }
         }
 
-        self.print_me(&new_state);
-        self.state = new_state;
-        return (true, visibility_updates);
+        self.print_me(&self.old_state, &self.state);
     }
 
     pub fn is_dead(&self) -> bool {
         self.ships.iter().all(|ship| ship.is_dead())
+    }
+
+    pub fn pop_updates(&mut self) -> Vec<Message> {
+        let foo = self.visibility_updates.clone();
+        self.visibility_updates = vec![];
+        return foo;
     }
 }
