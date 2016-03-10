@@ -443,25 +443,25 @@ fn handle_shoot(games: &mut Vec<Rc<RefCell<Game>>>, game: Rc<RefCell<Game>>,
             game_over = opponent_board.is_dead();
         }
 
+        updates = hashmap![opponent_name.clone() => visibility_updates];
+
         match hit_result {
             HitResult::Hit => {
                 response_msg = Message::HitResponse { x: target_x, y: target_y };
-                updates = hashmap![opponent_name.clone() => vec![Message::EnemyHitUpdate { x: target_x, y: target_y }]];
+                merge_updates(&mut updates, hashmap![opponent_name.clone() => vec![Message::EnemyHitUpdate { x: target_x, y: target_y }]]);
             },
             HitResult::Miss => {
                 response_msg = Message::MissResponse { x: target_x, y: target_y };
-                updates = hashmap![opponent_name.clone() => vec![Message::EnemyMissUpdate { x: target_x, y: target_y }]];
+                merge_updates(&mut updates, hashmap![opponent_name.clone() => vec![Message::EnemyMissUpdate { x: target_x, y: target_y }]]);
             },
             HitResult::Destroyed => {
                 response_msg = Message::DestroyedResponse { x: target_x, y: target_y };
                 if !game_over {
-                    updates = hashmap![opponent_name.clone() => vec![Message::EnemyHitUpdate { x: target_x, y: target_y }]];
+                    merge_updates(&mut updates, hashmap![opponent_name.clone() => vec![Message::EnemyHitUpdate { x: target_x, y: target_y }]]);
                 }
             },
         }
     }
-
-    merge_updates(&mut updates, hashmap![opponent_name => visibility_updates]);
 
     if game_over {
         updates = terminate_game(games, game, lobby, player_name, true, Reason::Obliterated);
