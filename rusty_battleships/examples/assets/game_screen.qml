@@ -6,6 +6,7 @@ import QtQuick.Dialogs 1.1
 Item {
     id: screen
 
+    anchors.fill: parent
     visible: false
 
     // TODO: provide button for surrender

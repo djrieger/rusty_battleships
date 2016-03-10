@@ -1,140 +1,162 @@
 import QtQuick 2.2
 import QtQuick.Controls 1.2
+import QtQuick.Controls.Styles 1.2
 import QtQuick.Layouts 1.0
 import QtQuick.Dialogs 1.1
 
 Item {
     id: screen
 
+    anchors.fill: parent
     visible: false
 
     signal connected();
 
-    ColumnLayout {
-        id: mainLayout
-        /* anchors.fill: parent */
-        anchors.margins: margin
+    GroupBox {
+        anchors.left: parent.left
+        anchors.right: parent.right
 
-        Label {
-            id: infoLabel
-            text: "Gefundene Server:"
-        }
+        title: "Connect to game server"
 
-        ListView {
-            id: serverList
-            width: 200
-            height: 200
-            /* Layout.fillHeight: true */
-            model: ListModel {
-                id: serverListModel
-                ListElement {
-                    ip: "0.0.0.0"
-                    port: 0
-                    name: "Warte auf Server..."
-                }
+        ColumnLayout {
+            anchors.fill: parent
+            anchors.margins: 5
+            spacing: 12
+
+            Label {
+                text: "Please select a server from the list."
             }
-            delegate: Item {
-                x: 5
-                width: 80
-                height: 15
-                Row {
-                    id: row1
-                    spacing: 10
-                    anchors.verticalCenter: parent.verticalCenter
-                    Rectangle {
-                        width: 200
-                        height: 15
 
-                        Text {
-                            text: name + " (" + ip + ":" + port + ")"
-                            anchors.verticalCenter: parent.verticalCenter
-                            font.bold: true
+            ColumnLayout {
+                Layout.fillWidth: true
+
+                ComboBox {
+                    id: serverList
+
+                    editable: false
+                    enabled: false // initially disabled
+                    Layout.fillWidth: true
+
+                    model: ListModel {
+                        id: serverListModel
+                        ListElement { name: "Other server…" }
+                    }
+                    // actual server selected, not "other server"?
+                    property bool serverSelected: currentIndex !== count - 1
+                    textRole: "name"
+
+                    property string previousValue;
+                    onEnabledChanged: {
+                        // remember previous value during an update
+                        if (enabled) {
+                            if (previousValue && find(previousValue) !== -1) {
+                                currentIndex = find(previousValue)
+                            }
+                        } else {
+                            if (currentIndex !== -1) {
+                                previousValue = currentText
+                            }
                         }
+                    }
+                }
 
-                        MouseArea {
-                            id: mouse_area1
-                            z: 1
-                            hoverEnabled: true
-                            anchors.fill: parent
+                RowLayout {
+                    id: updateNotice
 
-                            onClicked:{
-                                serverList.currentIndex = index
-                                hostnameField.text = ""
-                                portField.text = ""
-                                console.log("Chose server " + index);
+                    BusyIndicator {
+                        implicitHeight: 10; implicitWidth: 10
+                    }
+                    Label {
+                        text: "Searching for available game servers"
+                    }
+                }
+
+                TextField {
+                    id: customServer
+                    visible: !serverList.serverSelected && serverList.enabled
+                    Layout.fillWidth: true
+
+                    placeholderText: "Example: 127.0.0.1:5000"
+
+                    property bool validIp: false
+
+                    style: TextFieldStyle {
+                        background: Rectangle {
+                            radius: 2
+                            border.color: customServer.validIp ? "black" : "red"
+                            border.width: 1
+                        }
+                    }
+
+                    onTextChanged: {
+                        validIp = false;
+                        var components = text.split(":");
+
+                        if (components.length === 2) {
+                            var ipOctets = components[0].split(".");
+                            var port = parseInt(components[1], 10);
+
+                            if (ipOctets.length === 4 && port >= 0 && port <= 65535) {
+                                var valid = true;
+
+                                for (var i = 0; i < 4; i++) {
+                                    var octet = parseInt(ipOctets[i], 10);
+                                    // this way, we also check whether octet is an actual integer
+                                    valid = valid && octet >= 0 && octet <= 255;
+                                }
+
+                                validIp = valid;
                             }
                         }
                     }
                 }
             }
-        }
 
-        TextField {
-            id: nicknameField
-            Layout.fillWidth: true
-            placeholderText: "Nickname"
-            focus: true
-        }
+            Button {
+                anchors.topMargin: 50
+                enabled: serverList.serverSelected || customServer.validIp
+                text: "Connect"
 
-        RowLayout {
-            TextField {
-                id: hostnameField
-                Layout.fillWidth: true
-                placeholderText: "Host"
-            }
+                onClicked: {
+                    /*
+                    if (hostnameField.text != "") {
+                      bridge.connect(hostnameField.text, parseInt(portField.text, 10), nicknameField.text);
+                    } else {
+                      var server = serverListModel.get(serverList.currentIndex);
+                      bridge.connect(server.ip, parseInt(server.port, 10), nicknameField.text);
+                    }
 
-            TextField {
-                id: portField
-                Layout.fillWidth: true
-                placeholderText: "Port"
-            }
-        }
+                    // TODO: wait for response, handle errors
 
-        Button {
-            text: "Verbinden"
-            onClicked: {
-              // FIXME: validate inputs, handle errors
-              connect();
+                    screen.connected();
+                    */
+                }
             }
         }
     }
-
-    function login() {
-        bridge.send_login_request(usernameField.text);
-        bridge.poll_state();
-    }
-
-    function features() {
-        bridge.send_get_features_request();
-        bridge.poll_state();
-        featuresLabel.text = bridge.get_features_list();
-    }
-
-    function connect() {
-        if (hostnameField.text != "") {
-          bridge.connect(hostnameField.text, parseInt(portField.text, 10), nicknameField.text);
-        } else {
-          var server = serverListModel.get(serverList.currentIndex);
-          bridge.connect(server.ip, parseInt(server.port, 10), nicknameField.text);
-        }
-
-        // TODO: wait for response, handle errors
-
-        screen.connected();
-    }
-
 
     function updateServers() {
-        var servers = eval(bridge.discover_servers());
-        serverListModel.clear();
-        servers.map(function (server) {
-            serverListModel.append({
-                ip: server.ip.join("."),
-                port: server.port,
-                name: server.name
+        // don't annoy the user by changing anything while he's using the box
+        if (!serverList.pressed) {
+            // FIXME: handle removed servers somehow
+            var servers = eval(bridge.discover_servers());
+            serverListModel.clear();
+            servers.map(function (server) {
+                serverListModel.append({
+                    ip: server.ip.join("."),
+                    port: server.port,
+                    name: server.name
+                });
             });
-        });
+            serverListModel.append({
+                name: "Other server…"
+            });
+
+            serverList.enabled = true;
+            updateNotice.visible = false;
+        }
     }
+
 
     function activate() {
       timer.triggered.connect(updateServers);

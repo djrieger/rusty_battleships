@@ -11,17 +11,20 @@ ApplicationWindow {
 
     property int margin: 11
     minimumWidth: 400 + 2 * margin
-    minimumHeight: 300 + 2 * margin
+    minimumHeight: 400 + 2 * margin
 
-    property var connectScreen: Qt.createQmlObject(assets.get_connect_screen(), window, "connect_screen.qml")
-    property var gameScreen: Qt.createQmlObject(assets.get_game_screen(), window, "game_screen.qml")
-    property var lobbyScreen: Qt.createQmlObject(assets.get_lobby_screen(), window, "lobby_screen.qml")
+    Item {
+        id: container
+
+        anchors.fill: parent
+        anchors.margins: margin
+    }
 
     statusBar: StatusBar {
         anchors.fill: parent
         RowLayout {
             anchors.fill: parent
-            
+
             Label { text: ""; id: statusLabel; anchors.left: parent.left }
             Label { text: ""; id: logLabel; anchors.right: parent.right }
         }
@@ -41,10 +44,25 @@ ApplicationWindow {
         }
     }
 
+    property var connectScreen: Qt.createQmlObject(assets.get_connect_screen(), container, "connect_screen.qml")
+    property var gameScreen: Qt.createQmlObject(assets.get_game_screen(), container, "game_screen.qml")
+    property var lobbyScreen: Qt.createQmlObject(assets.get_lobby_screen(), container, "lobby_screen.qml")
+    property var loginScreen: Qt.createQmlObject(assets.get_login_screen(), container, "login_screen.qml")
+
     Component.onCompleted: {
         // connect different screens
         connectScreen.connected.connect(function () {
             connectScreen.deactivate();
+            loginScreen.activate();
+        });
+
+        loginScreen.disconnected.connect(function () {
+            loginScreen.deactivate();
+            connectScreen.activate();
+        });
+
+        loginScreen.registered.connect(function () {
+            loginScreen.deactivate();
             lobbyScreen.activate();
         });
 

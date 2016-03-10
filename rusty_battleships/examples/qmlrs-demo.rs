@@ -41,6 +41,7 @@ macro_rules! version_string {
 static CONNECT_SCREEN: &'static str = include_str!("assets/connect_screen.qml");
 static GAME_SCREEN: &'static str = include_str!("assets/game_screen.qml");
 static LOBBY_SCREEN: &'static str = include_str!("assets/lobby_screen.qml");
+static LOGIN_SCREEN: &'static str = include_str!("assets/login_screen.qml");
 static MAIN_WINDOW: &'static str = include_str!("assets/main.qml");
 
 
@@ -58,12 +59,17 @@ impl Assets {
     fn get_lobby_screen(&self) -> String {
         LOBBY_SCREEN.to_owned()
     }
+
+    fn get_login_screen(&self) -> String {
+        LOGIN_SCREEN.to_owned()
+    }
 }
 
 Q_OBJECT! { Assets:
     slot fn get_connect_screen();
     slot fn get_game_screen();
     slot fn get_lobby_screen();
+    slot fn get_login_screen();
 }
 
 
