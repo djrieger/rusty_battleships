@@ -101,6 +101,7 @@ impl Board {
     }
 
     fn coords_valid(&self, x: usize, y: usize) -> bool {
+        println!("Coords invalid: {}:{}", x, y);
         return x < (W as usize) && y < (H as usize);
     }
 
@@ -130,6 +131,7 @@ impl Board {
                 let (dest_x, dest_y) = Board::get_ship_dest_coords(ship, i);
                 if !self.coords_valid(dest_x, dest_y) || new_state[dest_x][dest_y].has_ship() {
                     // coordinates are invalid or there is another ship at these coordinates
+                    println!("Collision detected at {}:{}, new ship index {}", dest_x, dest_y, ship_index);
                     return (false, vec![]);
                 } else {
                     let ref cell = self.state[dest_x][dest_y];
