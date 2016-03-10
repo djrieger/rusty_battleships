@@ -328,7 +328,7 @@ fn placement2ships(placement: [ShipPlacement; 5]) -> Vec<Ship> {
         let ship = Ship {
             x: x as isize,
             y: y as isize,
-            horizontal: direction == Direction::West || direction == Direction::East, // FIXME?
+            direction: direction, 
             length: length_and_hp,
             health_points: length_and_hp,
         };

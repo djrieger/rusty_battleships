@@ -5,10 +5,9 @@ pub struct Ship {
     pub x: isize,
     pub y: isize,
     pub length: usize,
-    pub horizontal: bool,
+    pub direction: Direction,
     pub health_points: usize,
 }
-
 
 impl Ship {
     pub fn move_me(&mut self, direction: Direction) -> bool {

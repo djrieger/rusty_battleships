@@ -203,11 +203,11 @@ impl State {
         send_message(Message::PlaceShipsRequest { placement: ship_placements }, &mut self.buff_writer);
 
         let mut ships = Vec::<Ship>::new();
-        ships.push(Ship { x: 0, y: 0, length: 2, horizontal:true, health_points: 2});
-        ships.push(Ship { x: 0, y: 1, length: 2, horizontal:true, health_points: 2});
-        ships.push(Ship { x: 0, y: 2, length: 3, horizontal:true, health_points: 3});
-        ships.push(Ship { x: 0, y: 3, length: 4, horizontal:true, health_points: 4});
-        ships.push(Ship { x: 0, y: 4, length: 5, horizontal:true, health_points: 5});
+        ships.push(Ship { x: 0, y: 0, length: 2, direction: Direction::East, health_points: 2});
+        ships.push(Ship { x: 0, y: 1, length: 2, direction: Direction::East, health_points: 2});
+        ships.push(Ship { x: 0, y: 2, length: 3, direction: Direction::East, health_points: 3});
+        ships.push(Ship { x: 0, y: 3, length: 4, direction: Direction::East, health_points: 4});
+        ships.push(Ship { x: 0, y: 4, length: 5, direction: Direction::East, health_points: 5});
         self.my_board = Some(Board::new(ships, true));
         self.their_board = Some(Board::new(Vec::<Ship>::new(), false));
 
