@@ -15,14 +15,14 @@ impl Ship {
         if self.health_points == 0 {
             return false;
         }
-        println!("Moving ship from current position {}:{} to {:?}", self.x, self.y, direction);
+        println!("Moving ship len {} from current position {}:{} to {:?}", self.length, self.x, self.y, direction);
         match direction {
             Direction::North => self.y -= 1,
             Direction::East => self.x += 1,
             Direction::South => self.y += 1,
             Direction::West => self.x -= 1,
         }
-        println!("Finished moving, new ship pos {}:{}", self.x, self.y);
+        println!("Finished moving ship len {}, new ship pos {}:{}", self.length, self.x, self.y);
         return true;
     }
 

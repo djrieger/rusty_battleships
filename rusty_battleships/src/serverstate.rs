@@ -407,6 +407,7 @@ fn handle_move(game: &mut Game, player_name: &String, movement: (usize, Directio
         return None;
     }
 
+    println!("Computing state for {}:", player_name);
     let (state_valid, visibility_updates) = my_board.compute_state();
     if !state_valid {
         println!("compute_state sagt NEIN");

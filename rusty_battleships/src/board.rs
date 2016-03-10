@@ -5,6 +5,9 @@ use message::{Message, Direction};
 use game::Game;
 use ship::Ship;
 
+extern crate ansi_term;
+use self::ansi_term::Colour::{Green, Yellow, Cyan, Black};
+
 extern crate time;
 
 pub const W: usize = 10;
@@ -101,7 +104,6 @@ impl Board {
     }
 
     fn coords_valid(&self, x: usize, y: usize) -> bool {
-        println!("Coords invalid: {}:{}", x, y);
         return x < (W as usize) && y < (H as usize);
     }
 
@@ -114,6 +116,29 @@ impl Board {
             Direction::North => dest.1 -= i as isize,
         }
         return (dest.0 as usize, dest.1 as usize);
+    }
+
+    fn print_me(&self, state: &[[CellState; H]; W]) {
+        let mut result = String::new();
+        {
+            for y in 0..H {
+                for x in 0..W {
+                    let character = match state[x][y].ship_index {
+                        Some(index) => String::from(index.to_string()),
+                        None => String::from("-"),
+                    };
+                    if state[x][y].visible {
+                        result.push_str(&format!("{}", Black.on(Green).paint(character)));
+                    } else {
+                        result.push_str(&character);
+                    }
+                    if x == W-1 {
+                        result.push_str("\n");
+                    } 
+                }
+            }
+            println!("{}", result);
+        }
     }
 
     /**
@@ -132,6 +157,7 @@ impl Board {
                 if !self.coords_valid(dest_x, dest_y) || new_state[dest_x][dest_y].has_ship() {
                     // coordinates are invalid or there is another ship at these coordinates
                     println!("Collision detected at {}:{}, new ship index {}", dest_x, dest_y, ship_index);
+                    self.print_me(&new_state);
                     return (false, vec![]);
                 } else {
                     let ref cell = self.state[dest_x][dest_y];
@@ -158,6 +184,7 @@ impl Board {
             }
         }
 
+        self.print_me(&new_state);
         self.state = new_state;
         return (true, visibility_updates);
     }
