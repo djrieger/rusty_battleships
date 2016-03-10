@@ -7,7 +7,7 @@ use ship::Ship;
 
 extern crate time;
 
-pub const W: usize = 16;
+pub const W: usize = 10;
 pub const H: usize = 10;
 
 pub enum ToChildCommand {
