@@ -391,6 +391,7 @@ fn handle_move(game: &mut Game, player_name: &String, movement: (usize, Directio
     let (ship_index, direction) = movement;
     if ship_index < 0 || ship_index > 4 {
         // ship index is out of bounds
+        println!("hispindex out of b");
         return None;
     }
 
@@ -402,11 +403,13 @@ fn handle_move(game: &mut Game, player_name: &String, movement: (usize, Directio
     }
 
     if !movement_allowed {
+        println!("this ship cannot move.");
         return None;
     }
 
     let (state_valid, visibility_updates) = my_board.compute_state();
     if !state_valid {
+        println!("compute_state sagt NEIN");
         return None;
     }
 
