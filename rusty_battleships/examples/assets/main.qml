@@ -18,12 +18,12 @@ ApplicationWindow {
     property var lobbyScreen: Qt.createQmlObject(assets.get_lobby_screen(), window, "lobby_screen.qml")
 
     statusBar: StatusBar {
+        anchors.fill: parent
         RowLayout {
             anchors.fill: parent
-            RowLayout {
-                Label { text: "Read Only"; id: statusLabel }
-                Label { text: "Read Only"; id: logLabel }
-            }
+            
+            Label { text: ""; id: statusLabel; anchors.left: parent.left }
+            Label { text: ""; id: logLabel; anchors.right: parent.right }
         }
     }
 
