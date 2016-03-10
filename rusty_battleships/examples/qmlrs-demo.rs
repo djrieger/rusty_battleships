@@ -218,15 +218,13 @@ impl Bridge {
         }
     }
 
-    fn connect(&mut self, hostname: String, port: i64, nickname: String) {
-        println!("Connecting to {}, {}, {}", hostname, port, nickname);
+    fn connect(&mut self, hostname: String, port: i64) -> bool {
+        println!("Connecting to {}, {}", hostname, port);
         /* From UI-Thread (this one) to Status-Update-Thread.
            Since every UI input corresponds to a Request, we can recycle message.rs for encoding user input. */
         let (tx_ui_update, rcv_ui_update) : (mpsc::Sender<Message>, mpsc::Receiver<Message>) = mpsc::channel();
-        let (tx_board_update, rcv_board_update) : (mpsc::Sender<Board>, mpsc::Receiver<Board>) = mpsc::channel();
         self.ui_sender = Some(tx_ui_update);
-        tcp_loop(hostname, port, rcv_ui_update, self.msg_update_sender.clone(), self.lobby_sender.clone());
-        self.send_login_request(nickname);
+        return tcp_loop(hostname, port, rcv_ui_update, self.msg_update_sender.clone(), self.lobby_sender.clone());
     }
 
     fn discover_servers(&mut self) -> String {
@@ -311,7 +309,7 @@ Q_OBJECT! { Bridge:
     slot fn update_lobby();
     slot fn poll_log();
     slot fn get_last_message();
-    slot fn connect(String, i64, String);
+    slot fn connect(String, i64);
     slot fn discover_servers();
     slot fn get_ready_players();
     slot fn get_available_players();
@@ -322,7 +320,7 @@ Q_OBJECT! { Bridge:
 }
 
 fn tcp_loop(hostname: String, port: i64, rcv_ui_update: mpsc::Receiver<Message>,
-    tx_message_update: mpsc::Sender<(Status, Message)>, tx_lobby_update: mpsc::Sender<Message>) {
+    tx_message_update: mpsc::Sender<(Status, Message)>, tx_lobby_update: mpsc::Sender<Message>) -> bool {
 
     //Connect to the specified address and port.
     let mut sender;
@@ -330,7 +328,7 @@ fn tcp_loop(hostname: String, port: i64, rcv_ui_update: mpsc::Receiver<Message>,
         Ok(foo) => sender = foo,
         Err(why) => {
             println!("{:?}", why);
-            return;
+            return false;
         }
     };
     sender.set_write_timeout(None);
@@ -345,6 +343,8 @@ fn tcp_loop(hostname: String, port: i64, rcv_ui_update: mpsc::Receiver<Message>,
     thread::spawn(move || {
         current_state.handle_communication();
     });
+
+    return true;
 }
 
 fn main() {

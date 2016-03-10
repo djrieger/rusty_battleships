@@ -26,7 +26,7 @@ Item {
             spacing: 12
 
             Label {
-                text: "Please select a server from the list."
+                text: "Please enter the nickname you would like to use."
             }
 
             ColumnLayout {
@@ -36,21 +36,25 @@ Item {
                     id: customServer
                     Layout.fillWidth: true
 
-                    placeholderText: "Example: 127.0.0.1:5000"
+                    placeholderText: "Example: john_doe"
 
-                    property bool validIp: false
+                    property bool validName: false
 
                     style: TextFieldStyle {
                         background: Rectangle {
                             radius: 2
-                            border.color: customServer.validIp ? "black" : "red"
+                            border.color: customServer.validName ? "black" : "red"
                             border.width: 1
                         }
                     }
+
+                    // FIXME: validate
                 }
 
                 RowLayout {
-                    id: updateNotice
+                    id: progressNotice
+
+                    visible: false
 
                     BusyIndicator {
                         implicitHeight: 10; implicitWidth: 10
@@ -63,6 +67,7 @@ Item {
 
             Button {
                 anchors.topMargin: 50
+                enabled: customServer.validName
                 text: "Register"
 
                 onClicked: {
@@ -88,12 +93,10 @@ Item {
 
 
     function activate() {
-      timer.triggered.connect(updateServers);
       visible = true;
     }
 
     function deactivate() {
-      timer.triggered.disconnect(updateServers);
       visible = false;
     }
 }

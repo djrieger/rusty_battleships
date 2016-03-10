@@ -123,18 +123,26 @@ Item {
                 text: "Connect"
 
                 onClicked: {
-                    /*
-                    if (hostnameField.text != "") {
-                      bridge.connect(hostnameField.text, parseInt(portField.text, 10), nicknameField.text);
+                    // FIXME: disable button while logging in, show BusyIndicator
+
+                    var ip;
+                    var port;
+
+                    if (serverList.serverSelected) {
+                        var server = serverListModel.get(serverList.currentIndex);
+                        ip = server.ip;
+                        port = server.port;
                     } else {
-                      var server = serverListModel.get(serverList.currentIndex);
-                      bridge.connect(server.ip, parseInt(server.port, 10), nicknameField.text);
+                        var components = customServer.text.split(":");
+                        ip = components[0];
+                        port = parseInt(components[1], 10);
                     }
 
-                    // TODO: wait for response, handle errors
-
-                    screen.connected();
-                    */
+                    if (bridge.connect(ip, port)) {
+                        screen.connected();
+                    } else {
+                        // FIXME: handle error
+                    }
                 }
             }
         }
