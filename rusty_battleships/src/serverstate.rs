@@ -349,6 +349,7 @@ pub fn handle_place_ships_request(placement: [ShipPlacement; 5], player_name: &S
         let new_board_valid;
         let opponent_ready;
         {
+            println!("Computing initial placement for {}:", player_name);
             let mut game_ref = (*game).borrow_mut();
             if game_ref.player1 == *player_name {
                 game_ref.board1.ships = ships;
@@ -407,7 +408,7 @@ fn handle_move(game: &mut Game, player_name: &String, movement: (usize, Directio
         return None;
     }
 
-    println!("Computing state for {}:", player_name);
+    println!("Computing state after movement of ship {} for {}:", ship_index, player_name);
     let (state_valid, visibility_updates) = my_board.compute_state();
     if !state_valid {
         println!("compute_state sagt NEIN");
@@ -433,6 +434,7 @@ fn handle_shoot(games: &mut Vec<Rc<RefCell<Game>>>, game: Rc<RefCell<Game>>,
 
         {
             let ref mut opponent_board = if game_ref.player1 != *player_name { &mut game_ref.board2 } else { &mut game_ref.board1 };
+            println!("Shooting on {}'s board:", opponent_name);
             opponent_board.compute_state();
             hit_result = opponent_board.hit(target_x as usize, target_y as usize);
             game_over = opponent_board.is_dead();
