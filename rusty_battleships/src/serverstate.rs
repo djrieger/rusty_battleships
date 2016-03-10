@@ -248,8 +248,9 @@ pub fn handle_not_ready_request(username: &String, lobby: &mut HashMap<String, P
 }
 
 fn initialize_game(player1: &String, player2: &String) -> Rc<RefCell<Game>> {
-    let first_board = Board::new(vec![]);
-    let second_board = Board::new(vec![]);
+    // Unwrapping is safe here since boards with no ships are always valid
+    let first_board = Board::try_create(vec![]).unwrap();
+    let second_board = Board::try_create(vec![]).unwrap();
 
     return Rc::new(RefCell::new(Game::new(first_board, second_board, (*player1).clone(), (*player2).clone())));
 }
@@ -346,26 +347,31 @@ pub fn handle_place_ships_request(placement: [ShipPlacement; 5], player_name: &S
         }
 
         let ships = placement2ships(placement);
-        let new_board_valid;
+        if Board::try_create(ships.clone()).is_none() {
+            return Result::respond(Message::InvalidRequestResponse, false);
+        }
+        // let new_board_valid;
         let opponent_ready;
         {
             println!("Computing initial placement for {}:", player_name);
             let mut game_ref = (*game).borrow_mut();
             if game_ref.player1 == *player_name {
-                game_ref.board1.ships = ships;
-                new_board_valid = game_ref.board1.compute_state();
-                opponent_ready = game_ref.board2.ships.len() > 0;
+                // game_ref.board1.ships = ships;
+                game_ref.board1 = Board::try_create(ships).unwrap();
+                // new_board_valid = game_ref.board1.compute_state();
+                opponent_ready = game_ref.board2.has_ships();
             } else {
-                game_ref.board2.ships = ships;
-                new_board_valid = game_ref.board2.compute_state();
-                opponent_ready = game_ref.board1.ships.len() > 0;
+                // game_ref.board2.ships = ships;
+                // new_board_valid = game_ref.board2.compute_state();
+                game_ref.board2 = Board::try_create(ships).unwrap();
+                opponent_ready = game_ref.board1.has_ships();
             };
         }
 
         // Check if new state is valid
-        if !new_board_valid {
-            return Result::respond(Message::InvalidRequestResponse, false);
-        }
+        // if !new_board_valid {
+        //     return Result::respond(Message::InvalidRequestResponse, false);
+        // }
 
         let mut game_ref = (*game).borrow_mut();
         // opponent also done placing ships?

@@ -6,14 +6,14 @@ use game::Game;
 use ship::Ship;
 
 extern crate ansi_term;
-use self::ansi_term::Colour::{Green, Yellow, Cyan, Black};
+use self::ansi_term::Colour::{Green, Yellow, Cyan, Black, Red};
 
 extern crate time;
 
 pub const W: usize = 10;
 pub const H: usize = 10;
 
-type BoardState = [[CellState; H]; W];
+pub type BoardState = [[CellState; H]; W];
 
 pub enum ToChildCommand {
     Message(Message),
@@ -70,30 +70,49 @@ impl CellState {
 }
 
 pub struct Board {
-    pub ships: Vec<Ship>,
+    ships: Vec<Ship>,
     state: BoardState,
-    old_state: BoardState,
-    // interim_state: BoardState,
+    old_states: Vec<BoardState>,
     visibility_updates: Vec<Message>,
 }
 
 impl Board {
-    pub fn new(ships: Vec<Ship>) -> Board {
-        Board {
+    pub fn try_create(ships: Vec<Ship>) -> Option<Board> {
+        let mut board = Board {
             state: [[CellState::new(); H]; W],
-            old_state: [[CellState::new(); H]; W],
+            old_states: vec![],
             ships: ships,
             visibility_updates: vec![],
+        };
+        if let Some(state) = board.compute_state() {
+            board.state = state;
+            return Some(board);
+        } else {
+            return None;
         }
     }
 
-    pub fn move_ship(&mut self, ship_index: u8, direction: Direction) -> bool {
-        if self.ships[ship_index as usize].move_me(direction) && self.compute_state() {
-            self.compute_visibility_updates();
-            return true;
-        } else {
-            return false;
+    pub fn has_ships(&self) -> bool {
+        self.ships.len() > 0
+    }
+
+    // pub fn set_ships(&mut self, ships: Vec<Ship) {
+    //     self.ships = ships;
+    //     }
+
+    fn add_state(&mut self) -> bool {
+        self.old_states.push(self.state.clone());
+        match self.compute_state() {
+            Some(state) => self.state = state,
+            None => return false,
         }
+        self.compute_visibility_updates();
+
+        true
+    }
+
+    pub fn move_ship(&mut self, ship_index: u8, direction: Direction) -> bool {
+        return self.ships[ship_index as usize].move_me(direction) && self.add_state();
     }
 
     pub fn hit(&mut self, x: usize, y: usize) -> HitResult {
@@ -113,8 +132,10 @@ impl Board {
                 }
             }
         };
-        self.compute_state();
-        self.compute_visibility_updates();
+        self.add_state();
+
+        self.print_me(Some((x, y)));
+        self.old_states.clear();
         return hit_result;
     }
 
@@ -123,7 +144,7 @@ impl Board {
      * @return true if board state is valid, false otherwise (if ships overlap or are outside board
      * boarders)
      */
-    pub fn compute_state(&mut self) -> bool {
+    pub fn compute_state(&mut self) -> Option<BoardState> {
         let mut new_state = [[CellState::new(); H]; W];
 
         for (ship_index, ship) in self.ships.iter().enumerate() {
@@ -135,25 +156,23 @@ impl Board {
                 if !self.coords_valid(dest_x, dest_y) || new_state[dest_x as usize][dest_y as usize].has_ship() {
                     // coordinates are invalid or there is another ship at these coordinates
                     println!("Collision detected at {}:{}, new ship index {}", dest_x, dest_y, ship_index);
-                    self.print_me(&self.state, &new_state);
-                    return false;
+                    self.print_me(None);
+                    return None;
                 } else {
                     new_state[dest_x as usize][dest_y as usize].set_ship((ship_index) as u8);
                 }
             }
         }
 
-        self.old_state = self.state;
-        self.state = new_state;
-        return true;
+        return Some(new_state);
     }
 
     fn compute_visibility_updates(&mut self) {
-        // Find all cells that had ships in old state (self.state) but no longer in new_state ->
-        // some ship moved out of some cell
+        // Find all cells that had ships in old state (self.state) but no longer in new_state and
+        // vice versa -> some ship moved out of some cell
         for x in 0..W {
             for y in 0..H {
-                let ref old_cell = self.old_state[x][y];
+                let ref old_cell = self.old_states.last().unwrap()[x][y];
                 let ref mut new_cell = self.state[x][y];
                 // copy visibility information to new state
                 new_cell.visible = new_cell.visible || old_cell.visible;
@@ -166,8 +185,6 @@ impl Board {
                 }
             }
         }
-
-        self.print_me(&self.old_state, &self.state);
     }
 
     fn coords_valid(&self, x: isize, y: isize) -> bool {
@@ -185,7 +202,7 @@ impl Board {
         return (dest.0, dest.1);
     }
 
-    fn print_state(state: &[[CellState; H]; W]) -> Vec<String> {
+    fn print_state(state: &BoardState, target_coords: Option<(usize, usize)>) -> Vec<String> {
         let mut lines = vec![];
         for y in 0..H {
             let mut line = String::new();
@@ -194,26 +211,35 @@ impl Board {
                     Some(index) => String::from(index.to_string()),
                     None => String::from("-"),
                 };
+
+                if let Some((target_x, target_y)) = target_coords {
+                    if x == target_x && y == target_y {
+                        line.push_str(&format!("{}", Black.on(Red).paint(character)));
+                        continue;
+                    }
+                }
+
                 if state[x][y].visible {
                     line.push_str(&format!("{}", Black.on(Green).paint(character)));
                 } else {
                     line.push_str(&character);
                 }
-                // if x == W-1 {
-                //     result.push_str("\n");
-                // } 
             }
             lines.push(line);
         }
         return lines;
     }
 
-    fn print_me(&self, old_state: &[[CellState; H]; W], new_state: &[[CellState; H]; W]) {
-        let left_lines = Board::print_state(&old_state);
-        let right_lines = Board::print_state(&new_state);
+    fn print_me(&self, target_coords: Option<(usize, usize)>) {
         println!("Printing state");
-        for (left_line, right_line) in left_lines.iter().zip(right_lines.iter()) {
-            println!("{} | {}", left_line, right_line);
+        let mut printed_boards: Vec<Vec<String>> = self.old_states.iter().map(|state| Board::print_state(&state, None)).collect();
+        printed_boards.push(Board::print_state(&self.state, target_coords));
+
+        for i in 0..10 {
+            for board in &printed_boards {
+                print!("{}  |  ", board.get(i).unwrap());
+            }
+            print!("\n");
         }
         println!("");
     }
