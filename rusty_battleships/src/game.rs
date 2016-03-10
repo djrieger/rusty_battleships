@@ -81,10 +81,7 @@ impl Game {
     }
 
     pub fn is_running(&self) -> bool {
-        if let GameState::Running = self.state {
-            return true;
-        }
-        false
+        self.state == GameState::Running
     }
 
     pub fn is_player1_active(&self) -> bool {
