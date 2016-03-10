@@ -420,7 +420,7 @@ fn handle_move(game: &mut Game, player_name: &String, movement: (usize, Directio
 
 fn handle_shoot(games: &mut Vec<Rc<RefCell<Game>>>, game: Rc<RefCell<Game>>,
         lobby: &mut HashMap<String, Player>, player_name: &String, target_x: u8,
-        target_y: u8, visibility_updates: Vec<Message>) -> Result {
+        target_y: u8, move_visibility_updates: Vec<Message>) -> Result {
     let game_over;
     let hit_result;
     let response_msg;
@@ -431,6 +431,7 @@ fn handle_shoot(games: &mut Vec<Rc<RefCell<Game>>>, game: Rc<RefCell<Game>>,
     {
         let mut game_ref = (*game).borrow_mut();
         opponent_name = game_ref.get_opponent_name(player_name).to_owned();
+        updates = hashmap![opponent_name.clone() => move_visibility_updates];
 
         {
             let ref mut opponent_board = if game_ref.player1 == *player_name {
@@ -440,10 +441,10 @@ fn handle_shoot(games: &mut Vec<Rc<RefCell<Game>>>, game: Rc<RefCell<Game>>,
             };
             println!("Shooting on {}'s board at {}:{}:", opponent_name, target_x, target_y);
             hit_result = opponent_board.hit(target_x as usize, target_y as usize);
+            let shoot_visibility_changes = opponent_board.compute_state().1;
+            merge_updates(&mut updates, hashmap![opponent_name.clone() => shoot_visibility_changes]);
             game_over = opponent_board.is_dead();
         }
-
-        updates = hashmap![opponent_name.clone() => visibility_updates];
 
         match hit_result {
             HitResult::Hit => {
