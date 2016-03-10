@@ -287,7 +287,7 @@ impl State {
             Status::Register => {
                 self.status = Status::Available;
                 if !self.use_qml_interface {
-                    self.challenge("test2"); //FIXME ONLY FOR TESTING!
+                    self.challenge(&ask(String::from("Who to challenge?"))); //FIXME ONLY FOR TESTING!
                 }
                 return Ok(());
             },
@@ -336,6 +336,8 @@ impl State {
     pub fn handle_no_such_player_response(&mut self, nickname: &str) {
         if self.status == Status::AwaitGameStart {
             self.status = Status::Available;
+            //FIXME TESTING
+            self.ready();
         } else {
             panic!("Received a NAME_TAKEN_RESPONSE while not in AwaitGameStart State! STATUS={:?}", self.status);
         }

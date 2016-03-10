@@ -186,7 +186,7 @@ fn handle_main(msg: Message, player: &mut board::PlayerHandle, lobby: &mut HashM
 
 fn main() {
     let mut port:u16 = 5000;
-    let mut ip = Ipv4Addr::new(127, 0, 0, 1);
+    let mut ip = Ipv4Addr::new(0,0,0,0);
 
     {  // this block limits scope of borrows by ap.refer() method
         let mut ap = ArgumentParser::new();

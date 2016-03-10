@@ -328,7 +328,7 @@ fn placement2ships(placement: [ShipPlacement; 5]) -> Vec<Ship> {
         let ship = Ship {
             x: x as isize,
             y: y as isize,
-            direction: direction, 
+            direction: direction,
             length: length_and_hp,
             health_points: length_and_hp,
         };
@@ -389,7 +389,7 @@ pub fn handle_place_ships_request(placement: [ShipPlacement; 5], player_name: &S
  */
 fn handle_move(game: &mut Game, player_name: &String, movement: (usize, Direction)) -> Option<Vec<Message>> {
     let (ship_index, direction) = movement;
-    if ship_index < 1 || ship_index > 5 {
+    if ship_index < 0 || ship_index > 4 {
         // ship index is out of bounds
         return None;
     }
