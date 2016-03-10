@@ -48,7 +48,11 @@ struct Bridge {
     lobby_sender : mpsc::Sender<Message>, //For the State object!
     lobby_receiver: mpsc::Receiver<Message>,
 
+    board_receiver: Option<mpsc::Receiver<Board>>,
+
     state: Status,
+    my_board: Option<Board>,
+    their_board: Option<Board>,
     features_list: Vec<String>,
     last_rcvd_msg: Option<Message>,
     ready_players_list: Vec<String>,
@@ -181,6 +185,7 @@ impl Bridge {
         /* From UI-Thread (this one) to Status-Update-Thread.
            Since every UI input corresponds to a Request, we can recycle message.rs for encoding user input. */
         let (tx_ui_update, rcv_ui_update) : (mpsc::Sender<Message>, mpsc::Receiver<Message>) = mpsc::channel();
+        let (tx_board_update, rcv_board_update) : (mpsc::Sender<Board>, mpsc::Receiver<Board>) = mpsc::channel();
         self.ui_sender = Some(tx_ui_update);
         tcp_loop(hostname, port, rcv_ui_update, self.msg_update_sender.clone(), self.lobby_sender.clone());
         self.send_login_request(nickname);
@@ -349,11 +354,14 @@ fn main() {
     let mut engine = qmlrs::Engine::new();
     let mut bridge = Bridge {
         state: Status::Unregistered,
+        my_board: None,
+        their_board: None,
         ui_sender: None,
         msg_update_sender: tx_message_update, //For the State object!
         msg_update_receiver: rcv_main,
         lobby_sender : tx_lobby_update, //For the State object!
         lobby_receiver: rcv_lobby_update,
+        board_receiver: None,
         last_rcvd_msg: None,
         udp_discovery_receiver: rcv_udp_discovery,
         discovered_servers: HashMap::new(),
