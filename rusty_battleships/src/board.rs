@@ -101,7 +101,7 @@ impl Board {
     }
 
     fn coords_valid(&self, x: usize, y: usize) -> bool {
-        return x < (W as usize) && y < (H as usize));
+        return x < (W as usize) && y < (H as usize);
     }
 
     fn get_ship_dest_coords(ship: &Ship, i: usize) -> (usize, usize) {
