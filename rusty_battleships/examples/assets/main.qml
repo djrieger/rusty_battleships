@@ -21,26 +21,26 @@ ApplicationWindow {
     }
 
     statusBar: StatusBar {
-        anchors.fill: parent
-        RowLayout {
-            anchors.fill: parent
-
-            Label { text: ""; id: statusLabel; anchors.left: parent.left }
-            Label { text: ""; id: logLabel; anchors.right: parent.right }
+        Label {
+          id: statusMessage;
+          anchors.left: parent.left
+        }
+        Label {
+          id: logMessage;
+          anchors.right: parent.right
         }
     }
 
     Timer {
         id: timer
 
-        interval: 500
+        interval: 250
         running: true
         repeat: true
 
         onTriggered: {
-            // FIXME: less debugg-y messages
-            statusLabel.text = bridge.poll_state();
-            logLabel.text = bridge.poll_log();
+            statusMessage.text = bridge.poll_state();
+            logMessage.text = bridge.poll_log();
         }
     }
 
