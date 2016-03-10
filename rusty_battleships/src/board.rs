@@ -108,9 +108,9 @@ impl Board {
         let mut dest = (ship.x, ship.y);
         match ship.direction {
             Direction::East => dest.0 += i as isize,
-            Direction::South => dest.1 -= i as isize,
+            Direction::South => dest.1 += i as isize,
             Direction::West => dest.0 -= i as isize,
-            Direction::North => dest.1 += i as isize,
+            Direction::North => dest.1 -= i as isize,
         }
         return (dest.0 as usize, dest.1 as usize);
     }
