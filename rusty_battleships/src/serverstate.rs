@@ -396,7 +396,7 @@ fn handle_move(game: &mut Game, player_name: &String, movement: (usize, Directio
     }
 
     let movement_allowed;
-    let ref mut my_board = if *game.player1 == *player_name { &mut game.board2 } else { &mut game.board1 };
+    let ref mut my_board = if *game.player1 == *player_name { &mut game.board1 } else { &mut game.board2 };
     {
         let ref mut my_ship = my_board.ships[ship_index];
         movement_allowed = my_ship.move_me(direction);
