@@ -18,18 +18,14 @@ ApplicationWindow {
         running: true
         repeat: true
         onTriggered: {
-            var rawResponse = bridge.discover_servers();
-            var lines = rawResponse.split("\n");
+            var servers = eval(bridge.discover_servers());
             serverListModel.clear();
-            lines.map(function (line) {
-                var parts = line.split(",", 3);
-                if (parts.length == 3) {
-                    serverListModel.append({
-                        ip: parts[0],
-                        port: parseInt(parts[1]),
-                        name: parts[2]
-                    });
-                }
+            servers.map(function (server) {
+                serverListModel.append({
+                    ip: server.ip.join("."),
+                    port: server.port,
+                    name: server.name
+                });
             });
         }
     }
@@ -127,7 +123,7 @@ ApplicationWindow {
         } else {
             bridge.connect(serverListModel.get(serverList.currentIndex).ip, serverListModel.get(serverList.currentIndex).port, nicknameField.text);
         }
-        var component = Qt.createQmlObject(bridge.get_main_window(), connectWindow, "main_window");
+        var component = Qt.createQmlObject(assets.get_main_window(), connectWindow, "main_window");
         component.show();
     }
 }

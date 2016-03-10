@@ -1,20 +1,23 @@
-use std::net::{Ipv4Addr, TcpStream, UdpSocket, SocketAddr, SocketAddrV4};
-
-extern crate byteorder;
-use byteorder::{ByteOrder, BigEndian, ReadBytesExt};
-
+use std::collections::{BTreeMap, HashMap};
 use std::io::{BufReader, BufWriter, Write};
-use std::option::Option::None;
-use std::collections::HashMap;
+use std::net::{Ipv4Addr, TcpStream, UdpSocket, SocketAddr, SocketAddrV4};
 use std::sync::mpsc;
 use std::sync::mpsc::{RecvError, TryRecvError};
 use std::thread;
 
+extern crate argparse;
+use argparse::{ArgumentParser, Print, Store};
+
+extern crate byteorder;
+use byteorder::{ByteOrder, BigEndian, ReadBytesExt};
+
 #[macro_use]
 extern crate qmlrs;
 
-extern crate argparse;
-use argparse::{ArgumentParser, Print, Store};
+extern crate rustc_serialize;
+use rustc_serialize::Encodable;
+use rustc_serialize::json;
+use rustc_serialize::json::{ToJson, Json};
 
 extern crate rusty_battleships;
 use rusty_battleships::message::{serialize_message, deserialize_message, Message, Direction};
@@ -30,13 +33,34 @@ macro_rules! description {
 macro_rules! version {
     () => ( env!("CARGO_PKG_VERSION") )
 }
-macro_rules! version_string {            // Like this (with a literal instead of a String variable), everything works just fine:
-
+macro_rules! version_string {
     () => ( concat!(description!(), " v", version!()) )
 }
 
-static WINDOW: &'static str = include_str!("assets/main_window.qml");
+
 static CONNECT_WINDOW: &'static str = include_str!("assets/connect_window.qml");
+static MAIN_WINDOW: &'static str = include_str!("assets/main_window.qml");
+
+
+struct Assets;
+
+impl Assets {
+    fn get_main_window(&self) -> String {
+        MAIN_WINDOW.to_owned()
+    }
+}
+
+Q_OBJECT! { Assets:
+    slot fn get_main_window();
+}
+
+
+#[derive(RustcEncodable)]
+struct Server {
+    ip: [u8; 4],
+    port: u16,
+    name: String
+}
 
 
 struct Bridge {
@@ -59,7 +83,7 @@ struct Bridge {
     available_players_list: Vec<String>,
 
     udp_discovery_receiver: mpsc::Receiver<(Ipv4Addr, u16, String)>,
-    discovered_servers: HashMap<(Ipv4Addr, u16), String>,
+    discovered_servers: Vec<Server>,
 }
 
 impl Bridge {
@@ -74,7 +98,7 @@ impl Bridge {
             if let Ok(tuple) = resp {
                 match tuple.1.clone() {
                     Message::OkResponse => {
-                        println!("Loggresp.unwrap()ed in.");
+                        println!("Logged in.");
                         response_received = true;
                         self.state = tuple.0;
                         self.last_rcvd_msg = Some(tuple.1.clone());
@@ -101,10 +125,6 @@ impl Bridge {
 
     fn send_get_features_request(&mut self) {
         self.ui_sender.as_mut().unwrap().send(Message::GetFeaturesRequest);
-    }
-
-    fn get_main_window(&self) -> String {
-        WINDOW.to_owned()
     }
 
     fn update_lobby(&mut self) {
@@ -193,14 +213,10 @@ impl Bridge {
 
     fn discover_servers(&mut self) -> String {
         if let Ok((ip, port, server_name)) = self.udp_discovery_receiver.try_recv() {
-            self.discovered_servers.insert((ip, port), server_name);
+            self.discovered_servers.push(Server { ip: ip.octets(), port: port, name: server_name });
         }
 
-        let mut result = String::new();
-        for (&(ip, port), server_name) in &self.discovered_servers {
-            result.push_str(&format!("{},{},{}\n", ip, port, server_name));
-        }
-        return String::from(result.to_owned().trim());
+        return json::encode(&self.discovered_servers).unwrap();
     }
 
     fn get_coords_from_button_index(button_index: i64) -> (u8, u8) {
@@ -271,7 +287,6 @@ impl Bridge {
 
 Q_OBJECT! { Bridge:
     slot fn send_login_request(String);
-    slot fn get_main_window();
     slot fn send_get_features_request();
     slot fn send_challenge(String);
     slot fn poll_state();
@@ -352,6 +367,7 @@ fn main() {
 
     let tcp_thread = thread::spawn(tcp_loop);
     let mut engine = qmlrs::Engine::new();
+    let assets = Assets;
     let mut bridge = Bridge {
         state: Status::Unregistered,
         my_board: None,
@@ -364,12 +380,13 @@ fn main() {
         board_receiver: None,
         last_rcvd_msg: None,
         udp_discovery_receiver: rcv_udp_discovery,
-        discovered_servers: HashMap::new(),
+        discovered_servers: Vec::<Server>::new(),
         ready_players_list : Vec::<String>::new(),
         available_players_list : Vec::<String>::new(),
         features_list : Vec::<String>::new(),
     };
     bridge.state = Status::Unregistered;
+    engine.set_property("assets", assets);
     engine.set_property("bridge", bridge);
     engine.load_data(CONNECT_WINDOW);
     engine.exec();
