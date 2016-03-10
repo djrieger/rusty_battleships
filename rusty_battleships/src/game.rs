@@ -11,6 +11,8 @@ pub enum GameState {
     Running,
 }
 
+static LIMIT_SECONDS: i64 = 60;
+
 pub struct Game {
     pub board1: Board,
     pub board2: Board,
@@ -69,15 +71,11 @@ impl Game {
         self.last_turn_started_at = Some(time::PreciseTime::now());
     }
 
-    fn time_exceeded(time: Option<time::PreciseTime>, limit_seconds: u64) -> bool {
-        return match time {
-            None => false,
-            Some(start_time) => start_time.to(time::PreciseTime::now()) > time::Duration::seconds(limit_seconds as i64),
-        }
-    }
-
     pub fn turn_time_exceeded(&self) -> bool {
-        return Game::time_exceeded(self.last_turn_started_at, 60);
+        match self.last_turn_started_at {
+            None => false,
+            Some(start_time) => start_time.to(time::PreciseTime::now()) > time::Duration::seconds(LIMIT_SECONDS),
+        }
     }
 
     pub fn is_running(&self) -> bool {
