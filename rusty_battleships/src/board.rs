@@ -85,6 +85,7 @@ impl Board {
     }
 
     pub fn hit(&mut self, x: usize, y: usize) -> HitResult {
+        self.compute_state();
         if x >= W || y >= H {
             return HitResult::Miss;
         }
@@ -151,7 +152,10 @@ impl Board {
         let mut new_state = [[CellState::new(); H]; W];
         let mut visibility_updates = vec![];
 
-        for (ship_index, ship) in self.ships.iter().filter(|ship| !ship.is_dead()).enumerate() {
+        for (ship_index, ship) in self.ships.iter().enumerate() {
+            if ship.is_dead() {
+                continue;
+            }
             for i in 0..ship.length  {
                 let (dest_x, dest_y) = Board::get_ship_dest_coords(ship, i);
                 if !self.coords_valid(dest_x, dest_y) || new_state[dest_x as usize][dest_y as usize].has_ship() {
