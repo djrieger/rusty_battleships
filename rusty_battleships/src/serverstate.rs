@@ -433,6 +433,7 @@ fn handle_shoot(games: &mut Vec<Rc<RefCell<Game>>>, game: Rc<RefCell<Game>>,
 
         {
             let ref mut opponent_board = if game_ref.player1 != *player_name { &mut game_ref.board2 } else { &mut game_ref.board1 };
+            opponent_board.compute_state();
             hit_result = opponent_board.hit(target_x as usize, target_y as usize);
             game_over = opponent_board.is_dead();
         }
