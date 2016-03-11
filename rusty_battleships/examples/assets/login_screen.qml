@@ -38,17 +38,15 @@ Item {
 
                     placeholderText: "Example: john_doe"
 
-                    property bool validName: false
-
                     style: TextFieldStyle {
                         background: Rectangle {
                             radius: 2
-                            border.color: customServer.validName ? "black" : "red"
+                            border.color: customServer.acceptableInput ? "black" : "red"
                             border.width: 1
                         }
                     }
 
-                    // FIXME: validate
+                    validator: RegExpValidator { regExp: /^[\x21-\x7E]{1,255}$/ }
                 }
 
                 RowLayout {
@@ -67,10 +65,11 @@ Item {
 
             Button {
                 anchors.topMargin: 50
-                enabled: customServer.validName
+                enabled: customServer.acceptableInput
                 text: "Register"
 
                 onClicked: {
+                    // FIXME
                     console.log("Yay!");
                 }
             }
