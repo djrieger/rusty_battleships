@@ -117,31 +117,64 @@ Item {
                 }
             }
 
-            Button {
-                anchors.topMargin: 50
-                enabled: serverList.serverSelected || customServer.validIp
-                text: "Connect"
+            ColumnLayout {
+                Layout.fillWidth: true
 
-                onClicked: {
-                    // FIXME: disable button while logging in, show BusyIndicator
+                RowLayout {
+                    Button {
+                        anchors.topMargin: 50
+                        enabled: (serverList.serverSelected || customServer.validIp) && !connecting
+                        text: "Connect"
 
-                    var ip;
-                    var port;
+                        property bool connecting: false
 
-                    if (serverList.serverSelected) {
-                        var server = serverListModel.get(serverList.currentIndex);
-                        ip = server.ip;
-                        port = server.port;
-                    } else {
-                        var components = customServer.text.split(":");
-                        ip = components[0];
-                        port = parseInt(components[1], 10);
+                        onClicked: {
+                            connecting = true
+                            connectNotice.visible = true
+                            connectError.visible = false
+
+                            var ip;
+                            var port;
+
+                            if (serverList.serverSelected) {
+                                var server = serverListModel.get(serverList.currentIndex);
+                                ip = server.ip;
+                                port = server.port;
+                            } else {
+                                var components = customServer.text.split(":");
+                                ip = components[0];
+                                port = parseInt(components[1], 10);
+                            }
+
+                            if (bridge.connect(ip, port)) {
+                                screen.connected();
+                            } else {
+                                connectError.visible = true
+                            }
+
+                            connectNotice.visible = false
+                            connecting = false
+                        }
                     }
+                    Label {
+                        id: connectError
 
-                    if (bridge.connect(ip, port)) {
-                        screen.connected();
-                    } else {
-                        // FIXME: handle error
+                        color: "red"
+                        text: "Error while connecting to server"
+                        visible: false
+                    }
+                }
+
+                RowLayout {
+                    id: connectNotice
+
+                    visible: false
+
+                    BusyIndicator {
+                        implicitHeight: 10; implicitWidth: 10
+                    }
+                    Label {
+                        text: "Connecting to server"
                     }
                 }
             }
