@@ -90,7 +90,7 @@ struct Bridge {
     lobby_sender : mpsc::Sender<Message>, //For the State object!
     lobby_receiver: mpsc::Receiver<Message>,
 
-    board_receiver: Option<mpsc::Receiver<Board>>,
+    board_receiver: Option<mpsc::Receiver<(Board, Board)>>,
 
     state: Status,
     my_board: Option<Board>,
@@ -223,8 +223,11 @@ impl Bridge {
         /* From UI-Thread (this one) to Status-Update-Thread.
            Since every UI input corresponds to a Request, we can recycle message.rs for encoding user input. */
         let (tx_ui_update, rcv_ui_update) : (mpsc::Sender<Message>, mpsc::Receiver<Message>) = mpsc::channel();
+        /* From Statuis-Update-Thread to UI-Thread (this one). Transmits the current board situation. */
+        let (tx_board_update, rcv_board_update) : (mpsc::Sender<(Board, Board)>, mpsc::Receiver<(Board, Board)>) = mpsc::channel();
         self.ui_sender = Some(tx_ui_update);
-        return tcp_loop(hostname, port, rcv_ui_update, self.msg_update_sender.clone(), self.lobby_sender.clone());
+        self.board_receiver = Some(rcv_board_update);
+        return tcp_loop(hostname, port, rcv_ui_update, self.msg_update_sender.clone(), self.lobby_sender.clone(), tx_board_update);
     }
 
     fn discover_servers(&mut self) -> String {
@@ -320,7 +323,7 @@ Q_OBJECT! { Bridge:
 }
 
 fn tcp_loop(hostname: String, port: i64, rcv_ui_update: mpsc::Receiver<Message>,
-    tx_message_update: mpsc::Sender<(Status, Message)>, tx_lobby_update: mpsc::Sender<Message>) -> bool {
+    tx_message_update: mpsc::Sender<(Status, Message)>, tx_lobby_update: mpsc::Sender<Message>, tx_board_update: mpsc::Sender<(Board, Board)>) -> bool {
 
     //Connect to the specified address and port.
     let mut sender;
@@ -338,7 +341,7 @@ fn tcp_loop(hostname: String, port: i64, rcv_ui_update: mpsc::Receiver<Message>,
     let mut buff_reader = BufReader::new(receiver);
 
     /* Holds the current state and provides state-based services such as shoot(), move-and-shoot() as well as state- and server-message-dependant state transitions. */
-    let mut current_state = State::new(true, Some(rcv_ui_update), Some(tx_message_update), Some(tx_lobby_update), buff_reader, buff_writer);
+    let mut current_state = State::new(true, Some(rcv_ui_update), Some(tx_message_update), Some(tx_lobby_update), Some(tx_board_update), buff_reader, buff_writer);
 
     thread::spawn(move || {
         current_state.handle_communication();

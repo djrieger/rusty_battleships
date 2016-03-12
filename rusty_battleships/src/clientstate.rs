@@ -77,6 +77,7 @@ pub struct State {
     ui_update_receiver : Option<Receiver<Message>>,
     ui_update_sender : Option<Sender<(Status, Message)>>,
     lobby_update_sender : Option<Sender<Message>>,
+    board_update_sender : Option<Sender<(Board, Board)>>,
 }
 
 #[derive(Debug, Hash, Eq, PartialEq, Clone)]
@@ -105,6 +106,7 @@ impl State {
                 rec_ui_update: Option<Receiver<Message>>,
                 tx_ui_update: Option<Sender<(Status, Message)>>,
                 tx_lobby_update: Option<Sender<Message>>,
+                tx_board_update: Option<Sender<(Board, Board)>>,
                 buff_reader: BufReader<TcpStream>,
                 buff_writer: BufWriter<TcpStream>) -> State {
         State {
@@ -122,6 +124,7 @@ impl State {
             ui_update_receiver : rec_ui_update,
             ui_update_sender : tx_ui_update,
             lobby_update_sender : tx_lobby_update,
+            board_update_sender : tx_board_update,
         }
     }
 
@@ -527,6 +530,23 @@ impl State {
             });
     }
 
+    fn send_updated_boards(&mut self, sender: &mut Sender<(Board, Board)>) {
+        let mb;
+        let tb;
+        if let Some(ref b) = self.my_board {
+            mb = b.clone();
+        } else {
+            panic!("I was told there would be boards! But there's no board for me...");
+        }
+        if let Some(ref c) = self.their_board {
+            tb = c.clone();
+        } else {
+            panic!("I was told there would be boards! But there's no board for them...");
+        }
+        let boards = (mb, tb);
+        sender.send(boards);
+    }
+
     pub fn update_listen_loop(&mut self, rx: Receiver<Message>) {
         println!(">>>Starting update_listen_loop.");
         /*check-for-messages-loop*/
@@ -580,6 +600,9 @@ impl State {
                     },
                     Message::GameOverUpdate {victorious, reason} => {
                         self.handle_game_over_update(victorious, reason);
+                        if let Some(mut sender) = self.board_update_sender.clone() {
+                            self.send_updated_boards(&mut sender);
+                        }
                     }
                     Message::ServerGoingDownUpdate {errormessage: err}=> {
                         println!("The server is going down!");
@@ -588,10 +611,16 @@ impl State {
                     Message::YourTurnUpdate => {
                         println!("It's yout turn!");
                         self.handle_your_turn_update();
+                        if let Some(mut sender) = self.board_update_sender.clone() {
+                            self.send_updated_boards(&mut sender);
+                        }
                     },
                     Message::EnemyTurnUpdate => {
                         println!("It's the enemy's turn!");
                         self.handle_enemy_turn_update();
+                        if let Some(mut sender) = self.board_update_sender.clone() {
+                            self.send_updated_boards(&mut sender);
+                        }
                     },
                     Message::NotYourTurnResponse => {
                         //println!("I'm sorry dave, I'm afraid I can't do that.");
@@ -603,18 +632,30 @@ impl State {
                     Message::EnemyHitUpdate {x, y} => {
                         println!("We're hit! ({}, {})", x, y);
                         self.handle_enemy_hit_update(x, y);
+                        if let Some(mut sender) = self.board_update_sender.clone() {
+                            self.send_updated_boards(&mut sender);
+                        }
                     },
                     Message::EnemyMissUpdate {x, y} => {
                         println!("They missed! ({}, {})", x, y);
                         self.handle_enemy_miss_update(x, y);
+                        if let Some(mut sender) = self.board_update_sender.clone() {
+                            self.send_updated_boards(&mut sender);
+                        }
                     },
                     Message::EnemyVisibleUpdate {x, y} => {
                         println!("The enemy has been sighted! ({}, {})", x, y);
                         self.handle_enemy_visible_update(x, y);
+                        if let Some(mut sender) = self.board_update_sender.clone() {
+                            self.send_updated_boards(&mut sender);
+                        }
                     },
                     Message::EnemyInvisibleUpdate {x, y} => {
                         println!("We lost track of the enemy! ({}, {})", x, y);
                         self.handle_enemy_invisible_update(x, y);
+                        if let Some(mut sender) = self.board_update_sender.clone() {
+                            self.send_updated_boards(&mut sender);
+                        }
                     },
                     // RESPONSES
                     Message::OkResponse => outcome = self.handle_ok_response(server_response.clone()),
@@ -646,14 +687,23 @@ impl State {
                     Message::HitResponse {x, y} => {
                         println!("You have hit a ship! ({}, {})", x, y);
                         self.handle_hit_response(x, y);
+                        if let Some(mut sender) = self.board_update_sender.clone() {
+                            self.send_updated_boards(&mut sender);
+                        }
                     },
                     Message::MissResponse {x, y} => {
                         println!("You have missed.({}, {})", x, y);
                         self.handle_miss_response(x, y);
+                        if let Some(mut sender) = self.board_update_sender.clone() {
+                            self.send_updated_boards(&mut sender);
+                        }
                     },
                     Message::DestroyedResponse {x, y} => {
                         println!("Congratulations! You destroyed an enemy ship!");
                         self.handle_destroyed_response(x, y);
+                        if let Some(mut sender) = self.board_update_sender.clone() {
+                            self.send_updated_boards(&mut sender);
+                        }
                     },
                     _ => println!(">>>RECEIVED: {:?}", server_response),
                 }
