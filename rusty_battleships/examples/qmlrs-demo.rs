@@ -166,20 +166,24 @@ impl Bridge {
 
     fn update_boards(&mut self) {
         let mut response = Err(TryRecvError::Disconnected);
-        let mut my_board;
-        let mut their_board;
+        let mut my_board: Option<Board> = None;
+        let mut their_board: Option<Board> = None;
         while response != Err(TryRecvError::Empty) {
-            response = self.board_receiver.try_recv();
-            if let Ok((mb, tb)) = response {
-                my_board = mb.clone();
-                their_board = tb.clone();
-            } else if let Err(TryRecvError::Disconnected) = response {
-                panic!("Board update list was closed. Probably because the sender thread died.");
-            } /*else {
-                panic!("You shall not pass Non-LobbyList messages via the lobby update channel!");
-            }*/
-            self.my_board = my_board.clone();
-            self.their_board = their_board.clone();
+            if let Some(ref mut br) = self.board_receiver {
+                response = br.try_recv();
+                if let Ok((ref mb, ref tb)) = response {
+                    my_board = Some(mb.clone());
+                    their_board = Some(tb.clone());
+                } else if let Err(TryRecvError::Disconnected) = response {
+                    panic!("Board update list was closed. Probably because the sender thread died.");
+                } /*else {
+                    panic!("You shall not pass Non-LobbyList messages via the lobby update channel!");
+                }*/
+                self.my_board = my_board.clone();
+                self.their_board = their_board.clone();
+            } else {
+                panic!("Our board update receiver is not there!");
+            }
         }
     }
 

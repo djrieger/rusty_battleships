@@ -1,6 +1,6 @@
 use message::{Message, Direction};
 
-#[derive(Copy, Clone,Debug)]
+#[derive(Copy, Clone,Debug, Eq, PartialEq, Hash)]
 pub struct Ship {
     pub x: isize,
     pub y: isize,

@@ -43,7 +43,7 @@ pub enum PlayerState {
     Playing
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
 pub struct CellState {
     pub visible: bool,
     pub ship_index: Option<u8>,

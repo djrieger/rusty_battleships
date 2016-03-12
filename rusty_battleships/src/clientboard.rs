@@ -5,7 +5,7 @@ use message::{Message, Direction};
 pub const W: usize = 16;
 pub const H: usize = 10;
 
-#[derive(Clone)]
+#[derive(Debug, Hash, Eq, PartialEq, Clone)]
 pub struct Board {
     pub mine: bool,
     pub ships: Vec<Ship>,
