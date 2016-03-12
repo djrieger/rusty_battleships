@@ -91,10 +91,10 @@ struct Bridge {
     lobby_receiver: mpsc::Receiver<Message>,
 
     board_receiver: Option<mpsc::Receiver<(Board, Board)>>,
-
-    state: Status,
     my_board: Option<Board>,
     their_board: Option<Board>,
+
+    state: Status,
     features_list: Vec<String>,
     last_rcvd_msg: Option<Message>,
     ready_players_list: Vec<String>,
@@ -161,6 +161,25 @@ impl Bridge {
             }*/
             self.available_players_list = available.clone();
             self.ready_players_list = ready.clone();
+        }
+    }
+
+    fn update_boards(&mut self) {
+        let mut response = Err(TryRecvError::Disconnected);
+        let mut my_board;
+        let mut their_board;
+        while response != Err(TryRecvError::Empty) {
+            response = self.board_receiver.try_recv();
+            if let Ok((mb, tb)) = response {
+                my_board = mb.clone();
+                their_board = tb.clone();
+            } else if let Err(TryRecvError::Disconnected) = response {
+                panic!("Board update list was closed. Probably because the sender thread died.");
+            } /*else {
+                panic!("You shall not pass Non-LobbyList messages via the lobby update channel!");
+            }*/
+            self.my_board = my_board.clone();
+            self.their_board = their_board.clone();
         }
     }
 
