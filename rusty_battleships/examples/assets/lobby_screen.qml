@@ -75,8 +75,6 @@ Item {
             }
 
             onClicked: {
-                lobby.currentIndex = index;
-                console.log("Challenged player " + index + name);
                 bridge.send_challenge(name);
                 screen.gameStarted();
             }
@@ -89,7 +87,7 @@ Item {
         text: "Wait for challenge from another player"
 
         onCheckedChanged: {
-            bridge.set_ready_state(checked); 
+            bridge.set_ready_state(checked);
         }
     }
 
@@ -107,12 +105,9 @@ Item {
 
 
     function checkGameStarted() {
-        state = bridge.poll_state();
-        if (["PlacingShips", "OpponentPlacing", "Planning", "OpponentPlanning"].indexOf(state) !== -1) {
-            console.log("I was challenged");
-            lobbyScreen.deactivate();
-            gameScreen.activate();
-            // TODO: Start game
+        if (bridge.poll_state() === "PlacingShips") {
+            // either challenge was received or other player was successfully challenged
+            screen.gameStarted();
         }
     }
 
@@ -126,7 +121,7 @@ Item {
 
     function deactivate() {
         timer.triggered.disconnect(updateLobby);
-        timer.triggered.connect(checkGameStarted);
+        timer.triggered.disconnect(checkGameStarted);
         visible = false;
     }
 }
