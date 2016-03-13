@@ -13,96 +13,139 @@ Item {
     signal disconnected();
     signal gameStarted();
 
-    RowLayout {
-        id: mainLayout
+    GridView {
+        id: userList
+
         anchors.fill: parent
-        anchors.margins: margin
 
-        Rectangle {
-            id: fieldContainer
-            color: "white"
-            Layout.fillWidth: true
-            Layout.fillHeight: true
+        model: ListModel {
+            ListElement {
+                name: "Captain Kirk"
+                ready: true
+            }
 
-            GridLayout {
-                id: field
-                anchors.centerIn: parent
-                width: Math.min(fieldContainer.height, fieldContainer.width)
-                height: width
-                rows: 5
-                columns: 5
+            ListElement {
+                name: "Captain Nemo"
+                ready: false
+            }
+
+            ListElement {
+                name: "Admiral Ackbar"
+                ready: false
+            }
+
+            ListElement {
+                name: "Captain Balou"
+                ready: false
+            }
+
+            ListElement {
+                name: "Captain Kirk"
+                ready: true
+            }
+
+            ListElement {
+                name: "Captain Nemo"
+                ready: false
+            }
+
+            ListElement {
+                name: "Admiral Ackbar"
+                ready: false
+            }
+
+            ListElement {
+                name: "Captain Balou"
+                ready: false
+            }
+            ListElement {
+                name: "Captain Kirk"
+                ready: true
+            }
+
+            ListElement {
+                name: "Captain Nemo"
+                ready: false
+            }
+
+            ListElement {
+                name: "Admiral Ackbar"
+                ready: false
+            }
+
+            ListElement {
+                name: "Captain Balou"
+                ready: false
             }
         }
 
-        ListView { //TODO: Needs to be filled.
-            id: userList
-            width: 200
-            Layout.fillHeight: true
-            model: ListModel {
-                ListElement {
-                    name: "Captain Kirk"
-                    colorCode: "lightgrey"
-                }
+        cellHeight: 50
+        cellWidth: 200
+        flow: GridView.FlowTopToBottom
 
-                ListElement {
-                    name: "Captain Nemo"
-                    colorCode: "lime"
-                }
+        delegate: Button {
+            antialiasing: true
+            height: 40
+            width: 190
+            y: 10 // vertical spacing
 
-                ListElement {
-                    name: "Admiral Ackbar"
-                    colorCode: "lightgrey"
-                }
+            enabled: ready && !waitCheckbox.checked
 
-                ListElement {
-                    name: "Captain Balou"
-                    colorCode: "lightgrey"
-                }
-            }
-            delegate: Item {
-                x: 5
-                width: 80
-                height: 15
-                Row {
-                    id: row1
+            RowLayout {
+                // some padding
+                height: parent.height - 4
+                width: parent.width - 9
+                x: 7
+                y: 2
+
+                opacity: enabled ? 1.0 : 0.3
+
+                Rectangle {
+                    color: ready ? "green" : "red"
                     anchors.verticalCenter: parent.verticalCenter
-                    spacing: 3
+                    border {
+                        color: "black"
+                        width: 1
+                    }
+                    height: parent.height - 10
+                    width: height
+                    radius: height * 0.5
+                }
 
-                    Rectangle {
-                        width: 200
-                        height: 15
-                        color: "transparent"
+                ColumnLayout {
+                    spacing: 1
 
-                        Rectangle {
-                            width: 15
-                            height: 15
-                            color: colorCode
-                            anchors.left: parent.left
-
-                            Text {
-                                text: name
-                                anchors.left: parent.right
-                                font.bold: false
-                            }
+                    Text {
+                        font {
+                            pointSize: 11
+                            weight: Font.DemiBold
                         }
+                        text: name
+                    }
 
-                        MouseArea {
-                            id: mouse_area1
-                            z: 1
-                            hoverEnabled: true
-                            anchors.fill: parent
-
-                            onClicked:{
-                                userList.currentIndex = index
-                                console.log("Challenged player " + index);
-                                // FIXME: do something
-                                screen.gameStarted();
-                            }
+                    Text {
+                        font {
+                            italic: true
+                            pointSize: 8
                         }
+                        text: ready ? "ready" : "not ready"
                     }
                 }
             }
+
+            onClicked:{
+                userList.currentIndex = index
+                console.log("Challenged player " + index);
+                // FIXME: do something
+                screen.gameStarted();
+            }
         }
+    }
+
+    CheckBox {
+        id: waitCheckbox
+        anchors.bottom: parent.bottom
+        text: "Wait for challenge from another player"
     }
 
     function update_lobby() {
