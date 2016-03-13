@@ -93,10 +93,10 @@ Item {
     function updateLobby() {
         var lobby = eval(bridge.update_lobby());
         lobbyModel.clear();
-        lobby.available_players.map(function (player) {
+        lobby.available_players.map(function (player_name) {
             lobbyModel.append({
-                name: player.name,
-                ready: lobby.ready_players.indexOf(player.name) !== -1
+                name: player_name,
+                ready: lobby.ready_players.indexOf(player_name) !== -1
             });
         });
     }
