@@ -76,8 +76,8 @@ Item {
 
             onClicked: {
                 lobby.currentIndex = index;
-                console.log("Challenged player " + index);
-                // FIXME: actually challenge the player
+                console.log("Challenged player " + index + name);
+                bridge.send_challenge(name);
                 screen.gameStarted();
             }
         }
@@ -107,7 +107,13 @@ Item {
 
 
     function checkGameStarted() {
-        // TODO: check whether I was challenged. If yes, start game
+        state = bridge.poll_state();
+        if (["PlacingShips", "OpponentPlacing", "Planning", "OpponentPlanning"].indexOf(state) !== -1) {
+            console.log("I was challenged");
+            lobbyScreen.deactivate();
+            gameScreen.activate();
+            // TODO: Start game
+        }
     }
 
 
