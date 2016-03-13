@@ -312,6 +312,9 @@ impl Bridge {
             self.ui_sender.as_mut().unwrap().send(Message::NotReadyRequest);
         }
     }
+
+    fn handle_placement(&mut self, placement: String) {
+    }
 }
 
 Q_OBJECT! { Bridge:
@@ -326,6 +329,7 @@ Q_OBJECT! { Bridge:
     slot fn get_features_list();
     slot fn on_clicked_my_board(i64);
     slot fn on_clicked_opp_board(i64);
+    slot fn handle_placement(String);
     // slot fn get_boards();
 
     slot fn set_ready_state(i64);

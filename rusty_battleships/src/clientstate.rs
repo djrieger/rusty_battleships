@@ -307,7 +307,7 @@ impl State {
             },
             Status::AwaitGameStart => {
                 self.status = Status::PlacingShips;
-                self.place_ships(); //FIXME ONLY FOR TESING!
+                // self.place_ships(); //FIXME ONLY FOR TESING!
                 return Ok(());
             },
             Status::AwaitReady => {
