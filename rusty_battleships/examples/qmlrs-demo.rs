@@ -128,9 +128,7 @@ impl Bridge {
                         response_received = true;
                         self.state = tuple.0;
                         self.last_rcvd_msg = Some(tuple.1.clone());
-                    }
-                    //Message::PlayerReadyUpdate{..} | Message::PlayerJoinedUpdate{..}
-                    //| Message::PlayerNotReadyUpdate{..} | Message::PlayerLeftUpdate{..} => continue,
+                    },
                     x => {
                         println!("Received illegal response: {:?}", x);
                         break;
@@ -142,10 +140,6 @@ impl Bridge {
         }
 
         return success;
-    }
-
-    fn send_get_features_request(&mut self) {
-        self.ui_sender.as_mut().unwrap().send(Message::GetFeaturesRequest);
     }
 
     fn update_lobby(&mut self) -> String {
@@ -322,7 +316,6 @@ impl Bridge {
 
 Q_OBJECT! { Bridge:
     slot fn send_login_request(String);
-    slot fn send_get_features_request();
     slot fn send_challenge(String);
     slot fn poll_state();
     slot fn update_lobby();

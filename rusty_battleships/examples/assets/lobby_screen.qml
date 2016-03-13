@@ -74,10 +74,10 @@ Item {
                 }
             }
 
-            onClicked:{
-                lobby.currentIndex = index
+            onClicked: {
+                lobby.currentIndex = index;
                 console.log("Challenged player " + index);
-                // FIXME: do something
+                // FIXME: actually challenge the player
                 screen.gameStarted();
             }
         }
@@ -88,8 +88,8 @@ Item {
         anchors.bottom: parent.bottom
         text: "Wait for challenge from another player"
 
-        onClicked: {
-            bridge.set_ready_state(waitCheckbox.checked); 
+        onCheckedChanged: {
+            bridge.set_ready_state(checked); 
         }
     }
 
@@ -106,14 +106,21 @@ Item {
     }
 
 
+    function checkGameStarted() {
+        // TODO: check whether I was challenged. If yes, start game
+    }
+
+
     function activate() {
         // TODO: pass server info and set title text accordingly
         timer.triggered.connect(updateLobby);
+        timer.triggered.connect(checkGameStarted);
         visible = true;
     }
 
     function deactivate() {
         timer.triggered.disconnect(updateLobby);
+        timer.triggered.connect(checkGameStarted);
         visible = false;
     }
 }
