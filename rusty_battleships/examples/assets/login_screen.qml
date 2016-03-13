@@ -99,10 +99,10 @@ Item {
 
 
     function activate() {
-      visible = true;
+        visible = true;
     }
 
     function deactivate() {
-      visible = false;
+        visible = false;
     }
 }

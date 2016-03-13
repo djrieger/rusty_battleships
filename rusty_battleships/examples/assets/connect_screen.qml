@@ -184,7 +184,6 @@ Item {
     function updateServers() {
         // don't annoy the user by changing anything while he's using the box
         if (!serverList.pressed) {
-            // FIXME: handle removed servers somehow
             var servers = eval(bridge.discover_servers());
             serverListModel.clear();
             servers.map(function (server) {
@@ -205,12 +204,12 @@ Item {
 
 
     function activate() {
-      timer.triggered.connect(updateServers);
-      visible = true;
+        timer.triggered.connect(updateServers);
+        visible = true;
     }
 
     function deactivate() {
-      timer.triggered.disconnect(updateServers);
-      visible = false;
+        timer.triggered.disconnect(updateServers);
+        visible = false;
     }
 }

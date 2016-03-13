@@ -151,12 +151,11 @@ impl Bridge {
     fn update_lobby(&mut self) -> String {
         let mut response = self.lobby_receiver.try_recv();
 
-        if response != Err(TryRecvError::Empty) {
-            if let Ok(lobby_list) = response {
+        while response != Err(TryRecvError::Empty) {
+            if let Ok(ref lobby_list) = response {
                 self.lobby_list = lobby_list.clone();
-                return json::encode(&lobby_list).unwrap();
-            } else if let Err(TryRecvError::Disconnected) = response {
-                panic!("Lobby update list was closed. Probably because the sender thread died.");
+            } else {
+                panic!("Could not receive lobby update, the sender thread probably died.");
             }
         }
 
@@ -245,6 +244,7 @@ impl Bridge {
     }
 
     fn discover_servers(&mut self) -> String {
+        // FIXME: handle removed servers somehow
         if let Ok((ip, port, server_name)) = self.udp_discovery_receiver.try_recv() {
             self.discovered_servers.push(Server { ip: ip.octets(), port: port, name: server_name });
         }

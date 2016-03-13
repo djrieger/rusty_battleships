@@ -14,71 +14,11 @@ Item {
     signal gameStarted();
 
     GridView {
-        id: userList
+        id: lobby
 
         anchors.fill: parent
 
-        model: ListModel {
-            ListElement {
-                name: "Captain Kirk"
-                ready: true
-            }
-
-            ListElement {
-                name: "Captain Nemo"
-                ready: false
-            }
-
-            ListElement {
-                name: "Admiral Ackbar"
-                ready: false
-            }
-
-            ListElement {
-                name: "Captain Balou"
-                ready: false
-            }
-
-            ListElement {
-                name: "Captain Kirk"
-                ready: true
-            }
-
-            ListElement {
-                name: "Captain Nemo"
-                ready: false
-            }
-
-            ListElement {
-                name: "Admiral Ackbar"
-                ready: false
-            }
-
-            ListElement {
-                name: "Captain Balou"
-                ready: false
-            }
-            
-            ListElement {
-                name: "Captain Kirk"
-                ready: true
-            }
-
-            ListElement {
-                name: "Captain Nemo"
-                ready: false
-            }
-
-            ListElement {
-                name: "Admiral Ackbar"
-                ready: false
-            }
-
-            ListElement {
-                name: "Captain Balou"
-                ready: false
-            }
-        }
+        model: ListModel { id: lobbyModel }
 
         cellHeight: 50
         cellWidth: 200
@@ -135,7 +75,7 @@ Item {
             }
 
             onClicked:{
-                userList.currentIndex = index
+                lobby.currentIndex = index
                 console.log("Challenged player " + index);
                 // FIXME: do something
                 screen.gameStarted();
@@ -149,19 +89,27 @@ Item {
         text: "Wait for challenge from another player"
     }
 
-    function update_lobby() {
-        bridge.get_ready_players();
-        bridge.get_available_players();
-        //^-- verwursten in list items!
+
+    function updateLobby() {
+        var lobby = eval(bridge.update_lobby());
+        lobbyModel.clear();
+        lobby.available_players.map(function (player) {
+            lobbyModel.append({
+                name: player.name,
+                ready: lobby.ready_players.indexOf(player.name) !== -1
+            });
+        });
     }
 
 
     function activate() {
-      // TODO: pass server info and set title text accordingly
-      visible = true;
+        // TODO: pass server info and set title text accordingly
+        timer.triggered.connect(updateLobby);
+        visible = true;
     }
 
     function deactivate() {
-      visible = false;
+        timer.triggered.disconnect(updateLobby);
+        visible = false;
     }
 }
