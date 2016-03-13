@@ -193,7 +193,7 @@ impl Bridge {
     }
 
     fn poll_state(&mut self) -> String {
-        if let Ok(tuple) = self.msg_update_receiver.try_recv() {
+        while let Ok(tuple) = self.msg_update_receiver.try_recv() {
             self.state = tuple.0;
             self.last_rcvd_msg = Some(tuple.1);
         }
@@ -206,7 +206,7 @@ impl Bridge {
     }
 
     fn poll_log(&mut self) -> String {
-        if let Ok(tuple) = self.msg_update_receiver.try_recv() {
+        while let Ok(tuple) = self.msg_update_receiver.try_recv() {
             self.state = tuple.0;
             self.last_rcvd_msg = Some(tuple.1);
         }
@@ -239,7 +239,7 @@ impl Bridge {
 
     fn discover_servers(&mut self) -> String {
         // FIXME: handle removed servers somehow
-        if let Ok((ip, port, server_name)) = self.udp_discovery_receiver.try_recv() {
+        while let Ok((ip, port, server_name)) = self.udp_discovery_receiver.try_recv() {
             self.discovered_servers.push(Server { ip: ip.octets(), port: port, name: server_name });
         }
 
