@@ -58,6 +58,7 @@ Item {
                 name: "Captain Balou"
                 ready: false
             }
+            
             ListElement {
                 name: "Captain Kirk"
                 ready: true

@@ -5,18 +5,26 @@ use std::thread;
 use std::time::Duration;
 use std::sync::mpsc::TryRecvError;
 
-//extern crate argparse;
-//use argparse::{ArgumentParser, Print, Store};
+use rustc_serialize::Encodable;
 
 use message::{serialize_message, deserialize_message, Message, ShipPlacement, Direction, Reason};
 use clientlobby::ClientLobby;
 use ship::{Ship};
 use clientboard::{Board};
 
-#[derive(PartialEq)]
+#[derive(Clone, PartialEq, RustcEncodable)]
 pub struct LobbyList {
     pub available_players : Vec<String>,
     pub ready_players : Vec<String>,
+}
+
+impl LobbyList {
+    pub fn new() -> LobbyList {
+        LobbyList {
+            available_players: Vec::new(),
+            ready_players: Vec::new()
+        }
+    }
 }
 
 fn send_message(msg: Message, stream: &mut BufWriter<TcpStream>) {

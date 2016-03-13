@@ -1,9 +1,8 @@
-extern crate rand;
-use self::rand::{thread_rng, Rng};
-
-extern crate time;
-
 use board::{Board};
+
+use rand::{thread_rng, Rng};
+
+use time;
 
 #[derive(PartialEq)]
 pub enum GameState {
@@ -39,7 +38,7 @@ impl Game {
             player1: player1,
             player2: player2,
             last_turn_started_at: None,
-            player1_active: rand::thread_rng().gen(),
+            player1_active: thread_rng().gen(),
             player1_afk_count: 0,
             player2_afk_count: 0,
             state: GameState::Placing,

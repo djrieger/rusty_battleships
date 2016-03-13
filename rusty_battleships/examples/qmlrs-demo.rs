@@ -97,8 +97,7 @@ struct Bridge {
     state: Status,
     features_list: Vec<String>,
     last_rcvd_msg: Option<Message>,
-    ready_players_list: Vec<String>,
-    available_players_list: Vec<String>,
+    lobby_list: LobbyList,
 
     udp_discovery_receiver: mpsc::Receiver<(Ipv4Addr, u16, String)>,
     discovered_servers: Vec<Server>,
@@ -149,21 +148,19 @@ impl Bridge {
         self.ui_sender.as_mut().unwrap().send(Message::GetFeaturesRequest);
     }
 
-    fn update_lobby(&mut self) {
-        let mut response = Err(TryRecvError::Disconnected);
-        let mut available = Vec::<String>::new();
-        let mut ready = Vec::<String>::new();
-        while response != Err(TryRecvError::Empty) {
-            response = self.lobby_receiver.try_recv();
-            if let Ok(LobbyList {ref available_players, ref ready_players}) = response {
-                available = available_players.clone();
-                ready = ready_players.clone();
+    fn update_lobby(&mut self) -> String {
+        let mut response = self.lobby_receiver.try_recv();
+
+        if response != Err(TryRecvError::Empty) {
+            if let Ok(lobby_list) = response {
+                self.lobby_list = lobby_list.clone();
+                return json::encode(&lobby_list).unwrap();
             } else if let Err(TryRecvError::Disconnected) = response {
                 panic!("Lobby update list was closed. Probably because the sender thread died.");
             }
-            self.available_players_list = available.clone();
-            self.ready_players_list = ready.clone();
         }
+
+        return json::encode(&self.lobby_list).unwrap();
     }
 
     fn update_boards(&mut self) {
@@ -187,14 +184,6 @@ impl Bridge {
                 panic!("Our board update receiver is not there!");
             }
         }
-    }
-
-    fn get_ready_players(&self) -> String {
-        return format!("{:?}", self.ready_players_list);
-    }
-
-    fn get_available_players(&self) -> String {
-        return format!("{:?}", self.available_players_list);
     }
 
     fn get_features_list(&self) -> String {
@@ -339,8 +328,6 @@ Q_OBJECT! { Bridge:
     slot fn get_last_message();
     slot fn connect(String, i64);
     slot fn discover_servers();
-    slot fn get_ready_players();
-    slot fn get_available_players();
     slot fn get_features_list();
     slot fn on_clicked_my_board(i64);
     slot fn on_clicked_opp_board(i64);
@@ -422,8 +409,7 @@ fn main() {
         last_rcvd_msg: None,
         udp_discovery_receiver: rcv_udp_discovery,
         discovered_servers: Vec::<Server>::new(),
-        ready_players_list : Vec::<String>::new(),
-        available_players_list : Vec::<String>::new(),
+        lobby_list: LobbyList::new(),
         features_list : Vec::<String>::new(),
     };
     bridge.state = Status::Unregistered;

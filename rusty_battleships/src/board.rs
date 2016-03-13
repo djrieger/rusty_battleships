@@ -5,10 +5,7 @@ use message::{Message, Direction};
 use game::Game;
 use ship::Ship;
 
-extern crate ansi_term;
-use self::ansi_term::Colour::{Green, Yellow, Cyan, Black, Red};
-
-extern crate time;
+use ansi_term::Colour::{Green, Black, Red};
 
 pub const W: usize = 10;
 pub const H: usize = 10;
