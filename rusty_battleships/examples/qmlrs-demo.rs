@@ -149,14 +149,8 @@ impl Bridge {
     }
 
     fn update_lobby(&mut self) -> String {
-        let mut response = self.lobby_receiver.try_recv();
-
-        while response != Err(TryRecvError::Empty) {
-            if let Ok(ref lobby_list) = response {
-                self.lobby_list = lobby_list.clone();
-            } else {
-                panic!("Could not receive lobby update, the sender thread probably died.");
-            }
+        if let Ok(ref lobby_list) = self.lobby_receiver.try_recv() {
+            self.lobby_list = lobby_list.clone();
         }
 
         return json::encode(&self.lobby_list).unwrap();

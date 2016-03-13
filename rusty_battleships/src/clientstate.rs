@@ -12,7 +12,7 @@ use clientlobby::ClientLobby;
 use ship::{Ship};
 use clientboard::{Board};
 
-#[derive(Clone, PartialEq, RustcEncodable)]
+#[derive(Clone, Debug, PartialEq, RustcEncodable)]
 pub struct LobbyList {
     pub available_players : Vec<String>,
     pub ready_players : Vec<String>,
@@ -534,8 +534,8 @@ impl State {
     fn send_updated_lobby(&mut self, sender: &mut Sender<LobbyList>) {
         let l = &self.lobby;
         sender.send(LobbyList {
-            available_players: l.player_list.clone(),
-            ready_players: l.ready_players.clone(),
+            available_players: l.get_available_players(),
+            ready_players: l.get_ready_players(),
         }).unwrap();
     }
 
