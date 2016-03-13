@@ -105,11 +105,13 @@ struct Bridge {
 }
 
 impl Bridge {
-    fn send_login_request(&mut self, username: String) {
+    fn send_login_request(&mut self, username: String) -> bool{
         println!(">>> UI: Sending login request for {} ...", username);
         self.ui_sender.as_mut().unwrap().send(Message::LoginRequest { username: username });
         // Wait for a OkResponse from the server, discard player state updates.
         let mut response_received = false;
+        let mut success = false;
+
         while !response_received {
             //Block while receiving! At some point there MUST be an OkResponse or a NameTakenResponse
             let resp = self.msg_update_receiver.recv();
@@ -118,6 +120,7 @@ impl Bridge {
                     Message::OkResponse => {
                         println!("Logged in.");
                         response_received = true;
+                        success = true;
                         self.state = tuple.0;
                         self.last_rcvd_msg = Some(tuple.1.clone());
                     },
@@ -127,8 +130,8 @@ impl Bridge {
                         self.state = tuple.0;
                         self.last_rcvd_msg = Some(tuple.1.clone());
                     }
-                    Message::PlayerReadyUpdate{..} | Message::PlayerJoinedUpdate{..}
-                    | Message::PlayerNotReadyUpdate{..} | Message::PlayerLeftUpdate{..} => continue,
+                    //Message::PlayerReadyUpdate{..} | Message::PlayerJoinedUpdate{..}
+                    //| Message::PlayerNotReadyUpdate{..} | Message::PlayerLeftUpdate{..} => continue,
                     x => {
                         println!("Received illegal response: {:?}", x);
                         break;
@@ -139,6 +142,7 @@ impl Bridge {
             }
         }
 
+        return success;
     }
 
     fn send_get_features_request(&mut self) {
@@ -214,8 +218,8 @@ impl Bridge {
             self.last_rcvd_msg = Some(tuple.1);
         }
         let state_description = match self.state {
-            Status::Unregistered => String::from("Noch nicht registriert"),
-            Status::Available => String::from("Registriert"),
+            Status::Unregistered => String::from("Not registered"),
+            Status::Available => String::from("Registered"),
             _ => format!("{:?}", self.state),
         };
         return state_description;

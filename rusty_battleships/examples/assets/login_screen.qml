@@ -33,7 +33,7 @@ Item {
                 Layout.fillWidth: true
 
                 TextField {
-                    id: customServer
+                    id: nickname
                     Layout.fillWidth: true
 
                     placeholderText: "Example: john_doe"
@@ -41,7 +41,7 @@ Item {
                     style: TextFieldStyle {
                         background: Rectangle {
                             radius: 2
-                            border.color: customServer.acceptableInput ? "black" : "red"
+                            border.color: nickname.acceptableInput ? "black" : "red"
                             border.width: 1
                         }
                     }
@@ -63,14 +63,35 @@ Item {
                 }
             }
 
-            Button {
-                anchors.topMargin: 50
-                enabled: customServer.acceptableInput
-                text: "Register"
+            RowLayout {
+                Button {
+                    anchors.topMargin: 50
+                    enabled: nickname.acceptableInput && !registering
+                    text: "Register"
 
-                onClicked: {
-                    // FIXME
-                    console.log("Yay!");
+                    property bool registering: false
+
+                    onClicked: {
+                        registering = true;
+                        progressNotice.visible = true
+                        nicknameError.visible = false
+
+                        if (bridge.send_login_request(nickname.text)) {
+                            screen.registered();
+                        } else {
+                            nicknameError.visible = true
+                        }
+
+                        progressNotice.visible = false
+                        registering = false;
+                    }
+                }
+                Label {
+                    id: nicknameError
+
+                    color: "red"
+                    text: "Nickname already taken, please select a different one"
+                    visible: false
                 }
             }
         }
@@ -79,15 +100,6 @@ Item {
 
     // FIXME
     function login() {
-        bridge.send_login_request(usernameField.text);
-        bridge.poll_state();
-    }
-
-    // FIXME: remove
-    function features() {
-        bridge.send_get_features_request();
-        bridge.poll_state();
-        featuresLabel.text = bridge.get_features_list();
     }
 
 
