@@ -310,6 +310,14 @@ impl Bridge {
 
         return result;
     }
+
+    fn set_ready_state(&mut self, ready: i64) {
+        if ready == 1 {
+            self.ui_sender.as_mut().unwrap().send(Message::ReadyRequest);
+        } else {
+            self.ui_sender.as_mut().unwrap().send(Message::NotReadyRequest);
+        }
+    }
 }
 
 Q_OBJECT! { Bridge:
@@ -326,6 +334,8 @@ Q_OBJECT! { Bridge:
     slot fn on_clicked_my_board(i64);
     slot fn on_clicked_opp_board(i64);
     slot fn get_boards();
+
+    slot fn set_ready_state(i64);
 }
 
 fn tcp_loop(hostname: String, port: i64, rcv_ui_update: mpsc::Receiver<Message>,

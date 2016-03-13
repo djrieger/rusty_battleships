@@ -87,6 +87,10 @@ Item {
         id: waitCheckbox
         anchors.bottom: parent.bottom
         text: "Wait for challenge from another player"
+
+        onClicked: {
+            bridge.set_ready_state(waitCheckbox.checked); 
+        }
     }
 
 
