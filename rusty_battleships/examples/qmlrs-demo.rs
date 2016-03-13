@@ -149,7 +149,7 @@ impl Bridge {
     }
 
     fn update_lobby(&mut self) -> String {
-        if let Ok(ref lobby_list) = self.lobby_receiver.try_recv() {
+        while let Ok(ref lobby_list) = self.lobby_receiver.try_recv() {
             self.lobby_list = lobby_list.clone();
         }
 
