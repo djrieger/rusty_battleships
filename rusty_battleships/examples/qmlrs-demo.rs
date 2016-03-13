@@ -254,56 +254,56 @@ impl Bridge {
         println!("Button clicked at {}, {}", x, y);
     }
 
-    fn get_boards(&self) -> String {
-        let mut ships = Vec::<Ship>::new();
-        ships.push(Ship { x: 0, y: 0, length: 2, direction: Direction::East, health_points: 2});
-        ships.push(Ship { x: 0, y: 1, length: 2, direction: Direction::East, health_points: 2});
-        ships.push(Ship { x: 0, y: 2, length: 3, direction: Direction::East, health_points: 3});
-        ships.push(Ship { x: 0, y: 3, length: 4, direction: Direction::East, health_points: 4});
-        ships.push(Ship { x: 0, y: 4, length: 5, direction: Direction::East, health_points: 5});
-        let mut board = Board::new(ships, true);
-        board.compute_state();
-
-        let mut result = String::new();
-        {
-            for y in 0..H {
-                for x in 0..W {
-                    match board.state[x][y].ship_index {
-                        Some(index) => result.push_str(&index.to_string()),
-                        None => result.push_str(" ")
-                    }
-                    if x == W-1 {
-                        result.push_str("|\n");
-                    } else {
-                        result.push_str("|");
-                    }
-                }
-            }
-            println!("{}", result);
-        }
-
-        board.move_ship(0, Direction::East);
-        {
-            result = String::new();
-            for y in 0..H {
-                for x in 0..W {
-                    match board.state[x][y].ship_index {
-                        Some(index) => result.push_str(&index.to_string()),
-                        None => result.push_str(" ")
-                    }
-                    if x == W-1 {
-                        result.push_str("|\n");
-                    } else {
-                        result.push_str("|");
-                    }
-                }
-            }
-            println!("{}", result);
-        }
-
-
-        return result;
-    }
+    // fn get_boards(&self) -> String {
+    //     let mut ships = Vec::<Ship>::new();
+    //     ships.push(Ship { x: 0, y: 0, length: 2, direction: Direction::East, health_points: 2});
+    //     ships.push(Ship { x: 0, y: 1, length: 2, direction: Direction::East, health_points: 2});
+    //     ships.push(Ship { x: 0, y: 2, length: 3, direction: Direction::East, health_points: 3});
+    //     ships.push(Ship { x: 0, y: 3, length: 4, direction: Direction::East, health_points: 4});
+    //     ships.push(Ship { x: 0, y: 4, length: 5, direction: Direction::East, health_points: 5});
+    //     let mut board = Board::new(ships, true);
+    //     board.compute_state();
+    //
+    //     let mut result = String::new();
+    //     {
+    //         for y in 0..H {
+    //             for x in 0..W {
+    //                 match board.state[x][y].ship_index {
+    //                     Some(index) => result.push_str(&index.to_string()),
+    //                     None => result.push_str(" ")
+    //                 }
+    //                 if x == W-1 {
+    //                     result.push_str("|\n");
+    //                 } else {
+    //                     result.push_str("|");
+    //                 }
+    //             }
+    //         }
+    //         println!("{}", result);
+    //     }
+    //
+    //     board.move_ship(0, Direction::East);
+    //     {
+    //         result = String::new();
+    //         for y in 0..H {
+    //             for x in 0..W {
+    //                 match board.state[x][y].ship_index {
+    //                     Some(index) => result.push_str(&index.to_string()),
+    //                     None => result.push_str(" ")
+    //                 }
+    //                 if x == W-1 {
+    //                     result.push_str("|\n");
+    //                 } else {
+    //                     result.push_str("|");
+    //                 }
+    //             }
+    //         }
+    //         println!("{}", result);
+    //     }
+    //
+    //
+    //     return result;
+    // }
 
     fn set_ready_state(&mut self, ready: i64) {
         if ready == 1 {
@@ -326,7 +326,7 @@ Q_OBJECT! { Bridge:
     slot fn get_features_list();
     slot fn on_clicked_my_board(i64);
     slot fn on_clicked_opp_board(i64);
-    slot fn get_boards();
+    // slot fn get_boards();
 
     slot fn set_ready_state(i64);
 }
