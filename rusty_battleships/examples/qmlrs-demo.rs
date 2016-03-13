@@ -348,7 +348,7 @@ Q_OBJECT! { Bridge:
 }
 
 fn tcp_loop(hostname: String, port: i64, rcv_ui_update: mpsc::Receiver<Message>,
-    tx_message_update: mpsc::Sender<(Status, Message)>, tx_lobby_update: mpsc::Sender<Message>, tx_board_update: mpsc::Sender<(Board, Board)>) -> bool {
+    tx_message_update: mpsc::Sender<(Status, Message)>, tx_lobby_update: mpsc::Sender<LobbyList>, tx_board_update: mpsc::Sender<(Board, Board)>) -> bool {
 
     //Connect to the specified address and port.
     let mut sender;
@@ -383,10 +383,6 @@ fn main() {
     let (tx_lobby_update, rcv_lobby_update) : (mpsc::Sender<LobbyList>, mpsc::Receiver<LobbyList>) = mpsc::channel();
     let (tx_udp_discovery, rcv_udp_discovery) = mpsc::channel();
 
-    let tcp_loop = move || { //-> fn with params
-
-    };
-
     let socket = UdpSocket::bind("0.0.0.0:0").unwrap();
     let response = vec![];
     socket.send_to(&response[..], &(Ipv4Addr::new(224, 0, 0, 250), 49001 as u16));
@@ -411,7 +407,6 @@ fn main() {
     };
     thread::spawn(udp_discovery_loop);
 
-    let tcp_thread = thread::spawn(tcp_loop);
     let mut engine = qmlrs::Engine::new();
     let assets = Assets;
     let mut bridge = Bridge {

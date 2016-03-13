@@ -13,9 +13,10 @@ use clientlobby::ClientLobby;
 use ship::{Ship};
 use clientboard::{Board};
 
+#[derive(PartialEq)]
 pub struct LobbyList {
-    available_players : Vec<String>,
-    ready_players : Vec<String>,
+    pub available_players : Vec<String>,
+    pub ready_players : Vec<String>,
 }
 
 fn send_message(msg: Message, stream: &mut BufWriter<TcpStream>) {
