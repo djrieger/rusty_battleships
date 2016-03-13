@@ -1,4 +1,4 @@
-use std::io::{BufReader, BufWriter, Write, Read, stdin, BufRead};
+use std::io::{BufReader, BufWriter, Write, stdin, BufRead};
 use std::net::{TcpStream};
 use std::sync::mpsc::{self, Sender, Receiver};
 use std::thread;
@@ -10,9 +10,13 @@ use std::sync::mpsc::TryRecvError;
 
 use message::{serialize_message, deserialize_message, Message, ShipPlacement, Direction, Reason};
 use clientlobby::ClientLobby;
-use game::Game;
 use ship::{Ship};
-use clientboard::{Board, W, H};
+use clientboard::{Board};
+
+pub struct LobbyList {
+    available_players : Vec<String>,
+    ready_players : Vec<String>,
+}
 
 fn send_message(msg: Message, stream: &mut BufWriter<TcpStream>) {
     let serialized_msg = serialize_message(msg);
@@ -76,7 +80,7 @@ pub struct State {
     use_qml_interface :  bool,
     ui_update_receiver : Option<Receiver<Message>>,
     ui_update_sender : Option<Sender<(Status, Message)>>,
-    lobby_update_sender : Option<Sender<Message>>,
+    lobby_update_sender : Option<Sender<LobbyList>>,
     board_update_sender : Option<Sender<(Board, Board)>>,
 }
 
@@ -105,7 +109,7 @@ impl State {
     pub fn new(use_qml_interface: bool,
                 rec_ui_update: Option<Receiver<Message>>,
                 tx_ui_update: Option<Sender<(Status, Message)>>,
-                tx_lobby_update: Option<Sender<Message>>,
+                tx_lobby_update: Option<Sender<LobbyList>>,
                 tx_board_update: Option<Sender<(Board, Board)>>,
                 buff_reader: BufReader<TcpStream>,
                 buff_writer: BufWriter<TcpStream>) -> State {
@@ -248,9 +252,7 @@ impl State {
             self.lobby.set_feature_list(features);
             self.status = Status::Unregistered;
             if !self.use_qml_interface { // To keep testing via terminal easy.
-                let mut nickname = String::from("");
-
-                nickname = ask(String::from("What's yer name, captain!?"));
+                let nickname = ask(String::from("What's yer name, captain!?"));
 
                 if self.login(&nickname) {
                     println!("G'day, captain {:?}!", self.lobby.player_name);
@@ -325,12 +327,11 @@ impl State {
     pub fn handle_name_taken_response(&mut self, nickname: &str) {
         if self.status == Status::Register {
             self.status = Status::Unregistered;
-            let mut new_name = String::from("");
             if !self.use_qml_interface {
-                new_name = ask(String::from("What was yer name again?")); //FIXME: FOR TESTING ONLY!
+                let new_name = ask(String::from("What was yer name again?")); //FIXME: FOR TESTING ONLY!
                 send_message(Message::LoginRequest { username: String::from(new_name) }, &mut self.buff_writer); //FIXME: FOR TESTING ONLY!
-            self.status = Status::Register; //FIXME: FOR TESTING ONLY!
-        }
+                self.status = Status::Register; //FIXME: FOR TESTING ONLY!
+            }
         } else {
             panic!("Received a NAME_TAKEN_RESPONSE while not in Register State! STATUS={:?}", self.status);
         }
@@ -521,13 +522,12 @@ impl State {
         self.update_listen_loop(rx);
     }
 
-    fn send_updated_lobby(&mut self, sender: &mut Sender<Message>) {
+    fn send_updated_lobby(&mut self, sender: &mut Sender<LobbyList>) {
         let l = &self.lobby;
-        sender.send(
-            Message::LobbyList {
-                available_players: l.player_list.clone(),
-                ready_players: l.ready_players.clone(),
-            });
+        sender.send(LobbyList {
+            available_players: l.player_list.clone(),
+            ready_players: l.ready_players.clone(),
+        }).unwrap();
     }
 
     fn send_updated_boards(&mut self, sender: &mut Sender<(Board, Board)>) {
@@ -768,7 +768,7 @@ impl State {
                         Message::SurrenderRequest => {
                             self.surrender();
                         },
-                        N => panic!("Received illegal request from client: {:?}", N),
+                        m => panic!("Received illegal request from client: {:?}", m),
                     }
                 } else {
 //                    println!(">>>No UI input: {:?}", input);

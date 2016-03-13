@@ -108,12 +108,6 @@ pub enum Message {
     ServerGoingDownUpdate {
         errormessage:String,
     },
-
-    //Only for intra-app-communication
-    LobbyList {
-        available_players : Vec<String>,
-        ready_players : Vec<String>,
-    }
 }
 
 #[derive(Debug, Hash, Eq, PartialEq)]
@@ -121,7 +115,6 @@ enum MessageEnvironment {
     Lobby,
     Game,
     All,
-    Intra,
 }
 
 #[derive(Debug, Hash, Eq, PartialEq)]
@@ -179,7 +172,6 @@ fn message_type(msg: Message) -> (MessageEnvironment, MessageType) {
         Message::EnemyAfkUpdate{..} => (MessageEnvironment::Game, MessageType::Update),
 
         Message::ServerGoingDownUpdate{..} => (MessageEnvironment::All, MessageType::Update),
-        Message::LobbyList{..} => (MessageEnvironment::Intra, MessageType::Update),
     }
 }
 
@@ -584,9 +576,6 @@ pub fn serialize_message(msg: Message) -> Vec<u8> {
             msgbuf.push(255);
             append_string(&mut msgbuf, errormessage);
         },
-        Message::LobbyList {..} => {
-            panic!("LobbyList-Message is not intended for serializtion.");
-        }
     }
     return msgbuf;
 }

@@ -21,7 +21,7 @@ use rustc_serialize::json::{ToJson, Json};
 
 extern crate rusty_battleships;
 use rusty_battleships::message::{serialize_message, deserialize_message, Message, Direction};
-use rusty_battleships::clientstate::{State, Status, tcp_poll};
+use rusty_battleships::clientstate::{LobbyList, State, Status, tcp_poll};
 use rusty_battleships::clientboard::{Board};
 use rusty_battleships::board::{W, H};
 use rusty_battleships::ship::Ship;
@@ -87,8 +87,8 @@ struct Bridge {
     msg_update_sender: mpsc::Sender<(Status, Message)>, //For the State object!
     msg_update_receiver:mpsc::Receiver<(Status, Message)>,
 
-    lobby_sender : mpsc::Sender<Message>, //For the State object!
-    lobby_receiver: mpsc::Receiver<Message>,
+    lobby_sender : mpsc::Sender<LobbyList>, //For the State object!
+    lobby_receiver: mpsc::Receiver<LobbyList>,
 
     board_receiver: Option<mpsc::Receiver<(Board, Board)>>,
     my_board: Option<Board>,
@@ -155,14 +155,12 @@ impl Bridge {
         let mut ready = Vec::<String>::new();
         while response != Err(TryRecvError::Empty) {
             response = self.lobby_receiver.try_recv();
-            if let Ok(Message::LobbyList {ref available_players, ref ready_players}) = response {
+            if let Ok(LobbyList {ref available_players, ref ready_players}) = response {
                 available = available_players.clone();
                 ready = ready_players.clone();
             } else if let Err(TryRecvError::Disconnected) = response {
                 panic!("Lobby update list was closed. Probably because the sender thread died.");
-            } /*else {
-                panic!("You shall not pass Non-LobbyList messages via the lobby update channel!");
-            }*/
+            }
             self.available_players_list = available.clone();
             self.ready_players_list = ready.clone();
         }
@@ -382,7 +380,7 @@ fn main() {
     let (tx_main, rcv_tcp) : (mpsc::Sender<Message>, mpsc::Receiver<Message>) = mpsc::channel();
     let (tx_message_update, rcv_main) : (mpsc::Sender<(Status, Message)>, mpsc::Receiver<(Status, Message)>) = mpsc::channel();
 
-    let (tx_lobby_update, rcv_lobby_update) : (mpsc::Sender<Message>, mpsc::Receiver<Message>) = mpsc::channel();
+    let (tx_lobby_update, rcv_lobby_update) : (mpsc::Sender<LobbyList>, mpsc::Receiver<LobbyList>) = mpsc::channel();
     let (tx_udp_discovery, rcv_udp_discovery) = mpsc::channel();
 
     let tcp_loop = move || { //-> fn with params
