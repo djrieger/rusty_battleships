@@ -74,10 +74,10 @@ Item {
                 }
             }
 
-            onClicked:{
-                lobby.currentIndex = index
+            onClicked: {
+                lobby.currentIndex = index;
                 console.log("Challenged player " + index);
-                // FIXME: do something
+                // FIXME: actually challenge the player
                 screen.gameStarted();
             }
         }
@@ -87,29 +87,45 @@ Item {
         id: waitCheckbox
         anchors.bottom: parent.bottom
         text: "Wait for challenge from another player"
+
+        onCheckedChanged: {
+            // FIXME: actually change ready state
+            if (checked) {
+                console.log("checked");
+            } else {
+                console.log("unchecked");
+            }
+        }
     }
 
 
     function updateLobby() {
         var lobby = eval(bridge.update_lobby());
         lobbyModel.clear();
-        lobby.available_players.map(function (player_name) {
+        lobby.available_players.map(function (player) {
             lobbyModel.append({
-                name: player_name,
-                ready: lobby.ready_players.indexOf(player_name) !== -1
+                name: player.name,
+                ready: lobby.ready_players.indexOf(player.name) !== -1
             });
         });
+    }
+
+
+    function checkGameStarted() {
+        // TODO: check whether I was challenged. If yes, start game
     }
 
 
     function activate() {
         // TODO: pass server info and set title text accordingly
         timer.triggered.connect(updateLobby);
+        timer.triggered.connect(checkGameStarted);
         visible = true;
     }
 
     function deactivate() {
         timer.triggered.disconnect(updateLobby);
+        timer.triggered.connect(checkGameStarted);
         visible = false;
     }
 }
