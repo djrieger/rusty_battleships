@@ -98,11 +98,6 @@ Item {
     }
 
 
-    // FIXME
-    function login() {
-    }
-
-
     function activate() {
       visible = true;
     }
