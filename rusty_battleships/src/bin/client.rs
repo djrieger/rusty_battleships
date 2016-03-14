@@ -1,4 +1,5 @@
 use std::collections::{BTreeMap, HashMap};
+use rusty_battleships::timer::timer_periodic;
 use std::io::{BufReader, BufWriter, Write};
 use std::net::{Ipv4Addr, TcpStream, UdpSocket, SocketAddr, SocketAddrV4};
 use std::sync::mpsc;
@@ -347,6 +348,13 @@ impl Bridge {
                 },
             });
         }
+        self.ui_sender.as_mut().unwrap().send(Message::PlaceShipsRequest { placement: [
+            placements[0],
+            placements[1],
+            placements[2],
+            placements[3],
+            placements[4]
+        ] });
         println!("{:?}", placements);
     }
 }
