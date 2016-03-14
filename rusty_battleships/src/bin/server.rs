@@ -127,6 +127,7 @@ fn handle_client(stream: TcpStream, tx: mpsc::SyncSender<ToMainThreadCommand>, r
                         println!("Client terminated connection");
                     } else {
                         println!("Got error: {:?}", e);
+                        // Ignoring return value of respond() since we are exiting anyway
                         respond(Message::InvalidRequestResponse, &mut buff_writer);
                     }
                     return;
@@ -140,11 +141,13 @@ fn handle_client(stream: TcpStream, tx: mpsc::SyncSender<ToMainThreadCommand>, r
                 ToChildCommand::TerminateConnection => return,
                 ToChildCommand::Message(Message::InvalidRequestResponse) => {
                     shutdown_player(&tx, &rx);
+                    // Ignoring return value of respond() since we are exiting anyway
                     respond(Message::InvalidRequestResponse, &mut buff_writer);
                     return;
                 },
                 ToChildCommand::Message(response_msg) => {
                     if respond(response_msg, &mut buff_writer).is_err() {
+                        shutdown_player(&tx, &rx);
                         return;
                     }
                 },
