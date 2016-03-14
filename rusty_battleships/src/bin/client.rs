@@ -384,13 +384,13 @@ impl Bridge {
      */
     fn get_ships_hps(&mut self) -> String {
         self.update_boards();
-        // WARNING! Assuming Board::ships are sorted by ship_index in descending order
-        let ref ships : Vec<Ship> = self.my_board.as_ref().unwrap().ships;
-        ships
-            .iter()
-            .map(|&ship| ship.health_points.to_string())
-            .collect::<Vec<String>>()
-            .concat()
+        let hps;
+        if let Some(ref board) = self.my_board {
+            hps = board.ships.iter().map(|&ship| ship.health_points).collect::<Vec<usize>>();
+        } else {
+            hps = vec![5, 4, 3, 2, 2];
+        }
+        return json::encode(&hps).unwrap();
     }
 }
 

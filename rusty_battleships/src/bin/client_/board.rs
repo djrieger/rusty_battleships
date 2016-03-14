@@ -32,7 +32,7 @@ impl Board {
                 None => ship_index = None,
                 Some(x) => {
                     ship_index = Some(x);
-                    let mut ship = self.ships[ship_index.unwrap() as usize];
+                    let ref mut ship = self.ships[ship_index.unwrap() as usize];
                     ship.health_points -= 1;
                     if ship.health_points == 0 {
                         println!("Ship destroyed: {:?}", ship)// TODO: What if it's destroyed?
@@ -65,7 +65,7 @@ impl Board {
                 },
                 Some(x) => {
                     ship_index = Some(x);
-                    let mut ship = self.ships[ship_index.unwrap() as usize];
+                    let ref mut ship = self.ships[ship_index.unwrap() as usize];
                     if ship.health_points != 1 {
                         panic!("Server says DESTROYED, but the ship had {} hp before the hit!", ship.health_points);
                     }

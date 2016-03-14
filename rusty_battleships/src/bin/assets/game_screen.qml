@@ -16,44 +16,49 @@ Item {
         id: shipModel
 
 		ListElement {
-			property int x: -1
-			property int y: -1
-			property int length: 5
-			property int hp: 5
-			property bool horizontal
-			property bool reverse
+			name: "Aircraft carrier"
+			length: 5
+			hp: 5
+			x: -1
+			y: -1
+			horizontal: false
+			reverse: false
 		}
 		ListElement {
-			property int x: -1
-			property int y: -1
-			property int length: 4
-			property int hp: 4
-			property bool horizontal
-			property bool reverse
+			name: "Battleship"
+			length: 4
+			hp: 4
+			x: -1
+			y: -1
+			horizontal: false
+			reverse: false
 		}
 		ListElement {
-			property int x: -1
-			property int y: -1
-			property int length: 3
-			property int hp: 3
-			property bool horizontal
-			property bool reverse
+			name: "Cruiser"
+			length: 3
+			hp: 3
+			x: -1
+			y: -1
+			horizontal: false
+			reverse: false
 		}
 		ListElement {
-			property int x: -1
-			property int y: -1
-			property int length: 2
-			property int hp: 2
-			property bool horizontal
-			property bool reverse
+			name: "Destroyer"
+			length: 2
+			hp: 2
+			x: -1
+			y: -1
+			horizontal: false
+			reverse: false
 		}
 		ListElement {
-			property int x: -1
-			property int y: -1
-			property int length: 2
-			property int hp: 2
-			property bool horizontal
-			property bool reverse
+			name: "Submarine"
+			length: 2
+			hp: 2
+			x: -1
+			y: -1
+			horizontal: false
+			reverse: false
 		}
     }
 
@@ -90,12 +95,14 @@ Item {
                             height: parent.height / parent.rows - parent.spacing
 
                             property string text: " "
+                            property string textColor: "black"
                             property bool revealed: false
 
                             color: revealed ? "skyblue" : "white"
 
                             Text {
-                                text: parent.text //index
+                                text: parent.text
+                                color: parent.textColor
                                 font.pixelSize: Math.round(parent.height * 0.8)
                                 anchors.centerIn: parent
                             }
@@ -184,6 +191,22 @@ Item {
                 }
             }
         }
+
+        RowLayout {
+            TableView {
+                TableViewColumn {
+                    role: "name"
+                    title: "Ship"
+                    width: 100
+                }
+                TableViewColumn {
+                    role: "hp"
+                    title: "Hit points"
+                    width: 80
+                }
+                model: shipModel
+            }
+        }
 	}
 
     function opp_board_clicked(index) {
@@ -198,27 +221,6 @@ Item {
 	        bridge.move_and_shoot(x, y, board.moveShip, board.moveDirection);
 	        board.moveAllowed = false;
 	        board.active = false;
-        }
-    }
-
-    function updateState() {
-        var state = bridge.poll_state();
-
-        if (state === "Planning") {
-            if (!board.active) {
-                // Your turn started
-                board.active = true;
-                board.moveAllowed = true;
-		        board.moveDirection = -1;
-		        board.moveShip = -1;
-            }
-        } else if (state === "OpponentPlanning") {
-            if (board.active) {
-                // AFK received
-                board.active = false;
-            }
-        } else if (state === "Available") {
-            screen.gameEnded();
         }
     }
 
@@ -330,6 +332,11 @@ Item {
         for (var i = 0; i < ship.length; i++) {
 	        var button = boardButtons.itemAt(buttonIndex);
 
+	        // special case for submarine so it's easy to identify
+	        if (index === 4) {
+	            button.textColor = "grey";
+	        }
+
 	        if (i == 0) {
 	            if (ship.horizontal) {
 	                button.text = ship.reverse ? ">" : "<";
@@ -351,6 +358,17 @@ Item {
 	        } else {
 	            buttonIndex += ship.horizontal ? 1 : 10;
 	        }
+        }
+    }
+
+    function clearBoard(resetRevealed) {
+        for (var i = 0; i < 100; i++) {
+            var cell = boardButtons.itemAt(i);
+            cell.text = " ";
+            cell.textColor = "black";
+            if (resetRevealed) {
+                cell.revealed = false;
+            }
         }
     }
 
@@ -382,16 +400,6 @@ Item {
         }
     }
 
-    function clearBoard(resetRevealed) {
-        for (var i = 0; i < 100; i++) {
-            var cell = boardButtons.itemAt(i);
-            cell.text = " ";
-            if (resetRevealed) {
-                cell.revealed = false;
-            }
-        }
-    }
-
     function updateBoards() {
         var opp_board = bridge.get_opp_board();
         for (var i = 0; i < opp_board.length; i++) {
@@ -405,8 +413,45 @@ Item {
         }
     }
 
+    function updateHitPoints() {
+		var hitPoints = eval(bridge.get_ships_hps());
+		for (var i = 0; i < 5; i++) {
+            shipModel.get(i).hp = hitPoints[i];
+        }
+    }
+
+    function updateState() {
+        var state = bridge.poll_state();
+
+        if (state === "Planning") {
+            if (!board.active) {
+                // Your turn started
+                board.active = true;
+                board.moveAllowed = true;
+		        board.moveDirection = -1;
+		        board.moveShip = -1;
+
+				// re-draw ships (some might be destroyed now)
+		        clearBoard();
+                draw_ship(0);
+                draw_ship(1);
+                draw_ship(2);
+                draw_ship(3);
+                draw_ship(4);
+            }
+        } else if (state === "OpponentPlanning") {
+            if (board.active) {
+                // AFK received
+                board.active = false;
+            }
+        } else if (state === "Available") {
+            screen.gameEnded();
+        }
+    }
+
     function activate() {
         timer.triggered.connect(updateBoards);
+        timer.triggered.connect(updateHitPoints);
         timer.triggered.connect(updateState);
         // TODO: pass opponent info and set title text accordingly
         visible = true;
@@ -421,18 +466,14 @@ Item {
         board.placement_phase = true;
 
         clearBoard(true);
-        shipModel.get(0).x = -1;
-        shipModel.get(0).hp = 5;
-        shipModel.get(1).x = -1;
-        shipModel.get(1).hp = 4;
-        shipModel.get(2).x = -1;
-        shipModel.get(2).hp = 3;
-        shipModel.get(3).x = -1;
-        shipModel.get(3).hp = 2;
-        shipModel.get(4).x = -1;
-        shipModel.get(4).hp = 2;
+        for (var i = 0; i < 5; i++) {
+            var ship = shipModel.get(i);
+            ship.x = -1;
+            ship.hp = ship.length;
+        }
 
         timer.triggered.disconnect(updateBoards);
+        timer.triggered.disconnect(updateHitPoints);
         timer.triggered.disconnect(updateState);
         visible = false;
     }
