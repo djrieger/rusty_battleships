@@ -202,6 +202,7 @@ impl State {
             ship_vec.push(s);
         }
         self.my_board = Some(Board::new(ship_vec, true));
+        self.my_board.as_mut().unwrap().compute_state();
         self.their_board = Some(Board::new(Vec::<Ship>::new(), false));
 
         send_message(Message::PlaceShipsRequest{ placement: ships }, &mut self.buff_writer);
