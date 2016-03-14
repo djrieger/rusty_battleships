@@ -418,7 +418,7 @@ fn tcp_loop(hostname: String, port: i64, rcv_ui_update: mpsc::Receiver<Message>,
     let buff_reader = BufReader::new(receiver);
 
     /* Holds the current state and provides state-based services such as shoot(), move-and-shoot() as well as state- and server-message-dependant state transitions. */
-    let mut current_state = State::new(true, Some(rcv_ui_update), Some(tx_message_update), Some(tx_lobby_update), Some(tx_board_update), buff_reader, buff_writer);
+    let mut current_state = State::new(Some(rcv_ui_update), Some(tx_message_update), Some(tx_lobby_update), Some(tx_board_update), buff_reader, buff_writer);
 
     thread::spawn(move || {
         current_state.handle_communication();

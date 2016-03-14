@@ -13,6 +13,11 @@ use client_::lobby::ClientLobby;
 
 use rusty_battleships::message::{serialize_message, deserialize_message, Message, ShipPlacement, Direction, Reason};
 use rusty_battleships::ship::{Ship};
+use rusty_battleships::timer::timer_periodic;
+
+
+const TICK_DURATION_MS: u64 = 5;
+
 
 #[derive(Clone, Debug, PartialEq, RustcEncodable)]
 pub struct LobbyList {
@@ -43,27 +48,6 @@ pub fn ask(question: String) -> String {
     return answer;
 }
 
-pub fn ask_u8(question: String) -> u8 {
-    println!("{}", question);
-    let stdin = stdin();
-    let mut answer_correct = false;
-    let mut answer_number = 42;
-    while !answer_correct {
-        let mut answer_string : String = String::new();
-        stdin.read_line(&mut answer_string);
-        answer_string = String::from(answer_string.trim());
-        let answer = answer_string.parse::<u8>();
-        if !answer.is_err() {
-            answer_correct = true;
-            answer_number = answer.unwrap();
-        } else {
-            println!("That is no number.");
-        }
-    }
-
-    return answer_number;
-}
-
 /*Tries to read from the TCP stream. If there's no message, it waits patiently.*/
 pub fn tcp_poll(br: &mut BufReader<TcpStream>, tx: Sender<Message>) {
     loop {
@@ -71,7 +55,8 @@ pub fn tcp_poll(br: &mut BufReader<TcpStream>, tx: Sender<Message>) {
         //This can take a while!
         let msg_from_server = deserialize_message(br);
         if msg_from_server.is_err() {
-            panic!(">>> TCP: FUUUUU!");
+            println!(">>> TCP connection lost");
+            break;
         }
         tx.send(msg_from_server.unwrap()).unwrap();
     }
@@ -88,7 +73,7 @@ pub struct State {
     their_board : Option<Board>,
     pub buff_reader : BufReader<TcpStream>,
     buff_writer : BufWriter<TcpStream>,
-    use_qml_interface :  bool,
+    disconnected : bool,
     ui_update_receiver : Option<Receiver<Message>>,
     ui_update_sender : Option<Sender<(Status, Message)>>,
     lobby_update_sender : Option<Sender<LobbyList>>,
@@ -117,8 +102,7 @@ pub enum Status {
 
 impl State {
 
-    pub fn new(use_qml_interface: bool,
-                rec_ui_update: Option<Receiver<Message>>,
+    pub fn new(rec_ui_update: Option<Receiver<Message>>,
                 tx_ui_update: Option<Sender<(Status, Message)>>,
                 tx_lobby_update: Option<Sender<LobbyList>>,
                 tx_board_update: Option<Sender<(Board, Board)>>,
@@ -135,7 +119,7 @@ impl State {
             their_board : None,
             buff_reader : buff_reader,
             buff_writer : buff_writer,
-            use_qml_interface : use_qml_interface,
+            disconnected : true,
             ui_update_receiver : rec_ui_update,
             ui_update_sender : tx_ui_update,
             lobby_update_sender : tx_lobby_update,
@@ -224,22 +208,12 @@ impl State {
         return true;
     }
 
-    fn shoot(&mut self, x: Option<u8>, y: Option<u8>) {
+    fn shoot(&mut self, x: u8, y: u8) {
         if self.status != Status::Planning {
             panic!("I cannot shoot when I'm not in Planning state! STATUS = {:?}", self.status);
         }
-        let mut x_coord : u8 = 13;
-        let mut y_coord : u8 = 13;
-        if x == None && y == None {
-            if !self.use_qml_interface {
-                x_coord = ask_u8(String::from("X coordinate of shot:"));
-                y_coord = ask_u8(String::from("Y coordinate of shot:"));
-            }
-        } else {
-            x_coord = x.unwrap(); //Safe because of if-condition
-            y_coord = y.unwrap(); //Safe because of if-condition
-        }
-        send_message(Message::ShootRequest { x: x_coord, y: y_coord}, &mut self.buff_writer);
+
+        send_message(Message::ShootRequest { x: x, y: y }, &mut self.buff_writer);
     }
 
     fn move_and_shoot(&mut self, x: u8, y: u8, id: u8, direction: Direction) {
@@ -254,15 +228,6 @@ impl State {
         if self.status == Status::AwaitFeatures {
             self.lobby.set_feature_list(features);
             self.status = Status::Unregistered;
-            if !self.use_qml_interface { // To keep testing via terminal easy.
-                let nickname = ask(String::from("What's yer name, captain!?"));
-
-                if self.login(&nickname) {
-                    println!("G'day, captain {:?}!", self.lobby.player_name);
-                } else {
-                    println!("Login error.");
-                }
-            }
             return Ok(());
         } else {
             return Err(format!("ERROR: I did not expect a feature response! STATUS={:?}", self.status));
@@ -487,14 +452,6 @@ impl State {
     /* Contains the maain loop that does most of the work. Main-Function should hand over control to this function as
     soon as a tcp connection has been established.*/
     pub fn handle_communication(&mut self/*, br: BufReader<TcpStream>, bw: BufWriter<TcpStream>*/) {
-        if !self.use_qml_interface {
-            if self.get_features() {
-                println!("Supported features: {:?}", self.lobby.feature_list);
-            } else {
-                println!("No features.");
-            }
-        }
-
         let (tx, rx) = mpsc::channel();
         let mut one_time_reader = BufReader::<TcpStream>::new(self.buff_reader.get_ref().try_clone().unwrap());
         thread::spawn(move || tcp_poll(&mut one_time_reader, tx));
@@ -529,19 +486,19 @@ impl State {
 
     pub fn update_listen_loop(&mut self, rx: Receiver<Message>) {
         println!(">>>Starting update_listen_loop.");
+
+        self.disconnected = false;
+
+        let tick = timer_periodic(TICK_DURATION_MS);
+
         /*check-for-messages-loop*/
         loop {
-            let mut got_server_message = false;
-            let mut got_ui_message = false;
             //println!("Checking for messages.");
             let received = rx.try_recv();
             if let Ok(server_response) = received {
                 println!(">>>Oh, a message for me! MSG={:?}", server_response.clone());
-                got_server_message = true;
 
                 let outcome: Result<(), String>;
-
-
 
                 /* Handle messages from the server. */
                 match server_response.clone() {
@@ -654,9 +611,6 @@ impl State {
                     Message::NotWaitingResponse {nickname: nn} => {
                         println!("Captain {:?} is not waiting to be challenged.", nn);
                         self.handle_not_waiting_response(&nn);
-                        if !self.use_qml_interface {
-                            self.ready();
-                        }
                     },
                     Message::GameAlreadyStartedResponse => {
                         println!("The game has already started.");
@@ -693,73 +647,57 @@ impl State {
             } else if received == Err(TryRecvError::Empty) {
                 //println!("Nothing there =(");
             } else if received == Err(TryRecvError::Disconnected) {
-                panic!("Server terminated connection. =(");
+                break;
             }
 
-
-            let interface;
-            if self.use_qml_interface {
-                interface = true;
-            } else {
-                interface = false;
-            }
-
-            if interface {
-
-                let mut input = Err(TryRecvError::Disconnected);
-                /* Handle user input */
-                if let Some(ref mut r) = self.ui_update_receiver {
-                    let rec = r; //Safe because of if-condition!
+            let mut input = Err(TryRecvError::Disconnected);
+            /* Handle user input */
+            if let Some(ref mut r) = self.ui_update_receiver {
+                let rec = r; //Safe because of if-condition!
 //                    println!(">>>Checking for UI input.");
-                    input = rec.try_recv();
-                }
-
-                if let Ok(received) = input {
-//                    println!(">>>UI input!");
-                    got_ui_message= true;
-                    match received {
-                        Message::GetFeaturesRequest => {
-                            self.get_features();
-                        },
-                        Message::LoginRequest { username } => {
-                            self.login(&username);
-                        },
-                        Message::ReadyRequest => {
-                            self.ready();
-                        },
-                        Message::NotReadyRequest => {
-                            self.unready();
-                        },
-                        Message::ChallengePlayerRequest { username } => {
-                            self.challenge(&username);
-                        },
-                        Message::PlaceShipsRequest { placement } => {
-                            self.place_ships( placement );
-                        },
-                        Message::ShootRequest { x, y } => {
-                            self.shoot( Some(x), Some(y) );
-                        },
-                        Message::MoveAndShootRequest { id, direction, x, y } => {
-                            self.move_and_shoot( x, y, id, direction );
-                        },
-                        Message::SurrenderRequest => {
-                            self.surrender();
-                        },
-                        m => panic!("Received illegal request from client: {:?}", m),
-                    }
-                } else {
-//                    println!(">>>No UI input: {:?}", input);
-                }
-
-
-                if !got_server_message && !got_ui_message {
-//                    println!(">>>Nothing to do.");
-                    thread::sleep(Duration::new(0, 500000000));
-                }
-
+                input = rec.try_recv();
             }
+
+            if let Ok(received) = input {
+//                    println!(">>>UI input!");
+                match received {
+                    Message::GetFeaturesRequest => {
+                        self.get_features();
+                    },
+                    Message::LoginRequest { username } => {
+                        self.login(&username);
+                    },
+                    Message::ReadyRequest => {
+                        self.ready();
+                    },
+                    Message::NotReadyRequest => {
+                        self.unready();
+                    },
+                    Message::ChallengePlayerRequest { username } => {
+                        self.challenge(&username);
+                    },
+                    Message::PlaceShipsRequest { placement } => {
+                        self.place_ships( placement );
+                    },
+                    Message::ShootRequest { x, y } => {
+                        self.shoot( x, y );
+                    },
+                    Message::MoveAndShootRequest { id, direction, x, y } => {
+                        self.move_and_shoot( x, y, id, direction );
+                    },
+                    Message::SurrenderRequest => {
+                        self.surrender();
+                    },
+                    m => panic!("Received illegal request from client: {:?}", m),
+                }
+            } else {
+//                    println!(">>>No UI input: {:?}", input);
+            }
+
+            tick.recv().expect("Timer thread died unexpectedly."); // wait for next tick
 
         }
 
+        self.disconnected = true;
     }
 }
