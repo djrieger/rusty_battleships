@@ -312,14 +312,11 @@ Item {
     function updateBoards() {
         var opp_board = bridge.get_opp_board();
         for (var i = 0; i < opp_board.length; i++) {
-            console.log(opp_board[i]);
-            console.log("i=" + i + ", Caption=" + opponentBoardButtons.itemAt(i).text);
             opponentBoardButtons.itemAt(i).text = opp_board[i];
         }
     }
 
     function activate() {
-        console.log("Activated game screen");
         timer.triggered.connect(updateBoards);
         // TODO: pass opponent info and set title text accordingly
         visible = true;
