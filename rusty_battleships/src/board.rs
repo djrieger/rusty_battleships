@@ -93,19 +93,16 @@ impl Board {
         self.ships.len() > 0
     }
 
-    // pub fn set_ships(&mut self, ships: Vec<Ship) {
-    //     self.ships = ships;
-    //     }
 
     fn add_state(&mut self) -> bool {
-        self.old_states.push(self.state.clone());
-        match self.compute_state() {
-            Some(state) => self.state = state,
-            None => return false,
+        if let Some(new_state) = self.compute_state() {
+            self.old_states.push(self.state.clone());
+            self.state = new_state;
+            self.compute_visibility_updates();
+            true
+        } else {
+            false
         }
-        self.compute_visibility_updates();
-
-        true
     }
 
     pub fn move_ship(&mut self, ship_index: u8, direction: Direction) -> bool {
@@ -117,7 +114,6 @@ impl Board {
             return HitResult::Miss;
         }
         self.state[x][y].visible = true;
-        //println!("Object at {}|{} : {:?}", x, y, self.state[x][y].ship_index);
         let hit_result = match self.state[x][y].ship_index {
             // no ship
             None => HitResult::Miss,
@@ -153,7 +149,7 @@ impl Board {
                 let (dest_x, dest_y) = Board::get_ship_dest_coords(ship, i);
                 if !self.coords_valid(dest_x, dest_y) || new_state[dest_x as usize][dest_y as usize].has_ship() {
                     // coordinates are invalid or there is another ship at these coordinates
-                    println!("Collision detected at {}:{}, new ship index {}", dest_x, dest_y, ship_index);
+                    println!("Coords invalid or collision detected at {}:{}, new ship index {}", dest_x, dest_y, ship_index);
                     self.print_me(None);
                     return None;
                 } else {
