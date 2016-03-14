@@ -268,6 +268,16 @@ impl Bridge {
         }
     }
 
+    /**
+     * returns bool as {0, 1}
+     */
+    fn can_move_in_direction(&mut self, ship_index: i64, direction: i64) -> i64 {
+        self.update_boards();
+        let ref ship = self.my_board.as_ref().unwrap().ships.get(ship_index as usize);
+        // TODO Implement!
+        return 1;
+    }
+
     fn set_ready_state(&mut self, ready: i64) {
         self.ui_sender.as_mut().unwrap().send(if ready == 1 { Message::ReadyRequest } else { Message::NotReadyRequest });
     }
@@ -393,8 +403,8 @@ Q_OBJECT! { Bridge:
     slot fn handle_placement(String);
     slot fn move_and_shoot(i64, i64, i64, i64);
     slot fn connection_closed();
-
     slot fn set_ready_state(i64);
+    slot fn can_move_in_direction(i64, i64);
     slot fn get_opp_board();
 }
 
