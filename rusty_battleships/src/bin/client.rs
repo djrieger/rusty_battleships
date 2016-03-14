@@ -348,6 +348,7 @@ impl Bridge {
      * and -1 if there is no ship at these coordinates
      */
     fn get_ship_at(&mut self, x: i64, y: i64) -> i64 {
+        assert!(x > -1 && x < W as i64 && y > -1 && y < H as i64);
         self.update_boards();
         match self.my_board.as_ref().unwrap().state[x as usize][y as usize].ship_index {
             Some(ship_index) => ship_index as i64,
@@ -406,6 +407,10 @@ Q_OBJECT! { Bridge:
     slot fn set_ready_state(i64);
     slot fn can_move_in_direction(i64, i64);
     slot fn get_opp_board();
+
+    slot fn get_ship_at(i64, i64);
+    slot fn get_my_board_visibility();
+    slot fn get_ships_hps();
 }
 
 fn tcp_loop(hostname: String, port: i64, rcv_ui_update: mpsc::Receiver<Message>,
