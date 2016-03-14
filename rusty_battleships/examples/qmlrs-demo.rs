@@ -323,16 +323,17 @@ impl Bridge {
             json_placements.push(placement);
         }
 
-        let get_length = |a:&rustc_serialize::json::Object | a.get("length").unwrap().as_u64().unwrap();
+        let get_bool = |obj: &rustc_serialize::json::Object, key| obj.get(key).unwrap().as_boolean().unwrap();
+        let get_u64 = |obj: &rustc_serialize::json::Object, key| obj.get(key).unwrap().as_u64().unwrap();
+
+        let get_length = |a: &rustc_serialize::json::Object | get_u64(a, "length");
         json_placements.sort_by(|&a, &b| get_length(a).cmp(&get_length(b)));
         json_placements.reverse();
 
-        let get_bool = |obj: &rustc_serialize::json::Object, key| obj.get(key).unwrap().as_boolean().unwrap();
-        let get_u64 = |obj: &rustc_serialize::json::Object, key| obj.get(key).unwrap().as_u64().unwrap();
         let mut placements = vec![];
         for placement_object in &json_placements {
             let reverse = get_bool(placement_object, "reverse"); 
-            let horizontal = placement_object.get("horizontal").unwrap().as_boolean().unwrap();
+            let horizontal = get_bool(placement_object, "horizontal");
             placements.push(ShipPlacement {
                 x: get_u64(placement_object, "x") as u8,
                 y: get_u64(placement_object, "y") as u8,
