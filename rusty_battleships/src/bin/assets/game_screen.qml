@@ -400,7 +400,7 @@ Item {
         if (!board.placement_phase) {
 	        var my_board = bridge.get_my_board_visibility();
 	        for (var i = 0; i < my_board.length; i++) {
-	            boardButtons.itemAt(i).revealed = !!my_board[i];
+	            boardButtons.itemAt(i).revealed = my_board[i] === "1";
 	        }
         }
     }
