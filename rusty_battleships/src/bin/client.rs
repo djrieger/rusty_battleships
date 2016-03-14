@@ -240,22 +240,36 @@ impl Bridge {
         ((button_index % 10) as u8, (button_index / 10) as u8)
     }
 
-    fn on_clicked_my_board(&mut self, button_index: i64) {
-        let (x, y) = Bridge::get_coords_from_button_index(button_index);
-        println!("Button clicked at {}, {}", x, y);
-    }
+    // fn on_clicked_my_board(&mut self, button_index: i64) {
+    //     let (x, y) = Bridge::get_coords_from_button_index(button_index);
+    //     println!("Button clicked at {}, {}", x, y);
+    // }
 
-    fn on_clicked_opp_board(&mut self, x: i64, y: i64) {
-        println!("Button clicked at {}, {}", x, y);
-        self.ui_sender.as_mut().unwrap().send(Message::ShootRequest { x: x as u8, y: y as u8 });
+    /**
+     * target coordinates for shot on opponent board: (x, y)
+     * ship_index: -1 for no movement and 0..4 for ship 
+     */
+    fn move_and_shoot(&mut self, x: i64, y: i64, ship_index: i64, direction: i64) {
+        if ship_index == -1 {
+            self.ui_sender.as_mut().unwrap().send(Message::ShootRequest { x: x as u8, y: y as u8 });
+        } else {
+            self.ui_sender.as_mut().unwrap().send(Message::MoveAndShootRequest {
+                x: x as u8,
+                y: y as u8,
+                id: ship_index as u8,
+                direction: match direction {
+                    0 => Direction::North,
+                    1 => Direction::East,
+                    2 => Direction::South,
+                    3 => Direction::West,
+                    _ => panic!("Invalid direction value"),
+                },
+            });
+        }
     }
 
     fn set_ready_state(&mut self, ready: i64) {
-        if ready == 1 {
-            self.ui_sender.as_mut().unwrap().send(Message::ReadyRequest);
-        } else {
-            self.ui_sender.as_mut().unwrap().send(Message::NotReadyRequest);
-        }
+        self.ui_sender.as_mut().unwrap().send(if ready == 1 { Message::ReadyRequest } else { Message::NotReadyRequest });
     }
 
     fn handle_placement(&mut self, placement_json: String) {
@@ -376,10 +390,8 @@ Q_OBJECT! { Bridge:
     slot fn connect(String, i64);
     slot fn discover_servers();
     slot fn get_features_list();
-    slot fn on_clicked_my_board(i64);
-    slot fn on_clicked_opp_board(i64, i64);
     slot fn handle_placement(String);
-    // slot fn get_boards();
+    slot fn move_and_shoot(i64, i64, i64, i64);
     slot fn connection_closed();
 
     slot fn set_ready_state(i64);
