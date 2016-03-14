@@ -17,7 +17,8 @@ Item {
             Rectangle {
                 id: board
 
-                width: 200; height: 200; color: "blue"
+                width: 200; height: 200;
+                color: active ? (placement_phase ? "yellow" : (moveAllowed ? "green" : "blue")) : "red"
 
                 property int currentX: -1
                 property int currentY: -1
@@ -25,6 +26,7 @@ Item {
                 property bool active: true
                 property bool moveAllowed: false
                 property int moveDirection: -1
+                property int moveShip: -1
                 property bool placement_phase: true
 
                 // only used during the placement phase
@@ -139,8 +141,8 @@ Item {
             Button {
                 width: 10
                 height: 10
-                text: "<"
-                enabled: board.moveAllowed
+                text: "∧"
+                enabled: board.moveAllowed && board.moveShip !== -1
                 onClicked: {
                     move(0);
                 }
@@ -149,7 +151,7 @@ Item {
                 width: 10
                 height: 10
                 text: ">"
-                enabled: board.moveAllowed
+                enabled: board.moveAllowed && board.moveShip !== -1
                 onClicked: {
                     move(1);
                 }
@@ -157,8 +159,8 @@ Item {
             Button {
                 width: 10
                 height: 10
-                text: "∧"
-                enabled: board.moveAllowed
+                text: "∨"
+                enabled: board.moveAllowed && board.moveShip !== -1
                 onClicked: {
                     move(2);
                 }
@@ -166,8 +168,8 @@ Item {
             Button {
                 width: 10
                 height: 10
-                text: "∨"
-                enabled: board.moveAllowed
+                text: "<"
+                enabled: board.moveAllowed && board.moveShip !== -1
                 onClicked: {
                     move(3);
                 }
@@ -178,135 +180,154 @@ Item {
     function opp_board_clicked(index) {
         var x = index % 10;
         var y = Math.floor(index / 10);
-        console.log("Clicked on opponent board");
-        bridge.on_clicked_opp_board(x, y);
+        bridge.move_and_shoot(x, y, board.moveShip, board.moveDirection);
+        board.active = false;
+    }
+
+    function updateState() {
+        var state = bridge.poll_state();
+
+        if (state === "Planning") {
+            if (!board.active) {
+                // Your turn started
+                board.active = true;
+                board.moveAllowed = true;
+		        board.moveDirection = -1;
+		        board.moveShip = -1;
+            }
+        } else if (state === "OpponentPlanning") {
+            if (board.active) {
+                // AFK received
+                board.active = false;
+            }
+        }
     }
 
     function board_clicked(index) {
-      if (board.active) {
-        if (board.placement_phase) {
-          // set coordinates or handle placement on second click
-          if (board.currentX == -1) {
-            board.currentX = index % 10;
-            board.currentY = Math.floor(index / 10);
-          } else {
-            var x = index % 10;
-            var y = Math.floor(index / 10);
+        if (board.active) {
+            if (board.placement_phase) {
+                // set coordinates or handle placement on second click
+                if (board.currentX == -1) {
+                    board.currentX = index % 10;
+                    board.currentY = Math.floor(index / 10);
+                } else {
+		            var x = index % 10;
+		            var y = Math.floor(index / 10);
 
-            handle_placement(x, y);
+		            handle_placement(x, y);
 
-            board.currentX = -1;
-            board.currentY = -1;
-          }
-        } else {
-          // set current coordinates for move
-          // TODO: check whether ship was selected
-          board.currentX = index % 10;
-          board.currentY = index / 10;
+		            board.currentX = -1;
+		            board.currentY = -1;
+                }
+            } else {
+                board.moveShip = bridge.get_ship_at(index % 10, Math.floor(index / 10));
+            }
         }
-      }
     }
 
     function handle_placement(x, y) {
-      var xDiff = x - board.currentX;
-      var yDiff = y - board.currentY;
-      var shipId = -1;
-      var horizontal = true;
-      var reverse = false;
+		var xDiff = x - board.currentX;
+		var yDiff = y - board.currentY;
+		var shipId = -1;
+		var horizontal = true;
+		var reverse = false;
 
-      if (xDiff == 0) {
-        var length = Math.abs(yDiff) + 1;
-        reverse = yDiff < 0;
-        horizontal = false;
+		if (xDiff == 0) {
+			var length = Math.abs(yDiff) + 1;
+			reverse = yDiff < 0;
+			horizontal = false;
 
-        if (length == 2) {
-          if (board.placement[3].x == -1) {
-            shipId = 3;
-          } else {
-            shipId = 4;
-          }
-        } else if (length > 2 && length < 6) {
-          shipId = 5 - length;
-        } else {
-          // TODO: invalid length, show error
-          console.log("Invalid ship length");
-        }
-      } else if (yDiff == 0) {
-        var length = Math.abs(xDiff) + 1;
-        reverse = xDiff < 0;
+			if (length == 2) {
+		        if (board.placement[3].x == -1) {
+			        shipId = 3;
+			    } else {
+			        shipId = 4;
+			    }
+			} else if (length > 2 && length < 6) {
+			    shipId = 5 - length;
+			} else {
+			    // TODO: invalid length, show error
+			    console.log("Invalid ship length");
+			}
+		} else if (yDiff == 0) {
+			var length = Math.abs(xDiff) + 1;
+			reverse = xDiff < 0;
 
-        if (length == 2) {
-          if (board.placement[3].x == -1) {
-            shipId = 3;
-          } else {
-            shipId = 4;
-          }
-        } else if (length > 2 && length < 6) {
-          shipId = 5 - length;
-        } else {
-          // TODO: invalid length, show error
-          console.log("Invalid ship length");
-        }
-      } else {
-        // TODO: diagonal, show error
-        console.log("Diagonal ship");
-      }
+			if (length == 2) {
+			    if (board.placement[3].x == -1) {
+			        shipId = 3;
+			    } else {
+			        shipId = 4;
+			    }
+			} else if (length > 2 && length < 6) {
+			    shipId = 5 - length;
+			} else {
+			    // TODO: invalid length, show error
+		  	    console.log("Invalid ship length");
+			}
+		} else {
+			// TODO: diagonal, show error
+			console.log("Diagonal ship");
+		}
 
-      if (shipId != -1) {
-        if (board.placement[shipId].x != -1) {
-          // TODO: double placement, show error
-          console.log("Double placement");
-        } else {
-          board.placement[shipId].x = board.currentX;
-          board.placement[shipId].y = board.currentY;
-          board.placement[shipId].horizontal = horizontal;
-          board.placement[shipId].reverse = reverse;
+		if (shipId != -1) {
+			if (board.placement[shipId].x != -1) {
+			    // TODO: double placement, show error
+			    console.log("Double placement");
+			} else {
+			    board.placement[shipId].x = board.currentX;
+			    board.placement[shipId].y = board.currentY;
+			    board.placement[shipId].horizontal = horizontal;
+			    board.placement[shipId].reverse = reverse;
 
-          draw_ship(shipId);
-        }
-      }
+			    draw_ship(shipId);
+			}
+		}
 
-      if ([0, 1, 2, 3, 4].filter(function(i) { return board.placement[i].x === -1; }).length === 0) {
-          board.placement_phase = false;
-          bridge.handle_placement(JSON.stringify(board.placement));
-      }
+		if ([0, 1, 2, 3, 4].filter(function(i) { return board.placement[i].x === -1; }).length === 0) {
+		    board.active = false;
+		    board.placement_phase = false;
+		    bridge.handle_placement(JSON.stringify(board.placement));
+		}
     }
 
     function draw_ship(index) {
-      console.assert(index >= 0 && index < 5);
+        console.assert(index >= 0 && index < 5);
 
-      var ship = board.placement[index];
-      var buttonIndex = 10 * ship.y + ship.x;
-      for (var i = 0; i < ship.length; i++) {
-        var button = boardButtons.itemAt(buttonIndex);
+        var ship = board.placement[index];
+        var buttonIndex = 10 * ship.y + ship.x;
+        for (var i = 0; i < ship.length; i++) {
+	        var button = boardButtons.itemAt(buttonIndex);
 
-        if (i == 0) {
-          if (ship.horizontal) {
-            button.text = ship.reverse ? ">" : "<";
-          } else {
-            button.text = ship.reverse ? "∨" : "∧";
-          }
-        } else if (i == ship.length - 1) {
-          if (ship.horizontal) {
-            button.text = ship.reverse ? "<" : ">";
-          } else {
-            button.text = ship.reverse ? "∧" : "∨";
-          }
-        } else {
-          button.text = ship.horizontal ? "=" : "||";
+	        if (i == 0) {
+	            if (ship.horizontal) {
+	                button.text = ship.reverse ? ">" : "<";
+	            } else {
+	                button.text = ship.reverse ? "∨" : "∧";
+	            }
+	        } else if (i == ship.length - 1) {
+	            if (ship.horizontal) {
+	                button.text = ship.reverse ? "<" : ">";
+	            } else {
+	                button.text = ship.reverse ? "∧" : "∨";
+	            }
+	        } else {
+	            button.text = ship.horizontal ? "=" : "||";
+	        }
+
+	        if (ship.reverse) {
+	            buttonIndex -= ship.horizontal ? 1 : 10;
+	        } else {
+	            buttonIndex += ship.horizontal ? 1 : 10;
+	        }
         }
-
-        if (ship.reverse) {
-          buttonIndex -= ship.horizontal ? 1 : 10;
-        } else {
-          buttonIndex += ship.horizontal ? 1 : 10;
-        }
-      }
     }
 
     function move(direction) {
-		board.moveDirection = direction
-		board.moveAllowed = false
+        if (bridge.can_move_in_direction(board.moveShip, direction)) {
+	        board.moveAllowed = false;
+			board.moveDirection = direction;
+        }
     }
 
     function updateBoards() {
@@ -318,12 +339,14 @@ Item {
 
     function activate() {
         timer.triggered.connect(updateBoards);
+        timer.triggered.connect(updateState);
         // TODO: pass opponent info and set title text accordingly
         visible = true;
     }
 
     function deactivate() {
         timer.triggered.disconnect(updateBoards);
+        timer.triggered.disconnect(updateState);
         visible = false;
     }
 }
