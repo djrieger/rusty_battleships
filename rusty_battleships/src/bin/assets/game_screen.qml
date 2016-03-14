@@ -181,6 +181,7 @@ Item {
         var x = index % 10;
         var y = Math.floor(index / 10);
         bridge.move_and_shoot(x, y, board.moveShip, board.moveDirection);
+        board.moveAllowed = false;
         board.active = false;
     }
 
@@ -200,6 +201,8 @@ Item {
                 // AFK received
                 board.active = false;
             }
+        } else if (state === "Available") {
+            screen.gameEnded();
         }
     }
 
@@ -221,6 +224,7 @@ Item {
                 }
             } else {
                 board.moveShip = bridge.get_ship_at(index % 10, Math.floor(index / 10));
+                console.log(board.moveShip);
             }
         }
     }
@@ -327,6 +331,20 @@ Item {
         if (bridge.can_move_in_direction(board.moveShip, direction)) {
 	        board.moveAllowed = false;
 			board.moveDirection = direction;
+
+			clearBoard();
+			draw_ship(0);
+			draw_ship(1);
+			draw_ship(2);
+			draw_ship(3);
+			draw_ship(4);
+        }
+        console.log("Tried to move.");
+    }
+
+    function clearBoard() {
+        for (var i = 0; i < 100; i++) {
+            boardButtons.itemAt(i).text = " ";
         }
     }
 
@@ -345,6 +363,19 @@ Item {
     }
 
     function deactivate() {
+        // reset board
+        board.active = true;
+        board.moveAllowed = false;
+        board.moveDirection = -1;
+        board.moveShip = -1;
+        board.placement_phase = true;
+        clearBoard();
+        board.placement[0].x = -1;
+        board.placement[1].x = -1;
+        board.placement[2].x = -1;
+        board.placement[3].x = -1;
+        board.placement[4].x = -1;
+
         timer.triggered.disconnect(updateBoards);
         timer.triggered.disconnect(updateState);
         visible = false;
