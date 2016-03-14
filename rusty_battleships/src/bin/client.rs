@@ -297,10 +297,6 @@ impl Bridge {
         let get_bool = |obj: &rustc_serialize::json::Object, key| obj.get(key).unwrap().as_boolean().unwrap();
         let get_u64 = |obj: &rustc_serialize::json::Object, key| obj.get(key).unwrap().as_u64().unwrap();
 
-        let get_length = |a: &rustc_serialize::json::Object | get_u64(a, "length");
-        json_placements.sort_by(|&a, &b| get_length(a).cmp(&get_length(b)));
-        json_placements.reverse();
-
         let mut placements = vec![];
         for placement_object in &json_placements {
             let reverse = get_bool(placement_object, "reverse");
