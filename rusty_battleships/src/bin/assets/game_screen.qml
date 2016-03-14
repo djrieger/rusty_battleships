@@ -187,8 +187,8 @@ Item {
 	}
 
     function opp_board_clicked(index) {
-        if (board.moveDirection === -1) {
-            // no direction selected, but ship may have been selected
+        if (board.moveAllowed) {
+            // did not complete move, reset selected ship
             board.moveShip = -1;
         }
 
@@ -312,7 +312,6 @@ Item {
 		    for (var i = 0; i < 5; i++) {
 		        placement.push(shipModel.get(i));
 		    }
-		    console.log(JSON.stringify(placement));
 		    bridge.handle_placement(JSON.stringify(placement));
 		}
     }

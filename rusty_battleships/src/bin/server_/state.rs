@@ -523,9 +523,9 @@ pub fn handle_afk(game: Rc<RefCell<Game>>, lobby: &mut HashMap<String, Player>,
         let strike_count = game_ref.get_active_player_afk_count();
 
         if strike_count < 2 {
+            let opponent_name = game_ref.get_opponent_name(&game_ref.get_active_player()).clone();
             game_ref.inc_active_player_afk_count();
             game_ref.switch_turns();
-            let opponent_name = game_ref.get_opponent_name(&game_ref.get_active_player()).clone();
             return hashmap![
                 active_player => vec![Message::AfkWarningUpdate { strikes: strike_count + 1 }],
                 opponent_name => vec![Message::EnemyAfkUpdate { strikes: strike_count + 1 }]

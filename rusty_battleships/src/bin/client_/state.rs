@@ -571,6 +571,10 @@ impl State {
                         self.handle_enemy_invisible_update(x, y);
                         self.send_updated_boards();
                     },
+                    Message::EnemyAfkUpdate {strikes} => {
+                        println!("The enemy is sleeping! ({})", strikes);
+                        self.handle_enemy_afk_update(strikes);
+                    },
                     // RESPONSES
                     Message::OkResponse => outcome = self.handle_ok_response(server_response.clone()),
                     Message::InvalidRequestResponse => {
