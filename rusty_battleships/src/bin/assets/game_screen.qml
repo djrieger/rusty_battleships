@@ -12,83 +12,119 @@ Item {
     // TODO: provide button for surrender
     signal gameEnded();
 
-    RowLayout {
-        Rectangle {
-            id: board
+	ColumnLayout {
+	    RowLayout {
+            Rectangle {
+                id: board
 
-            width: 200; height: 200; color: "blue"
+                width: 200; height: 200; color: "blue"
 
-            property int currentX: -1;
-            property int currentY: -1;
+                property int currentX: -1;
+                property int currentY: -1;
 
-            property bool active: true
-            property bool placement_phase: true
+                property bool active: true
+                property bool placement_phase: true
 
-            // only used during the placement phase
-            property list<QtObject> placement: [
-              QtObject {
-                property int x: -1
-                property int y: -1
-                property int length: 5
-                property bool horizontal
-                property bool reverse
-              },
-              QtObject {
-                property int x: -1
-                property int y: -1
-                property int length: 4
-                property bool horizontal
-                property bool reverse
-              },
-              QtObject {
-                property int x: -1
-                property int y: -1
-                property int length: 3
-                property bool horizontal
-                property bool reverse
-              },
-              QtObject {
-                property int x: -1
-                property int y: -1
-                property int length: 2
-                property bool horizontal
-                property bool reverse
-              },
-              QtObject {
-                property int x: -1
-                property int y: -1
-                property int length: 2
-                property bool horizontal
-                property bool reverse
-              }
-            ]
+                // only used during the placement phase
+                property list<QtObject> placement: [
+                  QtObject {
+                    property int x: -1
+                    property int y: -1
+                    property int length: 5
+                    property bool horizontal
+                    property bool reverse
+                  },
+                  QtObject {
+                    property int x: -1
+                    property int y: -1
+                    property int length: 4
+                    property bool horizontal
+                    property bool reverse
+                  },
+                  QtObject {
+                    property int x: -1
+                    property int y: -1
+                    property int length: 3
+                    property bool horizontal
+                    property bool reverse
+                  },
+                  QtObject {
+                    property int x: -1
+                    property int y: -1
+                    property int length: 2
+                    property bool horizontal
+                    property bool reverse
+                  },
+                  QtObject {
+                    property int x: -1
+                    property int y: -1
+                    property int length: 2
+                    property bool horizontal
+                    property bool reverse
+                  }
+                ]
 
-            Grid {
-                anchors.fill: parent
+                Grid {
+                    anchors.fill: parent
 
-                x: 5; y: 5
-                rows: 10; columns: 10; spacing: 1
+                    x: 5; y: 5
+                    rows: 10; columns: 10; spacing: 1
 
-                Repeater {
-                    id: boardButtons
+                    Repeater {
+                        id: boardButtons
 
-                    model: 100
+                        model: 100
 
-                    Rectangle {
-                        width: parent.width / parent.columns - parent.spacing
-                        height: parent.height / parent.rows - parent.spacing
+                        Rectangle {
+                            width: parent.width / parent.columns - parent.spacing
+                            height: parent.height / parent.rows - parent.spacing
 
-                        property string text: " "
+                            property string text: " "
 
-                        Text {
-                            text: parent.text //index
-                            font.pixelSize: Math.round(parent.height * 0.8)
-                            anchors.centerIn: parent
+                            Text {
+                                text: parent.text //index
+                                font.pixelSize: Math.round(parent.height * 0.8)
+                                anchors.centerIn: parent
+                            }
+                            MouseArea {
+                                anchors.fill: parent
+                                onClicked: {
+                                    board_clicked(index);
+                                }
+                            }
                         }
-                        MouseArea {
-                            anchors.fill: parent
-                            onClicked: {
-                                board_clicked(index);
+                    }
+                }
+            }
+
+            Rectangle {
+                width: 200; height: 200; color: "blue"
+
+                Grid {
+                    anchors.fill: parent
+
+                    x: 5; y: 5
+                    rows: 10; columns: 10; spacing: 1
+
+                    Repeater {
+                        id: opponentBoardButtons
+
+                        model: 100
+
+                        Rectangle {
+                            width: parent.width / parent.columns - parent.spacing
+                            height: parent.height / parent.rows - parent.spacing
+
+                            Text {
+                                text: "?"
+                                font.pixelSize: Math.round(parent.height * 0.8)
+                                anchors.centerIn: parent
+                            }
+                            MouseArea {
+                                anchors.fill: parent
+                                onClicked: {
+                                    bridge.on_clicked_opp_board(index);
+                                }
                             }
                         }
                     }
@@ -96,70 +132,33 @@ Item {
             }
         }
 
-        Rectangle {
-            width: 200; height: 200; color: "blue"
-
-            Grid {
-                anchors.fill: parent
-
-                x: 5; y: 5
-                rows: 10; columns: 10; spacing: 1
-
-                Repeater {
-                    id: opponentBoardButtons
-
-                    model: 100
-
-                    Rectangle {
-                        width: parent.width / parent.columns - parent.spacing
-                        height: parent.height / parent.rows - parent.spacing
-
-                        Text {
-                            text: "?"
-                            font.pixelSize: Math.round(parent.height * 0.8)
-                            anchors.centerIn: parent
-                        }
-                        MouseArea {
-                            anchors.fill: parent
-                            onClicked: {
-                                bridge.on_clicked_opp_board(index);
-                            }
-                        }
-                    }
-                }
+        RowLayout {
+            Button {
+                id: moveLeftBtn
+                width: 10
+                height: 10
+                Text { text: "<" }
+            }
+            Button {
+                id: moveRightBtn
+                width: 10
+                height: 10
+                Text { text: ">" }
+            }
+            Button {
+                id: moveUpBtn
+                width: 10
+                height: 10
+                Text { text: "∧" }
+            }
+            Button {
+                id: moveDownBtn
+                width: 10
+                height: 10
+                Text { text: "∨" }
             }
         }
-    }
-
-    ColumnLayout {
-        Button {
-            id: moveLeftBtn
-            width: 30
-            height: 30
-            Text { text: "<" }
-        }
-        Button {
-            id: moveRightBtn
-            width: 30
-            height: 30
-            Text { text: ">" }
-        }
-        Button {
-            id: moveUpBtn
-            width: 30
-            height: 30
-            Text { text: "Up" }
-        }
-        Button {
-            id: moveDownBtn
-            width: 30
-            height: 30
-            Text { text: "Down" }
-        }
-        CheckBox {
-            text: "Bereit"
-        }
-    }
+	}
 
     function board_clicked(index) {
       if (board.active) {
