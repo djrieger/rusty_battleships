@@ -245,11 +245,20 @@ impl Bridge {
     //     println!("Button clicked at {}, {}", x, y);
     // }
 
+    fn index_to_direction(index: i64) -> Direction {
+        match index {
+            0 => Direction::North,
+            1 => Direction::East,
+            2 => Direction::South,
+            3 => Direction::West,
+            _ => panic!("Invalid direction value"),
+        }
+    }
     /**
      * target coordinates for shot on opponent board: (x, y)
      * ship_index: -1 for no movement and 0..4 for ship 
      */
-    fn move_and_shoot(&mut self, x: i64, y: i64, ship_index: i64, direction: i64) {
+    fn move_and_shoot(&mut self, x: i64, y: i64, ship_index: i64, direction_index: i64) {
         if ship_index == -1 {
             self.ui_sender.as_mut().unwrap().send(Message::ShootRequest { x: x as u8, y: y as u8 });
         } else {
@@ -257,13 +266,7 @@ impl Bridge {
                 x: x as u8,
                 y: y as u8,
                 id: ship_index as u8,
-                direction: match direction {
-                    0 => Direction::North,
-                    1 => Direction::East,
-                    2 => Direction::South,
-                    3 => Direction::West,
-                    _ => panic!("Invalid direction value"),
-                },
+                direction: Bridge::index_to_direction(direction_index)
             });
         }
     }
@@ -271,11 +274,11 @@ impl Bridge {
     /**
      * returns bool as {0, 1}
      */
-    fn can_move_in_direction(&mut self, ship_index: i64, direction: i64) -> i64 {
+    fn can_move_in_direction(&mut self, ship_index: i64, direction_index: i64) -> bool {
         self.update_boards();
-        let ref ship = self.my_board.as_ref().unwrap().ships.get(ship_index as usize);
-        // TODO Implement!
-        return 1;
+        let mut cloned_board = self.my_board.as_ref().unwrap().clone();
+        cloned_board.move_ship(ship_index as usize, Bridge::index_to_direction(direction_index));
+        return cloned_board.compute_state().0;
     }
 
     fn set_ready_state(&mut self, ready: i64) {
