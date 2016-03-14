@@ -2,12 +2,10 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-use message::Message;
-use message::{ShipPlacement, Direction};
-use message::Reason;
-use board::{Board, PlayerState, Player, PlayerHandle, HitResult};
-use ship::Ship;
-use game::{Game, GameState};
+use rusty_battleships::message::{ShipPlacement, Direction, Message, Reason};
+use rusty_battleships::board::{Board, PlayerState, Player, PlayerHandle, HitResult};
+use rusty_battleships::ship::Ship;
+use rusty_battleships::game::{Game, GameState};
 
 // From http://stackoverflow.com/a/28392068
 macro_rules! hashmap {

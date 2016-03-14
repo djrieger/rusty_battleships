@@ -28,7 +28,9 @@ use rusty_battleships::board;
 use rusty_battleships::board::{ToMainThreadCommand, ToChildCommand};
 use rusty_battleships::game::Game;
 use rusty_battleships::timer::timer_periodic;
-use rusty_battleships::serverstate;
+
+mod server_;
+use server_::state;
 
 // http://stackoverflow.com/questions/35157399/how-to-concatenate-static-strings-in-rust/35159310
 macro_rules! description {
@@ -153,11 +155,11 @@ fn handle_client(stream: TcpStream, tx: mpsc::SyncSender<ToMainThreadCommand>, r
     }
 }
 
-fn handle_main(msg: Message, player: &mut board::PlayerHandle, lobby: &mut HashMap<String, board::Player>, games: &mut Vec<Rc<RefCell<Game>>>) -> serverstate::Result {
+fn handle_main(msg: Message, player: &mut board::PlayerHandle, lobby: &mut HashMap<String, board::Player>, games: &mut Vec<Rc<RefCell<Game>>>) -> state::Result {
     // These requests can be handled without any restrictions
     match msg {
-        Message::GetFeaturesRequest => return serverstate::handle_get_features_request(),
-        Message::ReportErrorRequest { errormessage } => return serverstate::handle_report_error_request(errormessage, player, lobby, games),
+        Message::GetFeaturesRequest => return state::handle_get_features_request(),
+        Message::ReportErrorRequest { errormessage } => return state::handle_report_error_request(errormessage, player, lobby, games),
         _ => {},
     }
 
@@ -165,7 +167,7 @@ fn handle_main(msg: Message, player: &mut board::PlayerHandle, lobby: &mut HashM
     // their nickname must be None
     if player.nickname.is_none() {
         if let Message::LoginRequest { username } = msg {
-            return serverstate::handle_login_request(username, player, lobby);
+            return state::handle_login_request(username, player, lobby);
         }
     } else {
         // All other requests are only valid after logging in, i.e. with a user name
@@ -174,17 +176,17 @@ fn handle_main(msg: Message, player: &mut board::PlayerHandle, lobby: &mut HashM
         let nickname = player.nickname.as_ref().unwrap();
 
         match msg {
-            Message::ReadyRequest => return serverstate::handle_ready_request(nickname, lobby),
-            Message::NotReadyRequest => return serverstate::handle_not_ready_request(nickname, lobby),
-            Message::ChallengePlayerRequest { username } => return serverstate::handle_challenge_player_request(username, nickname, lobby, games),
-            Message::SurrenderRequest => return serverstate::handle_surrender_request(nickname, lobby, games),
-            Message::PlaceShipsRequest { placement } => return serverstate::handle_place_ships_request(placement, nickname, lobby),
-            Message::ShootRequest { x, y } => return serverstate::handle_move_shoot_request((x, y), None, nickname, lobby, games),
-            Message::MoveAndShootRequest { id, direction, x, y } => return serverstate::handle_move_shoot_request((x, y), Some((id as usize, direction)), nickname, lobby, games),
+            Message::ReadyRequest => return state::handle_ready_request(nickname, lobby),
+            Message::NotReadyRequest => return state::handle_not_ready_request(nickname, lobby),
+            Message::ChallengePlayerRequest { username } => return state::handle_challenge_player_request(username, nickname, lobby, games),
+            Message::SurrenderRequest => return state::handle_surrender_request(nickname, lobby, games),
+            Message::PlaceShipsRequest { placement } => return state::handle_place_ships_request(placement, nickname, lobby),
+            Message::ShootRequest { x, y } => return state::handle_move_shoot_request((x, y), None, nickname, lobby, games),
+            Message::MoveAndShootRequest { id, direction, x, y } => return state::handle_move_shoot_request((x, y), Some((id as usize, direction)), nickname, lobby, games),
             _ => {},
         };
     }
-    return serverstate::Result::respond(Message::InvalidRequestResponse, false);
+    return state::Result::respond(Message::InvalidRequestResponse, false);
 }
 
 fn main() {
@@ -272,7 +274,7 @@ fn main() {
                     },
                     ToMainThreadCommand::TerminatePlayer => {
                         if let Some(ref name) = player_handle.nickname {
-                            message_store = serverstate::terminate_player(name, &mut lobby, &mut games);
+                            message_store = state::terminate_player(name, &mut lobby, &mut games);
                         }
                         player_handle.to_child_endpoint.send(ToChildCommand::TerminateConnection).unwrap();
                     }
@@ -290,7 +292,7 @@ fn main() {
             }
         }
         for game in &afk_games {
-            let mut result = serverstate::handle_afk(game.clone(), &mut lobby, &mut games);
+            let mut result = state::handle_afk(game.clone(), &mut lobby, &mut games);
             send_updates(&mut player_handles, &mut result);
         }
 
