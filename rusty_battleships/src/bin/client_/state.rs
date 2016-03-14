@@ -239,6 +239,7 @@ impl State {
     pub fn surrender(&mut self) {
         if self.status == Status::Planning || self.status == Status::OpponentPlanning
             || self.status == Status::OpponentPlacing || self.status == Status::PlacingShips {
+            self.status = Status::Surrendered;
             send_message(Message::SurrenderRequest, &mut self.buff_writer);
         }
     }
@@ -431,7 +432,7 @@ impl State {
     pub fn handle_game_over_update(&mut self, victory: bool, reason: Reason) {
         if self.status == Status::OpponentPlanning || self.status == Status::Planning ||
                 self.status == Status::OpponentPlacing || self.status == Status::PlacingShips ||
-                self.status == Status::Available {
+                self.status == Status::Available || self.status == Status::Surrendered {
             println!("The game is over.");
             if victory {
                 println!("Congratulations, captain! You've won!");
@@ -547,6 +548,7 @@ impl State {
                     },
                     Message::NotYourTurnResponse => {
                         //println!("I'm sorry dave, I'm afraid I can't do that.");
+                        // FIXME: handle properly, race condition occurred!
                         panic!("It's not your turn! Protocol demands termination.");
                     },
                     Message::AfkWarningUpdate {strikes} => {
