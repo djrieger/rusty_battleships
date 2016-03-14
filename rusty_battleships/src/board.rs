@@ -93,7 +93,6 @@ impl Board {
         self.ships.len() > 0
     }
 
-
     fn add_state(&mut self) -> bool {
         if let Some(new_state) = self.compute_state() {
             self.old_states.push(self.state.clone());
@@ -170,10 +169,12 @@ impl Board {
                 let ref mut new_cell = self.state[x][y];
                 // copy visibility information to new state
                 new_cell.visible = new_cell.visible || old_cell.visible;
-                if old_cell.visible {
-                    if old_cell.has_ship() && !new_cell.has_ship() {
+                if new_cell.visible {
+                    let ship_entered_cell = !old_cell.has_ship() && new_cell.has_ship();
+                    let ship_left_cell = old_cell.has_ship() && !new_cell.has_ship();
+                    if ship_left_cell {
                         self.visibility_updates.push(Message::EnemyInvisibleUpdate { x: x as u8, y: y as u8 });
-                    } else if !old_cell.has_ship() && new_cell.has_ship() {
+                    } else if ship_entered_cell {
                         self.visibility_updates.push(Message::EnemyVisibleUpdate { x: x as u8, y: y as u8 });
                     }
                 }
