@@ -22,6 +22,7 @@ use rustc_serialize::json::{Json};
 extern crate rusty_battleships;
 use rusty_battleships::message::{Message, Direction, ShipPlacement};
 use rusty_battleships::board::{CellState, W, H};
+use rusty_battleships::ship::{Ship};
 use rusty_battleships::timer::timer_periodic;
 
 // http://stackoverflow.com/questions/35157399/how-to-concatenate-static-strings-in-rust/35159310
@@ -223,7 +224,7 @@ impl Bridge {
         self.ui_sender = Some(tx_ui_update);
         self.board_receiver = Some(rcv_board_update);
         return tcp_loop(hostname, port, rcv_ui_update, self.msg_update_sender.clone(),
-            self.lobby_sender.clone(), tx_board_update, self.disconnect_sender.clone());
+        self.lobby_sender.clone(), tx_board_update, self.disconnect_sender.clone());
     }
 
     fn discover_servers(&mut self) -> String {
@@ -316,6 +317,52 @@ impl Bridge {
             }
         }
         result
+    }
+
+    /**
+     * returns the ship_index found at (x, y) on my board
+     * and -1 if there is no ship at these coordinates
+     */
+    fn get_ship_at(&mut self, x: i64, y: i64) -> i64 {
+        self.update_boards();
+        match self.my_board.as_ref().unwrap().state[x as usize][y as usize].ship_index {
+            Some(ship_index) => ship_index as i64,
+            None => -1,
+        }
+    }
+
+    /**
+     * Get visibility status of all cells for my board
+     * Returns an array of bool encoded as "10011101101..."
+     */
+    fn get_my_board_visibility(&mut self) -> String {
+        self.update_boards();
+        let mut result = String::new();
+        for y in 0..H {
+            for x in 0..W {
+                let character = match self.my_board.as_ref().unwrap().state[x][y].visible {
+                    true => '1',
+                    false => '0',
+                };
+                result.push(character);
+            }
+        }
+        result
+    }
+
+    /**
+     * returns an array of health points for all ships on my board
+     * Encoding: "54020" for HP 5 for first ship, 4 for second ...
+     */
+    fn get_ships_hps(&mut self) -> String {
+        self.update_boards();
+        // WARNING! Assuming Board::ships are sorted by ship_index in descending order
+        let ref ships : Vec<Ship> = self.my_board.as_ref().unwrap().ships;
+        ships
+            .iter()
+            .map(|&ship| ship.health_points.to_string())
+            .collect::<Vec<String>>()
+            .concat()
     }
 }
 
