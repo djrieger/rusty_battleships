@@ -9,7 +9,7 @@ use byteorder::{ByteOrder, BigEndian, ReadBytesExt};
 
 mod client_;
 use client_::state::{LobbyList, State, Status};
-use client_::board::{Board};
+use client_::board::{Board, W, H};
 
 #[macro_use]
 extern crate qmlrs;
@@ -21,6 +21,7 @@ use rustc_serialize::json::{Json};
 
 extern crate rusty_battleships;
 use rusty_battleships::message::{Message, Direction, ShipPlacement};
+use rusty_battleships::board::{CellState};
 use rusty_battleships::timer::timer_periodic;
 
 // http://stackoverflow.com/questions/35157399/how-to-concatenate-static-strings-in-rust/35159310
@@ -253,6 +254,8 @@ impl Bridge {
         self.ui_sender.as_mut().unwrap().send(Message::ShootRequest { x: x as u8, y: y as u8 });
     }
 
+
+
     // fn get_boards(&self) -> String {
     //     let mut ships = Vec::<Ship>::new();
     //     ships.push(Ship { x: 0, y: 0, length: 2, direction: Direction::East, health_points: 2});
@@ -353,6 +356,23 @@ impl Bridge {
         ] });
         println!("{:?}", placements);
     }
+
+    fn get_opp_board(&self) -> String {
+        let mut result = String::new();
+        if let Some(ref board) = self.their_board {
+            for y in 0..H {
+                for x in 0..W {
+                    let character = match board.state[x][y] {
+                        CellState { visible: false, ship_index: _ } => '?',
+                        CellState { visible: true, ship_index: Some(_) } => 'X',
+                        CellState { visible: true, ship_index: None } => ' ',
+                    };
+                    result.push(character);
+                }
+            }
+        }
+        result
+    }
 }
 
 Q_OBJECT! { Bridge:
@@ -371,6 +391,7 @@ Q_OBJECT! { Bridge:
     // slot fn get_boards();
 
     slot fn set_ready_state(i64);
+    slot fn get_opp_board();
 }
 
 fn tcp_loop(hostname: String, port: i64, rcv_ui_update: mpsc::Receiver<Message>,
