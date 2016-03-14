@@ -190,12 +190,7 @@ impl Bridge {
             self.state = tuple.0;
             self.last_rcvd_msg = Some(tuple.1);
         }
-        let state_description = match self.state {
-            Status::Unregistered => String::from("Not registered"),
-            Status::Available => String::from("Registered"),
-            _ => format!("{:?}", self.state),
-        };
-        return state_description;
+        format!("{:?}", self.state)
     }
 
     fn poll_log(&mut self) -> String {
