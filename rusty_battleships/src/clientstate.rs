@@ -4,6 +4,7 @@ use std::sync::mpsc::{self, Sender, Receiver};
 use std::thread;
 use std::time::Duration;
 use std::sync::mpsc::TryRecvError;
+use std::cmp;
 
 use rustc_serialize::Encodable;
 
@@ -198,7 +199,7 @@ impl State {
     }
 
     //FIXME: Change return value to Result<(),String)>
-    pub fn place_ships(&mut self, &mut ships: [ShipPlacement; 5]) -> bool {
+    pub fn place_ships(&mut self, ships: [ShipPlacement; 5]) -> bool {
         if self.status != Status::PlacingShips {
             return false;
         }
@@ -220,7 +221,18 @@ impl State {
         // ships.push(Ship { x: 0, y: 3, length: 4, direction: Direction::East, health_points: 4});
         // ships.push(Ship { x: 0, y: 4, length: 5, direction: Direction::East, health_points: 5});
 
-        self.my_board = Some(Board::new(&ships[..], true));
+        let mut ship_vec = Vec::<Ship>::new();
+        for i in 0..5 {
+            let s = Ship {
+                x: ships[i].x as isize,
+                y: ships[i].y as isize,
+                length: cmp::max(5-i, 2),
+                direction: ships[i].direction,
+                health_points: cmp::max(5-i, 2),
+            };
+            ship_vec.push(s);
+        }
+        self.my_board = Some(Board::new(ship_vec, true));
         self.their_board = Some(Board::new(Vec::<Ship>::new(), false));
 
         return true;
@@ -294,9 +306,6 @@ impl State {
         match self.status {
             Status::Register => {
                 self.status = Status::Available;
-                if !self.use_qml_interface {
-                    self.challenge(&ask(String::from("Who to challenge?"))); //FIXME ONLY FOR TESTING!
-                }
                 return Ok(());
             },
             Status::AwaitGameStart => {
@@ -329,11 +338,6 @@ impl State {
     pub fn handle_name_taken_response(&mut self, nickname: &str) {
         if self.status == Status::Register {
             self.status = Status::Unregistered;
-            if !self.use_qml_interface {
-                let new_name = ask(String::from("What was yer name again?")); //FIXME: FOR TESTING ONLY!
-                send_message(Message::LoginRequest { username: String::from(new_name) }, &mut self.buff_writer); //FIXME: FOR TESTING ONLY!
-                self.status = Status::Register; //FIXME: FOR TESTING ONLY!
-            }
         } else {
             panic!("Received a NAME_TAKEN_RESPONSE while not in Register State! STATUS={:?}", self.status);
         }
@@ -342,8 +346,6 @@ impl State {
     pub fn handle_no_such_player_response(&mut self, nickname: &str) {
         if self.status == Status::AwaitGameStart {
             self.status = Status::Available;
-            //FIXME TESTING
-            self.ready();
         } else {
             panic!("Received a NAME_TAKEN_RESPONSE while not in AwaitGameStart State! STATUS={:?}", self.status);
         }
@@ -472,6 +474,10 @@ impl State {
             panic!("Received a ENEMY_AFK_UPDATE while not in OPPONENT_PLANNING state! STATUS={:?}", self.status);
         }
     }
+
+    // pub fn clear_gamestate(&mut self) {
+    //     self.my_board = Board::new(Vec::<ShipPlacement>)
+    // }
 
     pub fn handle_game_over_update(&mut self, victory: bool, reason: Reason) {
         if self.status == Status::OpponentPlanning || self.status == Status::Planning ||
