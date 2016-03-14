@@ -9,7 +9,7 @@ use byteorder::{ByteOrder, BigEndian, ReadBytesExt};
 
 mod client_;
 use client_::state::{LobbyList, State, Status};
-use client_::board::{Board, W, H};
+use client_::board::{Board};
 
 #[macro_use]
 extern crate qmlrs;
@@ -21,7 +21,7 @@ use rustc_serialize::json::{Json};
 
 extern crate rusty_battleships;
 use rusty_battleships::message::{Message, Direction, ShipPlacement};
-use rusty_battleships::board::{CellState};
+use rusty_battleships::board::{CellState, W, H};
 use rusty_battleships::timer::timer_periodic;
 
 // http://stackoverflow.com/questions/35157399/how-to-concatenate-static-strings-in-rust/35159310
@@ -187,6 +187,8 @@ impl Bridge {
     }
 
     fn poll_state(&mut self) -> String {
+        // let foo = self.get_opp_board();
+        // println!("len = {}, str = {}", foo.len(), foo);
         while let Ok(tuple) = self.msg_update_receiver.try_recv() {
             self.state = tuple.0;
             self.last_rcvd_msg = Some(tuple.1);
@@ -359,18 +361,21 @@ impl Bridge {
 
     fn get_opp_board(&self) -> String {
         let mut result = String::new();
-        if let Some(ref board) = self.their_board {
-            for y in 0..H {
-                for x in 0..W {
+        for y in 0..H {
+            for x in 0..W {
+                if let Some(ref board) = self.their_board {
                     let character = match board.state[x][y] {
-                        CellState { visible: false, ship_index: _ } => '?',
+                        CellState { visible: false, ship_index: _ } => '"',
                         CellState { visible: true, ship_index: Some(_) } => 'X',
-                        CellState { visible: true, ship_index: None } => ' ',
+                        CellState { visible: true, ship_index: None } => '-',
                     };
                     result.push(character);
+                } else {
+                    result.push('?');
                 }
             }
         }
+        println!("Opp Board: {}", result);
         result
     }
 }
