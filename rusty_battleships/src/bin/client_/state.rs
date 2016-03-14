@@ -428,25 +428,26 @@ impl State {
         }
     }
 
-    // pub fn clear_gamestate(&mut self) {
-    //     self.my_board = Board::new(Vec::<ShipPlacement>)
-    // }
-
     pub fn handle_game_over_update(&mut self, victory: bool, reason: Reason) {
         if self.status == Status::OpponentPlanning || self.status == Status::Planning ||
-            self.status == Status::OpponentPlacing || self.status == Status::PlacingShips ||
-            self.status == Status::Available {
-                println!("The game is over.");
-                if victory {
-                    println!("Congratulations, captain! You've won!");
-                } else {
-                    println!("You've lost.", );
-                }
-                println!("Reason: {:?}", reason);
-                self.my_turn = false;
-                self.status = Status::Available;
-                //self.clear_gamestate(); //FIXME: Needs implementation!
+                self.status == Status::OpponentPlacing || self.status == Status::PlacingShips ||
+                self.status == Status::Available {
+            println!("The game is over.");
+            if victory {
+                println!("Congratulations, captain! You've won!");
             } else {
+                println!("You've lost.", );
+            }
+            println!("Reason: {:?}", reason);
+            self.status = Status::Available;
+
+            // reset game state
+            self.my_turn = false;
+            self.my_board = None;
+            self.my_afks = 0;
+            self.their_board = None;
+            self.their_afks = 0;
+        } else {
             panic!("Received a GAME_OVER_UPDATE while not in an ingame state! STATUS={:?}", self.status);
         }
     }
