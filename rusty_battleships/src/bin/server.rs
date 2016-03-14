@@ -66,11 +66,14 @@ fn start_udp_discovery(tcp_port: u16) {
                     let mut response = vec![];
                     response.write_u16::<BigEndian>(tcp_port).unwrap();
                     write!(&mut response, "Some host name");
-                    socket.send_to(&response[..], &src).expect("unable to respond");
-                    println!("Responded with port and host name");
+                    if (socket.send_to(&response[..], &src).is_err()) {
+                        println!("Unable to respond");
+                    } else {
+                        println!("Responded with port and host name");
+                    }
                 },
                 Err(e) => {
-                    println!("couldn't recieve a datagram: {}", e);
+                    println!("Couldn't receive a datagram: {}", e);
                 }
             }
         }
@@ -128,7 +131,7 @@ fn handle_client(stream: TcpStream, tx: mpsc::SyncSender<ToMainThreadCommand>, r
                     } else {
                         println!("Got error: {:?}", e);
                         // Ignoring return value of respond() since we are exiting anyway
-                        respond(Message::InvalidRequestResponse, &mut buff_writer);
+                        let _ = respond(Message::InvalidRequestResponse, &mut buff_writer);
                     }
                     return;
                 },
@@ -142,7 +145,7 @@ fn handle_client(stream: TcpStream, tx: mpsc::SyncSender<ToMainThreadCommand>, r
                 ToChildCommand::Message(Message::InvalidRequestResponse) => {
                     shutdown_player(&tx, &rx);
                     // Ignoring return value of respond() since we are exiting anyway
-                    respond(Message::InvalidRequestResponse, &mut buff_writer);
+                    let _ = respond(Message::InvalidRequestResponse, &mut buff_writer);
                     return;
                 },
                 ToChildCommand::Message(response_msg) => {
