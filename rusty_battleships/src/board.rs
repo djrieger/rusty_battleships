@@ -93,17 +93,6 @@ impl Board {
         self.ships.len() > 0
     }
 
-    fn add_state(&mut self) -> bool {
-        if let Some(new_state) = self.compute_state() {
-            self.old_states.push(self.state.clone());
-            self.state = new_state;
-            self.compute_visibility_updates();
-            true
-        } else {
-            false
-        }
-    }
-
     pub fn move_ship(&mut self, ship_index: u8, direction: Direction) -> bool {
         return self.ships[ship_index as usize].move_me(direction) && self.add_state();
     }
@@ -158,6 +147,23 @@ impl Board {
         }
 
         return Some(new_state);
+    }
+
+    pub fn pop_updates(&mut self) -> Vec<Message> {
+        let foo = self.visibility_updates.clone();
+        self.visibility_updates = vec![];
+        return foo;
+    }
+
+    fn add_state(&mut self) -> bool {
+        if let Some(new_state) = self.compute_state() {
+            self.old_states.push(self.state.clone());
+            self.state = new_state;
+            self.compute_visibility_updates();
+            true
+        } else {
+            false
+        }
     }
 
     fn compute_visibility_updates(&mut self) {
@@ -243,9 +249,4 @@ impl Board {
         self.ships.iter().all(|ship| ship.is_dead())
     }
 
-    pub fn pop_updates(&mut self) -> Vec<Message> {
-        let foo = self.visibility_updates.clone();
-        self.visibility_updates = vec![];
-        return foo;
-    }
 }
