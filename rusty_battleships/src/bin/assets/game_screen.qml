@@ -331,6 +331,7 @@ Item {
         if (bridge.can_move_in_direction(board.moveShip, direction)) {
 	        board.moveAllowed = false;
 			board.moveDirection = direction;
+            // TODO @moritz acutally move Ship
 
 			clearBoard();
 			draw_ship(0);
