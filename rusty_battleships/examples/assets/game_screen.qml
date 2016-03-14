@@ -244,6 +244,11 @@ Item {
           draw_ship(shipId);
         }
       }
+      
+      if ([0, 1, 2, 3, 4].filter(function(i) { return board.placement[i].x === -1; }).length === 0) {
+          board.placement_phase = false;
+          bridge.handle_placement(JSON.stringify(board.placement));
+      }
     }
 
     function draw_ship(index) {
@@ -275,10 +280,6 @@ Item {
         } else {
           buttonIndex += ship.horizontal ? 1 : 10;
         }
-      }
-      if ([0, 1, 2, 3, 4].filter(function(i) { return board.placement[i].x === -1; }).length === 0) {
-          board.placement_phase = false;
-          bridge.handle_placement(JSON.stringify(board.placement)); 
       }
     }
 
