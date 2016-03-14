@@ -580,9 +580,6 @@ impl State {
                     },
                     Message::GameOverUpdate {victorious, reason} => {
                         self.handle_game_over_update(victorious, reason);
-                        if let Some(mut sender) = self.board_update_sender.clone() {
-                            self.send_updated_boards(&mut sender);
-                        }
                     }
                     Message::ServerGoingDownUpdate {errormessage: err}=> {
                         println!("The server is going down!");
