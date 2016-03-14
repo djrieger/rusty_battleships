@@ -1,16 +1,15 @@
-use std::collections::{BTreeMap, HashMap};
-use rusty_battleships::timer::timer_periodic;
-use std::io::{BufReader, BufWriter, Write};
-use std::net::{Ipv4Addr, TcpStream, UdpSocket, SocketAddr, SocketAddrV4};
+use std::io::{BufReader, BufWriter};
+use std::net::{Ipv4Addr, TcpStream, UdpSocket, SocketAddr};
 use std::sync::mpsc;
-use std::sync::mpsc::{RecvError, TryRecvError};
+use std::sync::mpsc::{TryRecvError};
 use std::thread;
-
-extern crate argparse;
-use argparse::{ArgumentParser, Print, Store};
 
 extern crate byteorder;
 use byteorder::{ByteOrder, BigEndian, ReadBytesExt};
+
+mod client_;
+use client_::state::{LobbyList, State, Status};
+use client_::board::{Board};
 
 #[macro_use]
 extern crate qmlrs;
@@ -18,14 +17,11 @@ extern crate qmlrs;
 extern crate rustc_serialize;
 use rustc_serialize::Encodable;
 use rustc_serialize::json;
-use rustc_serialize::json::{ToJson, Json};
+use rustc_serialize::json::{Json};
 
 extern crate rusty_battleships;
-use rusty_battleships::message::{serialize_message, deserialize_message, Message, Direction, ShipPlacement};
-use rusty_battleships::clientstate::{LobbyList, State, Status, tcp_poll};
-use rusty_battleships::clientboard::{Board};
-use rusty_battleships::board::{W, H};
-use rusty_battleships::ship::Ship;
+use rusty_battleships::message::{Message, Direction, ShipPlacement};
+use rusty_battleships::timer::timer_periodic;
 
 // http://stackoverflow.com/questions/35157399/how-to-concatenate-static-strings-in-rust/35159310
 macro_rules! description {
@@ -392,8 +388,8 @@ fn tcp_loop(hostname: String, port: i64, rcv_ui_update: mpsc::Receiver<Message>,
     sender.set_write_timeout(None);
 
     let receiver = sender.try_clone().unwrap();
-    let mut buff_writer = BufWriter::new(sender);
-    let mut buff_reader = BufReader::new(receiver);
+    let buff_writer = BufWriter::new(sender);
+    let buff_reader = BufReader::new(receiver);
 
     /* Holds the current state and provides state-based services such as shoot(), move-and-shoot() as well as state- and server-message-dependant state transitions. */
     let mut current_state = State::new(true, Some(rcv_ui_update), Some(tx_message_update), Some(tx_lobby_update), Some(tx_board_update), buff_reader, buff_writer);

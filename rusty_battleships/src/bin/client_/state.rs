@@ -8,10 +8,11 @@ use std::cmp;
 
 use rustc_serialize::Encodable;
 
-use message::{serialize_message, deserialize_message, Message, ShipPlacement, Direction, Reason};
-use clientlobby::ClientLobby;
-use ship::{Ship};
-use clientboard::{Board};
+use client_::board::{Board};
+use client_::lobby::ClientLobby;
+
+use rusty_battleships::message::{serialize_message, deserialize_message, Message, ShipPlacement, Direction, Reason};
+use rusty_battleships::ship::{Ship};
 
 #[derive(Clone, Debug, PartialEq, RustcEncodable)]
 pub struct LobbyList {

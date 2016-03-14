@@ -1,4 +1,4 @@
-use message::{Message, Direction};
+use message::Direction;
 
 #[derive(Copy, Clone,Debug, Eq, PartialEq, Hash)]
 pub struct Ship {

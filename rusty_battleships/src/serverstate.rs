@@ -396,9 +396,9 @@ pub fn handle_place_ships_request(placement: [ShipPlacement; 5], player_name: &S
  */
 fn handle_move(game: &mut Game, player_name: &String, movement: (usize, Direction)) -> bool {
     let (ship_index, direction) = movement;
-    if ship_index < 0 || ship_index > 4 {
+    if ship_index > 4 {
         // ship index is out of bounds
-        println!("ship index out of b");
+        println!("ship index out of bounds");
         return false;
     }
 

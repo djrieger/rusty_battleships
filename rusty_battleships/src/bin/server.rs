@@ -25,7 +25,7 @@ use argparse::{ArgumentParser, Print, Store};
 extern crate rusty_battleships;
 use rusty_battleships::message::{serialize_message, deserialize_message, Message};
 use rusty_battleships::board;
-use rusty_battleships::board::{Player, ToMainThreadCommand, ToChildCommand};
+use rusty_battleships::board::{ToMainThreadCommand, ToChildCommand};
 use rusty_battleships::game::Game;
 use rusty_battleships::timer::timer_periodic;
 use rusty_battleships::serverstate;

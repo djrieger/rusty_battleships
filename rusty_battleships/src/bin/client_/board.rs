@@ -1,6 +1,6 @@
-use board::{CellState};
-use ship::Ship;
-use message::{Message, Direction};
+use rusty_battleships::board::{CellState};
+use rusty_battleships::message::{Message, Direction};
+use rusty_battleships::ship::Ship;
 
 pub const W: usize = 16;
 pub const H: usize = 10;
