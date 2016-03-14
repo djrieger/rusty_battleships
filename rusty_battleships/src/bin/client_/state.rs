@@ -222,6 +222,8 @@ impl State {
         if self.status != Status::Planning {
             panic!("I cannot move and shoot when I'm not in Planning state! STATUS = {:?}", self.status);
         }
+
+        self.my_board.as_mut().unwrap().move_ship(id as usize, direction);
         send_message(Message::MoveAndShootRequest { id: id, direction: direction, x: x, y: y }, &mut self.buff_writer);
     }
 
