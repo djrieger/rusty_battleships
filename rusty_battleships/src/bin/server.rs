@@ -123,7 +123,7 @@ fn handle_client(stream: TcpStream, tx: mpsc::SyncSender<ToMainThreadCommand>, r
                     if e.kind() == std::io::ErrorKind::UnexpectedEof {
                         println!("Client terminated connection");
                     } else {
-                        println!("Received malformed message, terminating client");
+                        println!("Got error: {:?}", e);
                         respond(Message::InvalidRequestResponse, &mut buff_writer);
                     }
                     return;
