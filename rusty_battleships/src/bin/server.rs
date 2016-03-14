@@ -66,7 +66,7 @@ fn start_udp_discovery(tcp_port: u16) {
                     let mut response = vec![];
                     response.write_u16::<BigEndian>(tcp_port).unwrap();
                     write!(&mut response, "Some host name");
-                    if (socket.send_to(&response[..], &src).is_err()) {
+                    if socket.send_to(&response[..], &src).is_err() {
                         println!("Unable to respond");
                     } else {
                         println!("Responded with port and host name");
@@ -293,7 +293,7 @@ fn main() {
 
 	    // delete old handles
 	    for (i, is_valid) in valid.iter().enumerate() {
-		    if (!is_valid) {
+		    if !is_valid {
 			    player_handles.remove(i);
 		    }
 	    }
