@@ -203,23 +203,6 @@ impl State {
         if self.status != Status::PlacingShips {
             return false;
         }
-        //Dummy Values
-        //TODO:Ask user!
-        // let ship_placements0 = ShipPlacement { x: 0, y: 0, direction: Direction::East};
-        // let ship_placements1 = ShipPlacement { x: 0, y: 1, direction: Direction::East};
-        // let ship_placements2 = ShipPlacement { x: 0, y: 2, direction: Direction::East};
-        // let ship_placements3 = ShipPlacement { x: 0, y: 3, direction: Direction::East};
-        // let ship_placements4 = ShipPlacement { x: 0, y: 4, direction: Direction::East};
-        // let ship_placements : [ShipPlacement; 5] = [ship_placements0, ship_placements1, ship_placements2, ship_placements3, ship_placements4];
-        // println!("{:?}", ship_placements);
-        // send_message(Message::PlaceShipsRequest { placement: ship_placements }, &mut self.buff_writer);
-        //
-        // let mut ships = Vec::<Ship>::new();
-        // ships.push(Ship { x: 0, y: 0, length: 2, direction: Direction::East, health_points: 2});
-        // ships.push(Ship { x: 0, y: 1, length: 2, direction: Direction::East, health_points: 2});
-        // ships.push(Ship { x: 0, y: 2, length: 3, direction: Direction::East, health_points: 3});
-        // ships.push(Ship { x: 0, y: 3, length: 4, direction: Direction::East, health_points: 4});
-        // ships.push(Ship { x: 0, y: 4, length: 5, direction: Direction::East, health_points: 5});
 
         let mut ship_vec = Vec::<Ship>::new();
         for i in 0..5 {
@@ -234,6 +217,8 @@ impl State {
         }
         self.my_board = Some(Board::new(ship_vec, true));
         self.their_board = Some(Board::new(Vec::<Ship>::new(), false));
+
+        send_message(Message::PlaceShipsRequest{ placement: ships }, &mut self.buff_writer);
 
         return true;
     }
