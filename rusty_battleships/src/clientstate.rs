@@ -191,40 +191,36 @@ impl State {
             return false;
         }
 
-        // if self.lobby.player_name != opponent {
-            //if self.lobby.player_list.contains(&String::from(opponent)) //FIXME: Lobby updates and related stuff!
-            println!("Challenging captain {:?}", opponent);
-            send_message(Message::ChallengePlayerRequest { username: String::from(opponent) }, &mut self.buff_writer);
-            self.status = Status::AwaitGameStart;
-            return true;
-        // } else {
-            // return false;
-        // }
+        println!("Challenging captain {:?}", opponent);
+        send_message(Message::ChallengePlayerRequest { username: String::from(opponent) }, &mut self.buff_writer);
+        self.status = Status::AwaitGameStart;
+        return true;
     }
 
     //FIXME: Change return value to Result<(),String)>
-    pub fn place_ships(&mut self) -> bool {
+    pub fn place_ships(&mut self, &mut ships: [ShipPlacement; 5]) -> bool {
         if self.status != Status::PlacingShips {
             return false;
         }
         //Dummy Values
         //TODO:Ask user!
-        let ship_placements0 = ShipPlacement { x: 0, y: 0, direction: Direction::East};
-        let ship_placements1 = ShipPlacement { x: 0, y: 1, direction: Direction::East};
-        let ship_placements2 = ShipPlacement { x: 0, y: 2, direction: Direction::East};
-        let ship_placements3 = ShipPlacement { x: 0, y: 3, direction: Direction::East};
-        let ship_placements4 = ShipPlacement { x: 0, y: 4, direction: Direction::East};
-        let ship_placements : [ShipPlacement; 5] = [ship_placements0, ship_placements1, ship_placements2, ship_placements3, ship_placements4];
-        println!("{:?}", ship_placements);
-        send_message(Message::PlaceShipsRequest { placement: ship_placements }, &mut self.buff_writer);
+        // let ship_placements0 = ShipPlacement { x: 0, y: 0, direction: Direction::East};
+        // let ship_placements1 = ShipPlacement { x: 0, y: 1, direction: Direction::East};
+        // let ship_placements2 = ShipPlacement { x: 0, y: 2, direction: Direction::East};
+        // let ship_placements3 = ShipPlacement { x: 0, y: 3, direction: Direction::East};
+        // let ship_placements4 = ShipPlacement { x: 0, y: 4, direction: Direction::East};
+        // let ship_placements : [ShipPlacement; 5] = [ship_placements0, ship_placements1, ship_placements2, ship_placements3, ship_placements4];
+        // println!("{:?}", ship_placements);
+        // send_message(Message::PlaceShipsRequest { placement: ship_placements }, &mut self.buff_writer);
+        //
+        // let mut ships = Vec::<Ship>::new();
+        // ships.push(Ship { x: 0, y: 0, length: 2, direction: Direction::East, health_points: 2});
+        // ships.push(Ship { x: 0, y: 1, length: 2, direction: Direction::East, health_points: 2});
+        // ships.push(Ship { x: 0, y: 2, length: 3, direction: Direction::East, health_points: 3});
+        // ships.push(Ship { x: 0, y: 3, length: 4, direction: Direction::East, health_points: 4});
+        // ships.push(Ship { x: 0, y: 4, length: 5, direction: Direction::East, health_points: 5});
 
-        let mut ships = Vec::<Ship>::new();
-        ships.push(Ship { x: 0, y: 0, length: 2, direction: Direction::East, health_points: 2});
-        ships.push(Ship { x: 0, y: 1, length: 2, direction: Direction::East, health_points: 2});
-        ships.push(Ship { x: 0, y: 2, length: 3, direction: Direction::East, health_points: 3});
-        ships.push(Ship { x: 0, y: 3, length: 4, direction: Direction::East, health_points: 4});
-        ships.push(Ship { x: 0, y: 4, length: 5, direction: Direction::East, health_points: 5});
-        self.my_board = Some(Board::new(ships, true));
+        self.my_board = Some(Board::new(&ships[..], true));
         self.their_board = Some(Board::new(Vec::<Ship>::new(), false));
 
         return true;
@@ -285,8 +281,6 @@ impl State {
     pub fn handle_game_start_update(&mut self, nickname: &str) -> Result<(), String> {
         if self.status == Status::Waiting {
             self.status = Status::PlacingShips;
-            //Place the ships!
-            self.place_ships();
             return Ok(());
         } else {
             return Err(format!("ERROR: I did not expect a GameStartUpdate! STATUS={:?}", self.status));
@@ -307,7 +301,6 @@ impl State {
             },
             Status::AwaitGameStart => {
                 self.status = Status::PlacingShips;
-                // self.place_ships(); //FIXME ONLY FOR TESING!
                 return Ok(());
             },
             Status::AwaitReady => {
@@ -383,9 +376,6 @@ impl State {
             }
             self.my_turn = true;
             self.status = Status::Planning;
-            //FIXME: ONLY FOR TESTING! USE GUI! ----v
-            self.shoot_and_move_right(None, None);
-            //FIXME: ONLY FOR TESTING! USE GUI! ----^
         } else {
             panic!("Received a ENEMY_HIT_UPDATE while not in OPPONENT_PLANNING state! STATUS={:?}", self.status);
         }
@@ -410,9 +400,6 @@ impl State {
             }
             self.my_turn = true;
             self.status = Status::Planning;
-            //FIXME: ONLY FOR TESTING! USE GUI! ----v
-            self.shoot_and_move_right(None, None);
-            //FIXME: ONLY FOR TESTING! USE GUI! ----^
         } else {
             panic!("Received a MISS_RESPONSE while not in PLANNING state! STATUS={:?}", self.status);
         }
@@ -434,11 +421,6 @@ impl State {
         if self.status == Status::OpponentPlacing {
             self.my_turn = true;
             self.status = Status::Planning;
-
-            //FIXME: ONLY FOR TESTING! USE GUI! ----v
-            self.shoot_and_move_right(None, None);
-            //FIXME: ONLY FOR TESTING! USE GUI! ----^
-
         } else {
             panic!("Received a YOUR_TURN_UPDATE while not in OPPONENT_PLACING state! STATUS={:?}", self.status);
         }
@@ -486,9 +468,6 @@ impl State {
                 panic!("Inconsistent strike count for **the enemy**! MINE={}, SERVER={}", self.their_afks, strikes);
             }
             self.status = Status::Planning;
-            //FIXME: ONLY FOR TESTING! USE GUI! ----v
-            self.shoot_and_move_right(None, None);
-            //FIXME: ONLY FOR TESTING! USE GUI! ----^
         } else {
             panic!("Received a ENEMY_AFK_UPDATE while not in OPPONENT_PLANNING state! STATUS={:?}", self.status);
         }
@@ -766,7 +745,7 @@ impl State {
                             self.challenge(&username);
                         },
                         Message::PlaceShipsRequest { placement } => {
-                            self.place_ships(); //FIXME incorporate transmitted placement.
+                            self.place_ships( placement );
                         },
                         Message::ShootRequest { x, y } => {
                             self.shoot_and_move_right( Some(x), Some(y) );
