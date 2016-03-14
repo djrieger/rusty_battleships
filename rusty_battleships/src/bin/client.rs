@@ -256,7 +256,7 @@ impl Bridge {
     }
     /**
      * target coordinates for shot on opponent board: (x, y)
-     * ship_index: -1 for no movement and 0..4 for ship 
+     * ship_index: -1 for no movement and 0..4 for ship
      */
     fn move_and_shoot(&mut self, x: i64, y: i64, ship_index: i64, direction_index: i64) {
         if ship_index == -1 {
@@ -287,10 +287,10 @@ impl Bridge {
 
     fn handle_placement(&mut self, placement_json: String) {
         let data = Json::from_str(&placement_json).unwrap();
-        let obj = data.as_object().unwrap();
+        let obj = data.as_array().unwrap();
         let mut json_placements = vec![];
         for i in 0..5 {
-            let placement = obj.get(&i.to_string()).unwrap().as_object().unwrap();
+            let placement = obj[i].as_object().unwrap();
             json_placements.push(placement);
         }
 
@@ -371,10 +371,11 @@ impl Bridge {
         let mut result = String::new();
         for y in 0..H {
             for x in 0..W {
-                let character = match self.my_board.as_ref().unwrap().state[x][y].visible {
-                    true => '1',
-                    false => '0',
-                };
+	            let mut character = '0';
+	            if let Some(ref board) = self.my_board {
+		            character = if board.state[x][y].visible { '1' } else { '0' }
+	            }
+
                 result.push(character);
             }
         }

@@ -12,6 +12,51 @@ Item {
     // TODO: provide button for surrender
     signal gameEnded();
 
+    ListModel {
+        id: shipModel
+
+		ListElement {
+			property int x: -1
+			property int y: -1
+			property int length: 5
+			property int hp: 5
+			property bool horizontal
+			property bool reverse
+		}
+		ListElement {
+			property int x: -1
+			property int y: -1
+			property int length: 4
+			property int hp: 4
+			property bool horizontal
+			property bool reverse
+		}
+		ListElement {
+			property int x: -1
+			property int y: -1
+			property int length: 3
+			property int hp: 3
+			property bool horizontal
+			property bool reverse
+		}
+		ListElement {
+			property int x: -1
+			property int y: -1
+			property int length: 2
+			property int hp: 2
+			property bool horizontal
+			property bool reverse
+		}
+		ListElement {
+			property int x: -1
+			property int y: -1
+			property int length: 2
+			property int hp: 2
+			property bool horizontal
+			property bool reverse
+		}
+    }
+
 	ColumnLayout {
 	    RowLayout {
             Rectangle {
@@ -29,45 +74,6 @@ Item {
                 property int moveShip: -1
                 property bool placement_phase: true
 
-                // only used during the placement phase
-                property list<QtObject> placement: [
-                  QtObject {
-                    property int x: -1
-                    property int y: -1
-                    property int length: 5
-                    property bool horizontal
-                    property bool reverse
-                  },
-                  QtObject {
-                    property int x: -1
-                    property int y: -1
-                    property int length: 4
-                    property bool horizontal
-                    property bool reverse
-                  },
-                  QtObject {
-                    property int x: -1
-                    property int y: -1
-                    property int length: 3
-                    property bool horizontal
-                    property bool reverse
-                  },
-                  QtObject {
-                    property int x: -1
-                    property int y: -1
-                    property int length: 2
-                    property bool horizontal
-                    property bool reverse
-                  },
-                  QtObject {
-                    property int x: -1
-                    property int y: -1
-                    property int length: 2
-                    property bool horizontal
-                    property bool reverse
-                  }
-                ]
-
                 Grid {
                     anchors.fill: parent
 
@@ -84,6 +90,9 @@ Item {
                             height: parent.height / parent.rows - parent.spacing
 
                             property string text: " "
+                            property bool revealed: false
+
+                            color: revealed ? "skyblue" : "white"
 
                             Text {
                                 text: parent.text //index
@@ -178,11 +187,18 @@ Item {
 	}
 
     function opp_board_clicked(index) {
-        var x = index % 10;
-        var y = Math.floor(index / 10);
-        bridge.move_and_shoot(x, y, board.moveShip, board.moveDirection);
-        board.moveAllowed = false;
-        board.active = false;
+        if (board.moveDirection === -1) {
+            // no direction selected, but ship may have been selected
+            board.moveShip = -1;
+        }
+
+        if (board.active && !board.placement_phase) {
+	        var x = index % 10;
+	        var y = Math.floor(index / 10);
+	        bridge.move_and_shoot(x, y, board.moveShip, board.moveDirection);
+	        board.moveAllowed = false;
+	        board.active = false;
+        }
     }
 
     function updateState() {
@@ -224,7 +240,6 @@ Item {
                 }
             } else {
                 board.moveShip = bridge.get_ship_at(index % 10, Math.floor(index / 10));
-                console.log(board.moveShip);
             }
         }
     }
@@ -242,7 +257,8 @@ Item {
 			horizontal = false;
 
 			if (length == 2) {
-		        if (board.placement[3].x == -1) {
+				// special case: 2 ships with length 2
+		        if (shipModel.get(3).x == -1) {
 			        shipId = 3;
 			    } else {
 			        shipId = 4;
@@ -258,7 +274,8 @@ Item {
 			reverse = xDiff < 0;
 
 			if (length == 2) {
-			    if (board.placement[3].x == -1) {
+				// special case: 2 ships with length 2
+			    if (shipModel.get(3).x == -1) {
 			        shipId = 3;
 			    } else {
 			        shipId = 4;
@@ -275,31 +292,42 @@ Item {
 		}
 
 		if (shipId != -1) {
-			if (board.placement[shipId].x != -1) {
+			if (shipModel.get(shipId).x != -1) {
 			    // TODO: double placement, show error
 			    console.log("Double placement");
 			} else {
-			    board.placement[shipId].x = board.currentX;
-			    board.placement[shipId].y = board.currentY;
-			    board.placement[shipId].horizontal = horizontal;
-			    board.placement[shipId].reverse = reverse;
+			    shipModel.get(shipId).x = board.currentX;
+			    shipModel.get(shipId).y = board.currentY;
+			    shipModel.get(shipId).horizontal = horizontal;
+			    shipModel.get(shipId).reverse = reverse;
 
 			    draw_ship(shipId);
 			}
 		}
 
-		if ([0, 1, 2, 3, 4].filter(function(i) { return board.placement[i].x === -1; }).length === 0) {
+		if ([0, 1, 2, 3, 4].filter(function(i) { return shipModel.get(i).x === -1; }).length === 0) {
 		    board.active = false;
 		    board.placement_phase = false;
-		    bridge.handle_placement(JSON.stringify(board.placement));
+		    var placement = [];
+		    for (var i = 0; i < 5; i++) {
+		        placement.push(shipModel.get(i));
+		    }
+		    console.log(JSON.stringify(placement));
+		    bridge.handle_placement(JSON.stringify(placement));
 		}
     }
 
     function draw_ship(index) {
         console.assert(index >= 0 && index < 5);
 
-        var ship = board.placement[index];
+        var ship = shipModel.get(index);
+
+        if (ship.hp === 0) {
+            return;
+        }
+
         var buttonIndex = 10 * ship.y + ship.x;
+
         for (var i = 0; i < ship.length; i++) {
 	        var button = boardButtons.itemAt(buttonIndex);
 
@@ -328,10 +356,20 @@ Item {
     }
 
     function move(direction) {
+        console.assert(direction > -1 && direction < 4);
         if (bridge.can_move_in_direction(board.moveShip, direction)) {
 	        board.moveAllowed = false;
 			board.moveDirection = direction;
-            // TODO @moritz acutally move Ship
+
+			if (direction === 0) {
+				shipModel.get(board.moveShip).y--;
+			} else if (direction === 1) {
+				shipModel.get(board.moveShip).x++;
+			} else if (direction === 2) {
+                shipModel.get(board.moveShip).y++;
+            } else if (direction === 3) {
+                shipModel.get(board.moveShip).x--;
+            }
 
 			clearBoard();
 			draw_ship(0);
@@ -339,13 +377,19 @@ Item {
 			draw_ship(2);
 			draw_ship(3);
 			draw_ship(4);
+        } else {
+            // TODO: show error message
+            console.log("Invalid move");
         }
-        console.log("Tried to move.");
     }
 
-    function clearBoard() {
+    function clearBoard(resetRevealed) {
         for (var i = 0; i < 100; i++) {
-            boardButtons.itemAt(i).text = " ";
+            var cell = boardButtons.itemAt(i);
+            cell.text = " ";
+            if (resetRevealed) {
+                cell.revealed = false;
+            }
         }
     }
 
@@ -353,6 +397,12 @@ Item {
         var opp_board = bridge.get_opp_board();
         for (var i = 0; i < opp_board.length; i++) {
             opponentBoardButtons.itemAt(i).text = opp_board[i];
+        }
+        if (!board.placement_phase) {
+	        var my_board = bridge.get_my_board_visibility();
+	        for (var i = 0; i < my_board.length; i++) {
+	            boardButtons.itemAt(i).revealed = !!my_board[i];
+	        }
         }
     }
 
@@ -370,12 +420,18 @@ Item {
         board.moveDirection = -1;
         board.moveShip = -1;
         board.placement_phase = true;
-        clearBoard();
-        board.placement[0].x = -1;
-        board.placement[1].x = -1;
-        board.placement[2].x = -1;
-        board.placement[3].x = -1;
-        board.placement[4].x = -1;
+
+        clearBoard(true);
+        shipModel.get(0).x = -1;
+        shipModel.get(0).hp = 5;
+        shipModel.get(1).x = -1;
+        shipModel.get(1).hp = 4;
+        shipModel.get(2).x = -1;
+        shipModel.get(2).hp = 3;
+        shipModel.get(3).x = -1;
+        shipModel.get(3).hp = 2;
+        shipModel.get(4).x = -1;
+        shipModel.get(4).hp = 2;
 
         timer.triggered.disconnect(updateBoards);
         timer.triggered.disconnect(updateState);

@@ -126,7 +126,7 @@ impl Board {
                         // no ship was here before but now this ship occupies this cell
                         visibility_updates.push(Message::EnemyVisibleUpdate { x: dest_x as u8, y: dest_y as u8 });
                     }
-                    new_state[dest_x as usize][dest_y as usize].set_ship((ship_index + 1) as u8);
+                    new_state[dest_x as usize][dest_y as usize].set_ship(ship_index as u8);
                 }
             }
         }

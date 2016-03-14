@@ -116,6 +116,7 @@ Item {
         // TODO: pass server info and set title text accordingly
         timer.triggered.connect(updateLobby);
         timer.triggered.connect(checkGameStarted);
+        waitCheckbox.checked = false;
         visible = true;
     }
 
