@@ -420,6 +420,7 @@ fn handle_shoot(games: &mut Vec<Rc<RefCell<Game>>>, game: Rc<RefCell<Game>>,
         let mut game_ref = (*game).borrow_mut();
         opponent_name = game_ref.get_opponent_name(player_name).to_owned();
 
+        // enemy visibility updates
         {
             let ref mut opponent_board = if game_ref.player1 == *player_name {
                 &mut game_ref.board2
@@ -428,10 +429,23 @@ fn handle_shoot(games: &mut Vec<Rc<RefCell<Game>>>, game: Rc<RefCell<Game>>,
             };
             println!("Shooting on {}'s board at {}:{}:", opponent_name, target_x, target_y);
             hit_result = opponent_board.hit(target_x as usize, target_y as usize);
-            updates = hashmap![player_name.clone() => opponent_board.pop_updates()];
+            let opponent_updates = hashmap![player_name.clone() => opponent_board.pop_updates()];
             game_over = opponent_board.is_dead();
+            merge_updates(&mut updates, opponent_updates);
         }
 
+        // my visibility updates
+        {
+            let ref mut my_board = if game_ref.player1 == *player_name {
+                &mut game_ref.board1
+            } else {
+                &mut game_ref.board2
+            };
+            let my_updates = hashmap![opponent_name.clone() => my_board.pop_updates()];
+            merge_updates(&mut updates, my_updates);
+        }
+
+        // hit updates
         match hit_result {
             HitResult::Hit => {
                 response_msg = Message::HitResponse { x: target_x, y: target_y };

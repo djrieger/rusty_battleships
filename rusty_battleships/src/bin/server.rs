@@ -41,7 +41,7 @@ macro_rules! version_string {
     () => ( concat!(description!(), " v", version!()) )
 }
 
-const TICK_DURATION_MS: u64 = 50;
+const TICK_DURATION_MS: u64 = 5;
 
 fn start_udp_discovery(tcp_port: u16) {
     let socket = match UdpSocket::bind("0.0.0.0:49001") {
