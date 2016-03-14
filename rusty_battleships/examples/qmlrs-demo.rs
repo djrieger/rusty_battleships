@@ -20,7 +20,7 @@ use rustc_serialize::json;
 use rustc_serialize::json::{ToJson, Json};
 
 extern crate rusty_battleships;
-use rusty_battleships::message::{serialize_message, deserialize_message, Message, Direction};
+use rusty_battleships::message::{serialize_message, deserialize_message, Message, Direction, ShipPlacement};
 use rusty_battleships::clientstate::{LobbyList, State, Status, tcp_poll};
 use rusty_battleships::clientboard::{Board};
 use rusty_battleships::board::{W, H};
@@ -313,7 +313,38 @@ impl Bridge {
         }
     }
 
-    fn handle_placement(&mut self, placement: String) {
+    fn handle_placement(&mut self, placement_json: String) {
+        // let placement_json = "{\"0\":{\"objectName\":\"\",\"x\":9,\"y\":0,\"length\":5,\"horizontal\":false,\"reverse\":false},\"1\":{\"objectName\":\"\",\"x\":8,\"y\":0,\"length\":4,\"horizontal\":false,\"reverse\":false},\"2\":{\"objectName\":\"\",\"x\":7,\"y\":0,\"length\":3,\"horizontal\":false,\"reverse\":false},\"3\":{\"objectName\":\"\",\"x\":6,\"y\":0,\"length\":2,\"horizontal\":false,\"reverse\":false},\"4\":{\"objectName\":\"\",\"x\":5,\"y\":0,\"length\":2,\"horizontal\":false,\"reverse\":false}}";
+        let data = Json::from_str(&placement_json).unwrap();
+        let obj = data.as_object().unwrap();
+        let mut json_placements = vec![];
+        for i in 0..5 {
+            let placement = obj.get(&i.to_string()).unwrap().as_object().unwrap();
+            json_placements.push(placement);
+        }
+
+        let get_length = |a:&rustc_serialize::json::Object | a.get("length").unwrap().as_u64().unwrap();
+        json_placements.sort_by(|&a, &b| get_length(a).cmp(&get_length(b)));
+        json_placements.reverse();
+
+        let get_bool = |obj: &rustc_serialize::json::Object, key| obj.get(key).unwrap().as_boolean().unwrap();
+        let get_u64 = |obj: &rustc_serialize::json::Object, key| obj.get(key).unwrap().as_u64().unwrap();
+        let mut placements = vec![];
+        for placement_object in &json_placements {
+            let reverse = get_bool(placement_object, "reverse"); 
+            let horizontal = placement_object.get("horizontal").unwrap().as_boolean().unwrap();
+            placements.push(ShipPlacement {
+                x: get_u64(placement_object, "x") as u8,
+                y: get_u64(placement_object, "y") as u8,
+                direction: match (reverse, horizontal) {
+                    (true, true) => Direction::West,
+                    (true, false) => Direction::North,
+                    (false, true) => Direction::East,
+                    (false, false) => Direction::South,
+                },
+            });
+        }
+        println!("{:?}", placements);
     }
 }
 

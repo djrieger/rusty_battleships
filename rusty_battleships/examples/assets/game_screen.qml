@@ -276,11 +276,9 @@ Item {
           buttonIndex += ship.horizontal ? 1 : 10;
         }
       }
-      if (board.placement.filter(function(ship) {
-          return ship.x === -1;
-      }).length === 0) {
+      if ([0, 1, 2, 3, 4].filter(function(i) { return board.placement[i].x === -1; }).length === 0) {
           board.placement_phase = false;
-          // bridge.handle_placement(/* JSON encoded board.placement ? */);
+          bridge.handle_placement(JSON.stringify(board.placement)); 
       }
     }
 
