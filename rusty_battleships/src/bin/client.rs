@@ -90,6 +90,9 @@ struct Bridge {
     lobby_sender : mpsc::Sender<LobbyList>, //For the State object!
     lobby_receiver: mpsc::Receiver<LobbyList>,
 
+    disconnect_sender : mpsc::Sender<bool>,
+    disconnect_receiver : mpsc::Receiver<bool>,
+
     board_receiver: Option<mpsc::Receiver<(Board, Board)>>,
     my_board: Option<Board>,
     their_board: Option<Board>,
@@ -230,7 +233,8 @@ impl Bridge {
         let (tx_board_update, rcv_board_update) : (mpsc::Sender<(Board, Board)>, mpsc::Receiver<(Board, Board)>) = mpsc::channel();
         self.ui_sender = Some(tx_ui_update);
         self.board_receiver = Some(rcv_board_update);
-        return tcp_loop(hostname, port, rcv_ui_update, self.msg_update_sender.clone(), self.lobby_sender.clone(), tx_board_update);
+        return tcp_loop(hostname, port, rcv_ui_update, self.msg_update_sender.clone(),
+            self.lobby_sender.clone(), tx_board_update, self.disconnect_sender.clone());
     }
 
     fn discover_servers(&mut self) -> String {
@@ -400,7 +404,9 @@ Q_OBJECT! { Bridge:
 }
 
 fn tcp_loop(hostname: String, port: i64, rcv_ui_update: mpsc::Receiver<Message>,
-    tx_message_update: mpsc::Sender<(Status, Message)>, tx_lobby_update: mpsc::Sender<LobbyList>, tx_board_update: mpsc::Sender<(Board, Board)>) -> bool {
+    tx_message_update: mpsc::Sender<(Status, Message)>, tx_lobby_update: mpsc::Sender<LobbyList>,
+    tx_board_update: mpsc::Sender<(Board, Board)>, tx_disconnect_update: mpsc::Sender<bool>)
+    -> bool {
 
     //Connect to the specified address and port.
     let mut sender;
@@ -418,7 +424,8 @@ fn tcp_loop(hostname: String, port: i64, rcv_ui_update: mpsc::Receiver<Message>,
     let buff_reader = BufReader::new(receiver);
 
     /* Holds the current state and provides state-based services such as shoot(), move-and-shoot() as well as state- and server-message-dependant state transitions. */
-    let mut current_state = State::new(Some(rcv_ui_update), Some(tx_message_update), Some(tx_lobby_update), Some(tx_board_update), buff_reader, buff_writer);
+    let mut current_state = State::new(rcv_ui_update, tx_message_update, tx_lobby_update,
+        tx_board_update, tx_disconnect_update, buff_reader, buff_writer);
 
     thread::spawn(move || {
         current_state.handle_communication();
@@ -430,9 +437,10 @@ fn tcp_loop(hostname: String, port: i64, rcv_ui_update: mpsc::Receiver<Message>,
 fn main() {
     // Channel pair for connecting the Bridge and ???
     let (tx_main, rcv_tcp) : (mpsc::Sender<Message>, mpsc::Receiver<Message>) = mpsc::channel();
-    let (tx_message_update, rcv_main) : (mpsc::Sender<(Status, Message)>, mpsc::Receiver<(Status, Message)>) = mpsc::channel();
+    let (tx_message_update, rcv_main) = mpsc::channel();
+    let (tx_disconnect_update, rcv_disconnect) = mpsc::channel();
 
-    let (tx_lobby_update, rcv_lobby_update) : (mpsc::Sender<LobbyList>, mpsc::Receiver<LobbyList>) = mpsc::channel();
+    let (tx_lobby_update, rcv_lobby_update) = mpsc::channel();
     let (tx_udp_discovery, rcv_udp_discovery) = mpsc::channel();
 
     let socket = UdpSocket::bind("0.0.0.0:0").unwrap();
@@ -464,6 +472,7 @@ fn main() {
 
     let mut engine = qmlrs::Engine::new();
     let assets = Assets;
+    // FIXME: why the hell does the bridge create the State???
     let mut bridge = Bridge {
         state: Status::Unregistered,
         my_board: None,
@@ -473,7 +482,9 @@ fn main() {
         msg_update_receiver: rcv_main,
         lobby_sender : tx_lobby_update, //For the State object!
         lobby_receiver: rcv_lobby_update,
-        board_receiver: None,
+        disconnect_sender : tx_disconnect_update,
+        disconnect_receiver : rcv_disconnect,
+        board_receiver : None,
         last_rcvd_msg: None,
         udp_discovery_receiver: rcv_udp_discovery,
         discovered_servers: Vec::<Server>::new(),

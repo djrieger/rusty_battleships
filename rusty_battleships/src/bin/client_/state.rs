@@ -73,11 +73,11 @@ pub struct State {
     their_board : Option<Board>,
     pub buff_reader : BufReader<TcpStream>,
     buff_writer : BufWriter<TcpStream>,
-    disconnected : bool,
-    ui_update_receiver : Option<Receiver<Message>>,
-    ui_update_sender : Option<Sender<(Status, Message)>>,
-    lobby_update_sender : Option<Sender<LobbyList>>,
-    board_update_sender : Option<Sender<(Board, Board)>>,
+    ui_update_receiver : Receiver<Message>,
+    ui_update_sender : Sender<(Status, Message)>,
+    lobby_update_sender : Sender<LobbyList>,
+    board_update_sender : Sender<(Board, Board)>,
+    disconnect_update_sender : Sender<bool>
 }
 
 #[derive(Debug, Hash, Eq, PartialEq, Clone)]
@@ -102,10 +102,11 @@ pub enum Status {
 
 impl State {
 
-    pub fn new(rec_ui_update: Option<Receiver<Message>>,
-                tx_ui_update: Option<Sender<(Status, Message)>>,
-                tx_lobby_update: Option<Sender<LobbyList>>,
-                tx_board_update: Option<Sender<(Board, Board)>>,
+    pub fn new(rec_ui_update: Receiver<Message>,
+                tx_ui_update: Sender<(Status, Message)>,
+                tx_lobby_update: Sender<LobbyList>,
+                tx_board_update: Sender<(Board, Board)>,
+                tx_disconnect_update: Sender<bool>,
                 buff_reader: BufReader<TcpStream>,
                 buff_writer: BufWriter<TcpStream>) -> State {
         State {
@@ -119,11 +120,11 @@ impl State {
             their_board : None,
             buff_reader : buff_reader,
             buff_writer : buff_writer,
-            disconnected : true,
             ui_update_receiver : rec_ui_update,
             ui_update_sender : tx_ui_update,
             lobby_update_sender : tx_lobby_update,
             board_update_sender : tx_board_update,
+            disconnect_update_sender : tx_disconnect_update
         }
     }
 
@@ -459,15 +460,15 @@ impl State {
         self.update_listen_loop(rx);
     }
 
-    fn send_updated_lobby(&mut self, sender: &mut Sender<LobbyList>) {
+    fn send_updated_lobby(&mut self) {
         let l = &self.lobby;
-        sender.send(LobbyList {
+        self.lobby_update_sender.send(LobbyList {
             available_players: l.get_available_players(),
             ready_players: l.get_ready_players(),
         }).unwrap();
     }
 
-    fn send_updated_boards(&mut self, sender: &mut Sender<(Board, Board)>) {
+    fn send_updated_boards(&mut self) {
         let mb;
         let tb;
         if let Some(ref b) = self.my_board {
@@ -481,13 +482,11 @@ impl State {
             panic!("I was told there would be boards! But there's no board for them...");
         }
         let boards = (mb, tb);
-        sender.send(boards);
+        self.board_update_sender.send(boards);
     }
 
     pub fn update_listen_loop(&mut self, rx: Receiver<Message>) {
         println!(">>>Starting update_listen_loop.");
-
-        self.disconnected = false;
 
         let tick = timer_periodic(TICK_DURATION_MS);
 
@@ -506,30 +505,22 @@ impl State {
                     Message::PlayerJoinedUpdate {nickname: nn} => {
                         println!("Welcome our new captain {:?}", nn);
                         self.lobby.add_player(&nn.clone());
-                        if let Some(mut sender) = self.lobby_update_sender.clone() {
-                            self.send_updated_lobby(&mut sender);
-                        }
+                        self.send_updated_lobby();
                     },
                     Message::PlayerLeftUpdate {nickname: nn} => {
                         println!("Say goodbye to captain {:?}", nn);
                         self.lobby.remove_player(&nn.clone());
-                        if let Some(mut sender) = self.lobby_update_sender.clone() {
-                            self.send_updated_lobby(&mut sender);
-                        }
+                        self.send_updated_lobby();
                     }
                     Message::PlayerReadyUpdate {nickname: nn} => {
                         println!("Captain {:?} is now ready to be challenged.", nn);
                         self.lobby.ready_player(&nn.clone());
-                        if let Some(mut sender) = self.lobby_update_sender.clone() {
-                            self.send_updated_lobby(&mut sender);
-                        }
+                        self.send_updated_lobby();
                     },
                     Message::PlayerNotReadyUpdate {nickname : nn} => {
                         println!("Captain {:?} is not ready.", nn);
                         self.lobby.unready_player(&nn.clone());
-                        if let Some(mut sender) = self.lobby_update_sender.clone() {
-                            self.send_updated_lobby(&mut sender);
-                        }
+                        self.send_updated_lobby();
                     },
                     Message::GameStartUpdate {nickname: nn} => {
                         println!("Received a challenge by captain {:?}", nn);
@@ -545,16 +536,12 @@ impl State {
                     Message::YourTurnUpdate => {
                         println!("It's yout turn!");
                         self.handle_your_turn_update();
-                        if let Some(mut sender) = self.board_update_sender.clone() {
-                            self.send_updated_boards(&mut sender);
-                        }
+                        self.send_updated_boards();
                     },
                     Message::EnemyTurnUpdate => {
                         println!("It's the enemy's turn!");
                         self.handle_enemy_turn_update();
-                        if let Some(mut sender) = self.board_update_sender.clone() {
-                            self.send_updated_boards(&mut sender);
-                        }
+                        self.send_updated_boards();
                     },
                     Message::NotYourTurnResponse => {
                         //println!("I'm sorry dave, I'm afraid I can't do that.");
@@ -566,30 +553,22 @@ impl State {
                     Message::EnemyHitUpdate {x, y} => {
                         println!("We're hit! ({}, {})", x, y);
                         self.handle_enemy_hit_update(x, y);
-                        if let Some(mut sender) = self.board_update_sender.clone() {
-                            self.send_updated_boards(&mut sender);
-                        }
+                        self.send_updated_boards();
                     },
                     Message::EnemyMissUpdate {x, y} => {
                         println!("They missed! ({}, {})", x, y);
                         self.handle_enemy_miss_update(x, y);
-                        if let Some(mut sender) = self.board_update_sender.clone() {
-                            self.send_updated_boards(&mut sender);
-                        }
+                        self.send_updated_boards();
                     },
                     Message::EnemyVisibleUpdate {x, y} => {
                         println!("The enemy has been sighted! ({}, {})", x, y);
                         self.handle_enemy_visible_update(x, y);
-                        if let Some(mut sender) = self.board_update_sender.clone() {
-                            self.send_updated_boards(&mut sender);
-                        }
+                        self.send_updated_boards();
                     },
                     Message::EnemyInvisibleUpdate {x, y} => {
                         println!("We lost track of the enemy! ({}, {})", x, y);
                         self.handle_enemy_invisible_update(x, y);
-                        if let Some(mut sender) = self.board_update_sender.clone() {
-                            self.send_updated_boards(&mut sender);
-                        }
+                        self.send_updated_boards();
                     },
                     // RESPONSES
                     Message::OkResponse => outcome = self.handle_ok_response(server_response.clone()),
@@ -618,31 +597,22 @@ impl State {
                     Message::HitResponse {x, y} => {
                         println!("You have hit a ship! ({}, {})", x, y);
                         self.handle_hit_response(x, y);
-                        if let Some(mut sender) = self.board_update_sender.clone() {
-                            self.send_updated_boards(&mut sender);
-                        }
+                        self.send_updated_boards();
                     },
                     Message::MissResponse {x, y} => {
                         println!("You have missed.({}, {})", x, y);
                         self.handle_miss_response(x, y);
-                        if let Some(mut sender) = self.board_update_sender.clone() {
-                            self.send_updated_boards(&mut sender);
-                        }
+                        self.send_updated_boards();
                     },
                     Message::DestroyedResponse {x, y} => {
                         println!("Congratulations! You destroyed an enemy ship!");
                         self.handle_destroyed_response(x, y);
-                        if let Some(mut sender) = self.board_update_sender.clone() {
-                            self.send_updated_boards(&mut sender);
-                        }
+                        self.send_updated_boards();
                     },
                     _ => println!(">>>RECEIVED: {:?}", server_response),
                 }
 
-                if let Some(ref mut sender) = self.ui_update_sender {
-                    println!("Transmitting to Bridge.");
-                    sender.send( (self.status.clone(), server_response.clone()) );
-                }
+                self.ui_update_sender.send( (self.status.clone(), server_response.clone()) );
 
             } else if received == Err(TryRecvError::Empty) {
                 //println!("Nothing there =(");
@@ -650,13 +620,7 @@ impl State {
                 break;
             }
 
-            let mut input = Err(TryRecvError::Disconnected);
-            /* Handle user input */
-            if let Some(ref mut r) = self.ui_update_receiver {
-                let rec = r; //Safe because of if-condition!
-//                    println!(">>>Checking for UI input.");
-                input = rec.try_recv();
-            }
+            let input = self.ui_update_receiver.try_recv();
 
             if let Ok(received) = input {
 //                    println!(">>>UI input!");
@@ -695,9 +659,8 @@ impl State {
             }
 
             tick.recv().expect("Timer thread died unexpectedly."); // wait for next tick
-
         }
 
-        self.disconnected = true;
+        self.disconnect_update_sender.send(true);
     }
 }
