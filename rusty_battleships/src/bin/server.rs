@@ -301,7 +301,7 @@ fn send_updates(player_handles: &mut Vec<board::PlayerHandle>, message_store: &m
             if message_store.contains_key(name) {
                 for message in message_store.remove(name).unwrap() {
                     println!("#{} ({}): {}", i, name, Yellow.paint(format!("{:?}", message)));
-                    player_handle.to_child_endpoint.send(ToChildCommand::Message(message)).unwrap();
+                    player_handle.to_child_endpoint.send(ToChildCommand::Message(message));
                 }
             }
         }
