@@ -109,7 +109,7 @@ impl Board {
     }
 
     pub fn move_ship(&mut self, ship_index: u8, direction: Direction) -> bool {
-        return self.add_state() && self.ships[ship_index as usize].move_me(direction);
+        return self.ships[ship_index as usize].move_me(direction) && self.add_state();
     }
 
     pub fn hit(&mut self, x: usize, y: usize) -> HitResult {
