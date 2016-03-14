@@ -122,7 +122,8 @@ Item {
                         MouseArea {
                             anchors.fill: parent
                             onClicked: {
-                                bridge.on_clicked_opp_board(index);
+                                opp_board_clicked(index);
+                                // bridge.on_clicked_opp_board(index);
                             }
                         }
                     }
@@ -159,6 +160,13 @@ Item {
         CheckBox {
             text: "Bereit"
         }
+    }
+
+    function opp_board_clicked(index) {
+        var x = index % 10;
+        var y = Math.floor(index / 10);
+        console.log("Clicked on opponent board");
+        bridge.on_clicked_opp_board(x, y);
     }
 
     function board_clicked(index) {

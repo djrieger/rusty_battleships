@@ -248,9 +248,9 @@ impl Bridge {
         println!("Button clicked at {}, {}", x, y);
     }
 
-    fn on_clicked_opp_board(&mut self, button_index: i64) {
-        let (x, y) = Bridge::get_coords_from_button_index(button_index);
+    fn on_clicked_opp_board(&mut self, x: i64, y: i64) {
         println!("Button clicked at {}, {}", x, y);
+        self.ui_sender.as_mut().unwrap().send(Message::ShootRequest { x: x as u8, y: y as u8 });
     }
 
     // fn get_boards(&self) -> String {
@@ -366,7 +366,7 @@ Q_OBJECT! { Bridge:
     slot fn discover_servers();
     slot fn get_features_list();
     slot fn on_clicked_my_board(i64);
-    slot fn on_clicked_opp_board(i64);
+    slot fn on_clicked_opp_board(i64, i64);
     slot fn handle_placement(String);
     // slot fn get_boards();
 
