@@ -90,7 +90,7 @@ struct Bridge {
     lobby_sender : mpsc::Sender<LobbyList>, //For the State object!
     lobby_receiver: mpsc::Receiver<LobbyList>,
 
-    disconnect_sender : mpsc::Sender<bool>,
+    disconnect_sender : mpsc::Sender<bool>, // For state object
     disconnect_receiver : mpsc::Receiver<bool>,
 
     board_receiver: Option<mpsc::Receiver<(Board, Board)>>,
@@ -143,6 +143,16 @@ impl Bridge {
         }
 
         return success;
+    }
+
+    fn connection_closed(&mut self) -> bool {
+        let mut result = false;
+
+        while let Ok(disconnected) = self.disconnect_receiver.try_recv() {
+            result = disconnected;
+        }
+
+        return result;
     }
 
     fn update_lobby(&mut self) -> String {
@@ -398,6 +408,7 @@ Q_OBJECT! { Bridge:
     slot fn on_clicked_opp_board(i64, i64);
     slot fn handle_placement(String);
     // slot fn get_boards();
+    slot fn connection_closed();
 
     slot fn set_ready_state(i64);
     slot fn get_opp_board();

@@ -41,6 +41,19 @@ ApplicationWindow {
         onTriggered: {
             statusMessage.text = bridge.poll_state();
             logMessage.text = bridge.poll_log();
+
+            if (bridge.connection_closed()) {
+                if (gameScreen.visible) {
+                    gameScreen.deactivate();
+                    connectScreen.activate();
+                } else if (lobbyScreen.visible) {
+                    lobbyScreen.deactivate();
+                    connectScreen.activate();
+                } else if (loginScreen.visible) {
+                    loginScreen.deactivate();
+                    connectScreen.activate();
+                }
+            }
         }
     }
 
