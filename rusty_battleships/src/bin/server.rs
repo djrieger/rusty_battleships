@@ -83,10 +83,11 @@ fn shutdown_player(tx: &mpsc::SyncSender<ToMainThreadCommand>, rx: &mpsc::Receiv
     rx.recv().expect("Main thread died before answering, exiting.");
 }
 
-fn respond(response_msg: Message, buff_writer: &mut BufWriter<TcpStream>) {
+fn respond(response_msg: Message, buff_writer: &mut BufWriter<TcpStream>) -> Result<(), std::io::Error> {
     let serialized_msg = serialize_message(response_msg);
-    buff_writer.write(&serialized_msg[..]).expect("Could not write to TCP steam, exiting.");
-    buff_writer.flush().expect("Could not write to TCP steam, exiting.");
+    try!(buff_writer.write(&serialized_msg[..])); //.expect("Could not write to TCP steam, exiting.");
+    try!(buff_writer.flush()); //.expect("Could not write to TCP steam, exiting.");
+    Ok(())
 }
 
 fn handle_client(stream: TcpStream, tx: mpsc::SyncSender<ToMainThreadCommand>, rx: mpsc::Receiver<ToChildCommand>) {
@@ -141,7 +142,9 @@ fn handle_client(stream: TcpStream, tx: mpsc::SyncSender<ToMainThreadCommand>, r
                     return;
                 },
                 ToChildCommand::Message(response_msg) => {
-                    respond(response_msg, &mut buff_writer);
+                    if respond(response_msg, &mut buff_writer).is_err() {
+                        return;
+                    }
                 },
             }
         }
