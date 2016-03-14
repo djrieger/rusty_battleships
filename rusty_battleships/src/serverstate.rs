@@ -428,7 +428,7 @@ fn handle_shoot(games: &mut Vec<Rc<RefCell<Game>>>, game: Rc<RefCell<Game>>,
             };
             println!("Shooting on {}'s board at {}:{}:", opponent_name, target_x, target_y);
             hit_result = opponent_board.hit(target_x as usize, target_y as usize);
-            updates = hashmap![opponent_name.clone() => opponent_board.pop_updates()];
+            updates = hashmap![player_name.clone() => opponent_board.pop_updates()];
             game_over = opponent_board.is_dead();
         }
 
