@@ -154,24 +154,10 @@ impl Bridge {
     }
 
     fn update_boards(&mut self) {
-        let mut response = Err(TryRecvError::Disconnected);
-        let mut my_board: Option<Board> = None;
-        let mut their_board: Option<Board> = None;
-        while response != Err(TryRecvError::Empty) {
-            if let Some(ref mut br) = self.board_receiver {
-                response = br.try_recv();
-                if let Ok((ref mb, ref tb)) = response {
-                    my_board = Some(mb.clone());
-                    their_board = Some(tb.clone());
-                } else if let Err(TryRecvError::Disconnected) = response {
-                    panic!("Board update list was closed. Probably because the sender thread died.");
-                } /*else {
-                    panic!("You shall not pass Non-LobbyList messages via the lobby update channel!");
-                }*/
-                self.my_board = my_board.clone();
-                self.their_board = their_board.clone();
-            } else {
-                panic!("Our board update receiver is not there!");
+        if let Some(ref recv) = self.board_receiver {
+            while let Ok((ref my_board, ref their_board)) = recv.try_recv() {
+                self.my_board = Some(my_board.clone());
+                self.their_board = Some(their_board.clone());
             }
         }
     }
@@ -190,8 +176,6 @@ impl Bridge {
     }
 
     fn poll_state(&mut self) -> String {
-        // let foo = self.get_opp_board();
-        // println!("len = {}, str = {}", foo.len(), foo);
         while let Ok(tuple) = self.msg_update_receiver.try_recv() {
             self.state = tuple.0;
             self.last_rcvd_msg = Some(tuple.1);
@@ -260,59 +244,6 @@ impl Bridge {
         self.ui_sender.as_mut().unwrap().send(Message::ShootRequest { x: x as u8, y: y as u8 });
     }
 
-
-
-    // fn get_boards(&self) -> String {
-    //     let mut ships = Vec::<Ship>::new();
-    //     ships.push(Ship { x: 0, y: 0, length: 2, direction: Direction::East, health_points: 2});
-    //     ships.push(Ship { x: 0, y: 1, length: 2, direction: Direction::East, health_points: 2});
-    //     ships.push(Ship { x: 0, y: 2, length: 3, direction: Direction::East, health_points: 3});
-    //     ships.push(Ship { x: 0, y: 3, length: 4, direction: Direction::East, health_points: 4});
-    //     ships.push(Ship { x: 0, y: 4, length: 5, direction: Direction::East, health_points: 5});
-    //     let mut board = Board::new(ships, true);
-    //     board.compute_state();
-    //
-    //     let mut result = String::new();
-    //     {
-    //         for y in 0..H {
-    //             for x in 0..W {
-    //                 match board.state[x][y].ship_index {
-    //                     Some(index) => result.push_str(&index.to_string()),
-    //                     None => result.push_str(" ")
-    //                 }
-    //                 if x == W-1 {
-    //                     result.push_str("|\n");
-    //                 } else {
-    //                     result.push_str("|");
-    //                 }
-    //             }
-    //         }
-    //         println!("{}", result);
-    //     }
-    //
-    //     board.move_ship(0, Direction::East);
-    //     {
-    //         result = String::new();
-    //         for y in 0..H {
-    //             for x in 0..W {
-    //                 match board.state[x][y].ship_index {
-    //                     Some(index) => result.push_str(&index.to_string()),
-    //                     None => result.push_str(" ")
-    //                 }
-    //                 if x == W-1 {
-    //                     result.push_str("|\n");
-    //                 } else {
-    //                     result.push_str("|");
-    //                 }
-    //             }
-    //         }
-    //         println!("{}", result);
-    //     }
-    //
-    //
-    //     return result;
-    // }
-
     fn set_ready_state(&mut self, ready: i64) {
         if ready == 1 {
             self.ui_sender.as_mut().unwrap().send(Message::ReadyRequest);
@@ -322,7 +253,6 @@ impl Bridge {
     }
 
     fn handle_placement(&mut self, placement_json: String) {
-        // let placement_json = "{\"0\":{\"objectName\":\"\",\"x\":9,\"y\":0,\"length\":5,\"horizontal\":false,\"reverse\":false},\"1\":{\"objectName\":\"\",\"x\":8,\"y\":0,\"length\":4,\"horizontal\":false,\"reverse\":false},\"2\":{\"objectName\":\"\",\"x\":7,\"y\":0,\"length\":3,\"horizontal\":false,\"reverse\":false},\"3\":{\"objectName\":\"\",\"x\":6,\"y\":0,\"length\":2,\"horizontal\":false,\"reverse\":false},\"4\":{\"objectName\":\"\",\"x\":5,\"y\":0,\"length\":2,\"horizontal\":false,\"reverse\":false}}";
         let data = Json::from_str(&placement_json).unwrap();
         let obj = data.as_object().unwrap();
         let mut json_placements = vec![];
@@ -363,7 +293,8 @@ impl Bridge {
         println!("{:?}", placements);
     }
 
-    fn get_opp_board(&self) -> String {
+    fn get_opp_board(&mut self) -> String {
+        self.update_boards();
         let mut result = String::new();
         for y in 0..H {
             for x in 0..W {
@@ -379,7 +310,6 @@ impl Bridge {
                 }
             }
         }
-        println!("Opp Board: {}", result);
         result
     }
 }
