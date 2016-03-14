@@ -224,7 +224,7 @@ impl State {
         return true;
     }
 
-    fn shoot_and_move_right(&mut self, x: Option<u8>, y: Option<u8>) {
+    fn shoot(&mut self, x: Option<u8>, y: Option<u8>) {
         if self.status != Status::Planning {
             panic!("I cannot shoot when I'm not in Planning state! STATUS = {:?}", self.status);
         }
@@ -239,7 +239,7 @@ impl State {
             x_coord = x.unwrap(); //Safe because of if-condition
             y_coord = y.unwrap(); //Safe because of if-condition
         }
-        send_message(Message::MoveAndShootRequest {id: 0, direction: Direction::East, x: x_coord, y: y_coord}, &mut self.buff_writer);
+        send_message(Message::ShootRequest { x: x_coord, y: y_coord}, &mut self.buff_writer);
     }
 
     fn move_and_shoot(&mut self, x: u8, y: u8, id: u8, direction: Direction) {
@@ -737,7 +737,7 @@ impl State {
                             self.place_ships( placement );
                         },
                         Message::ShootRequest { x, y } => {
-                            self.shoot_and_move_right( Some(x), Some(y) );
+                            self.shoot( Some(x), Some(y) );
                         },
                         Message::MoveAndShootRequest { id, direction, x, y } => {
                             self.move_and_shoot( x, y, id, direction );
