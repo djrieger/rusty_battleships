@@ -66,11 +66,14 @@ fn start_udp_discovery(tcp_port: u16) {
                     let mut response = vec![];
                     response.write_u16::<BigEndian>(tcp_port).unwrap();
                     write!(&mut response, "Some host name");
-                    socket.send_to(&response[..], &src).expect("unable to respond");
-                    println!("Responded with port and host name");
+                    if socket.send_to(&response[..], &src).is_err() {
+                        println!("Unable to respond");
+                    } else {
+                        println!("Responded with port and host name");
+                    }
                 },
                 Err(e) => {
-                    println!("couldn't recieve a datagram: {}", e);
+                    println!("Couldn't receive a datagram: {}", e);
                 }
             }
         }
@@ -128,7 +131,7 @@ fn handle_client(stream: TcpStream, tx: mpsc::SyncSender<ToMainThreadCommand>, r
                     } else {
                         println!("Got error: {:?}", e);
                         // Ignoring return value of respond() since we are exiting anyway
-                        respond(Message::InvalidRequestResponse, &mut buff_writer);
+                        let _ = respond(Message::InvalidRequestResponse, &mut buff_writer);
                     }
                     return;
                 },
@@ -142,7 +145,7 @@ fn handle_client(stream: TcpStream, tx: mpsc::SyncSender<ToMainThreadCommand>, r
                 ToChildCommand::Message(Message::InvalidRequestResponse) => {
                     shutdown_player(&tx, &rx);
                     // Ignoring return value of respond() since we are exiting anyway
-                    respond(Message::InvalidRequestResponse, &mut buff_writer);
+                    let _ = respond(Message::InvalidRequestResponse, &mut buff_writer);
                     return;
                 },
                 ToChildCommand::Message(response_msg) => {
@@ -254,6 +257,7 @@ fn main() {
             player_handles.push(player_handle);
         }
         // Receive Messages from child threads
+	    let mut valid = vec![true; player_handles.len()];
         for (i, player_handle) in player_handles.iter_mut().enumerate() {
             if let Ok(maybe_msg) = player_handle.from_child_endpoint.try_recv() {
                 match maybe_msg {
@@ -269,6 +273,7 @@ fn main() {
                         if result.terminate_connection {
                             println!("-- Closing connection to child {}", i);
                             player_handle.to_child_endpoint.send(ToChildCommand::TerminateConnection).unwrap();
+	                        valid[i] = false;
                         }
                         if !result.updates.is_empty() {
                             message_store = result.updates;
@@ -280,10 +285,19 @@ fn main() {
                             message_store = state::terminate_player(name, &mut lobby, &mut games);
                         }
                         player_handle.to_child_endpoint.send(ToChildCommand::TerminateConnection).unwrap();
+	                    valid[i] = false;
                     }
                 }
             }
         }
+
+	    // delete old handles
+	    for (i, is_valid) in valid.iter().enumerate() {
+		    if !is_valid {
+			    player_handles.remove(i);
+		    }
+	    }
+
         // Send all updates from result
         send_updates(&mut player_handles, &mut message_store);
 
@@ -309,7 +323,7 @@ fn send_updates(player_handles: &mut Vec<board::PlayerHandle>, message_store: &m
             if message_store.contains_key(name) {
                 for message in message_store.remove(name).unwrap() {
                     println!("#{} ({}): {}", i, name, Yellow.paint(format!("{:?}", message)));
-                    player_handle.to_child_endpoint.send(ToChildCommand::Message(message));
+                    player_handle.to_child_endpoint.send(ToChildCommand::Message(message)).unwrap();
                 }
             }
         }

@@ -19,10 +19,12 @@ Item {
 
                 width: 200; height: 200; color: "blue"
 
-                property int currentX: -1;
-                property int currentY: -1;
+                property int currentX: -1
+                property int currentY: -1
 
                 property bool active: true
+                property bool moveAllowed: false
+                property int moveDirection: -1
                 property bool placement_phase: true
 
                 // only used during the placement phase
@@ -134,28 +136,40 @@ Item {
 
         RowLayout {
             Button {
-                id: moveLeftBtn
                 width: 10
                 height: 10
-                Text { text: "<" }
+                text: "<"
+                enabled: board.moveAllowed
+                onClicked: {
+                    move(0);
+                }
             }
             Button {
-                id: moveRightBtn
                 width: 10
                 height: 10
-                Text { text: ">" }
+                text: ">"
+                enabled: board.moveAllowed
+                onClicked: {
+                    move(1);
+                }
             }
             Button {
-                id: moveUpBtn
                 width: 10
                 height: 10
-                Text { text: "∧" }
+                text: "∧"
+                enabled: board.moveAllowed
+                onClicked: {
+                    move(2);
+                }
             }
             Button {
-                id: moveDownBtn
                 width: 10
                 height: 10
-                Text { text: "∨" }
+                text: "∨"
+                enabled: board.moveAllowed
+                onClicked: {
+                    move(3);
+                }
             }
         }
 	}
@@ -250,7 +264,7 @@ Item {
           draw_ship(shipId);
         }
       }
-      
+
       if ([0, 1, 2, 3, 4].filter(function(i) { return board.placement[i].x === -1; }).length === 0) {
           board.placement_phase = false;
           bridge.handle_placement(JSON.stringify(board.placement));
@@ -287,6 +301,11 @@ Item {
           buttonIndex += ship.horizontal ? 1 : 10;
         }
       }
+    }
+
+    function move(direction) {
+		board.moveDirection = direction
+		board.moveAllowed = false
     }
 
 
