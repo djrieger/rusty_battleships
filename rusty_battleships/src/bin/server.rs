@@ -75,7 +75,7 @@ fn start_udp_discovery(tcp_port: u16) {
                     println!("{}", std::str::from_utf8(&buf).unwrap_or(""));
                     let mut response = vec![];
                     response.write_u16::<BigEndian>(tcp_port).unwrap();
-                    write!(&mut response, version_string!());
+                    write!(&mut response, version_string!()).unwrap();
                     if socket.send_to(&response[..], &src).is_err() {
                         println!("Unable to respond");
                     } else {

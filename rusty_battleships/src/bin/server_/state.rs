@@ -10,9 +10,9 @@ use rusty_battleships::game::{Game, GameState};
 // From http://stackoverflow.com/a/28392068
 macro_rules! hashmap {
     ($( $key: expr => $val: expr ),*) => {{
-         let mut map = ::std::collections::HashMap::new();
-         $( map.insert($key, $val); )*
-         map
+        let mut map = ::std::collections::HashMap::new();
+        $( map.insert($key, $val); )*
+        map
     }}
 }
 
@@ -299,6 +299,8 @@ pub fn handle_report_error_request(errormessage: String, player: &mut PlayerHand
         terminate_connection: true,
     };
 
+    println!("Client reported error: {}", errormessage);
+
     // For registered players we need to terminate a running game, if any
     if let Some(ref username) = player.nickname {
         termination_result.updates = terminate_player(username, lobby, games);
@@ -399,7 +401,7 @@ fn handle_shoot(games: &mut Vec<Rc<RefCell<Game>>>, game: Rc<RefCell<Game>>,
     let game_over;
     let hit_result;
     let response_msg;
-    let mut updates = hashmap![];
+    let mut updates = HashMap::new();
     let opponent_name;
 
     // evaluate shot
