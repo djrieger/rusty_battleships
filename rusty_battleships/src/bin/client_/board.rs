@@ -2,7 +2,7 @@ use rusty_battleships::board::{CellState};
 use rusty_battleships::message::{Message, Direction};
 use rusty_battleships::ship::Ship;
 
-pub const W: usize = 16;
+pub const W: usize = 10;
 pub const H: usize = 10;
 
 #[derive(Debug, Hash, Eq, PartialEq, Clone)]
@@ -115,11 +115,12 @@ impl Board {
         for (ship_index, ship) in self.ships.iter().filter(|ship| !ship.is_dead()).enumerate() {
             for i in 0..ship.length  {
                 let (dest_x, dest_y) = Board::get_ship_dest_coords(ship, i);
-                if !self.coords_valid(dest_x, dest_y) || new_state[dest_x][dest_y].has_ship() {
+                if !self.coords_valid(dest_x, dest_y)
+                        || new_state[dest_x as usize][dest_y as usize].has_ship() {
                     // coordinates are invalid or there is another ship at these coordinates
                     return (false, vec![]);
                 } else {
-                    let ref cell = self.state[dest_x][dest_y];
+                    let ref cell = self.state[dest_x as usize][dest_y as usize];
                     if cell.visible && cell.has_ship() {
                         // no ship was here before but now this ship occupies this cell
                         visibility_updates.push(Message::EnemyVisibleUpdate { x: dest_x as u8, y: dest_y as u8 });
@@ -147,11 +148,11 @@ impl Board {
         return (true, visibility_updates);
     }
 
-    fn coords_valid(&self, x: usize, y: usize) -> bool {
-        return !(x >= (W as usize) - 1 || y >= (H as usize) - 1);
+    fn coords_valid(&self, x: isize, y: isize) -> bool {
+        return x >= 0 && y >= 0 && x < (W as isize) && y < (H as isize);
     }
 
-    fn get_ship_dest_coords(ship: &Ship, i: usize) -> (usize, usize) {
+    fn get_ship_dest_coords(ship: &Ship, i: usize) -> (isize, isize) {
         let mut dest = (ship.x, ship.y);
         match ship.direction {
             Direction::East => dest.0 += i as isize,
@@ -159,6 +160,6 @@ impl Board {
             Direction::West => dest.0 -= i as isize,
             Direction::North => dest.1 -= i as isize,
         }
-        return (dest.0 as usize, dest.1 as usize);
+        return (dest.0, dest.1);
     }
 }
