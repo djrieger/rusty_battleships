@@ -339,7 +339,6 @@ pub fn handle_place_ships_request(placement: [ShipPlacement; 5], player_name: &S
         if Board::try_create(ships.clone()).is_none() {
             return Result::respond(Message::InvalidRequestResponse, false);
         }
-        // let new_board_valid;
         let opponent_ready;
         {
             println!("Computing initial placement for {}:", player_name);
@@ -347,11 +346,6 @@ pub fn handle_place_ships_request(placement: [ShipPlacement; 5], player_name: &S
             *game_ref.get_board(player_name) = Board::try_create(ships).unwrap();
             opponent_ready = game_ref.get_opponent_board(player_name).has_ships();
         }
-
-        // Check if new state is valid
-        // if !new_board_valid {
-        //     return Result::respond(Message::InvalidRequestResponse, false);
-        // }
 
         let mut game_ref = (*game).borrow_mut();
         // opponent also done placing ships?
@@ -377,7 +371,6 @@ pub fn handle_place_ships_request(placement: [ShipPlacement; 5], player_name: &S
 fn handle_move(game: &mut Game, player_name: &String, movement: (usize, Direction)) -> bool {
     let (ship_index, direction) = movement;
     if ship_index > 4 {
-        // ship index is out of bounds
         println!("ship index out of bounds");
         return false;
     }
