@@ -236,8 +236,8 @@ pub fn handle_not_ready_request(username: &String, lobby: &mut HashMap<String, P
 
 fn initialize_game(player1: &String, player2: &String) -> Rc<RefCell<Game>> {
     // Unwrapping is safe here since boards with no ships are always valid
-    let first_board = Board::try_create(vec![]).unwrap();
-    let second_board = Board::try_create(vec![]).unwrap();
+    let first_board = Board::try_create(vec![], true).unwrap();
+    let second_board = Board::try_create(vec![], true).unwrap();
 
     return Rc::new(RefCell::new(Game::new(first_board, second_board, (*player1).clone(), (*player2).clone())));
 }
@@ -336,7 +336,7 @@ pub fn handle_place_ships_request(placement: [ShipPlacement; 5], player_name: &S
         }
 
         let ships = placement2ships(placement);
-        if Board::try_create(ships.clone()).is_none() {
+        if Board::try_create(ships.clone(), false).is_none() {
             return Result::respond(Message::InvalidRequestResponse, false);
         }
         // let new_board_valid;
@@ -346,13 +346,13 @@ pub fn handle_place_ships_request(placement: [ShipPlacement; 5], player_name: &S
             let mut game_ref = (*game).borrow_mut();
             if game_ref.player1 == *player_name {
                 // game_ref.board1.ships = ships;
-                game_ref.board1 = Board::try_create(ships).unwrap();
+                game_ref.board1 = Board::try_create(ships, true).unwrap();
                 // new_board_valid = game_ref.board1.compute_state();
                 opponent_ready = game_ref.board2.has_ships();
             } else {
                 // game_ref.board2.ships = ships;
                 // new_board_valid = game_ref.board2.compute_state();
-                game_ref.board2 = Board::try_create(ships).unwrap();
+                game_ref.board2 = Board::try_create(ships, true).unwrap();
                 opponent_ready = game_ref.board1.has_ships();
             };
         }

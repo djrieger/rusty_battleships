@@ -1,18 +1,19 @@
-use rusty_battleships::board::{CellState};
-use rusty_battleships::message::{Direction};
-use rusty_battleships::ship::Ship;
+// use rusty_battleships::board::{CellState};
+// use rusty_battleships::message::{Direction};
+// use rusty_battleships::ship::Ship;
 
+/*
 pub const W: usize = 10;
 pub const H: usize = 10;
 
 #[derive(Debug, Hash, Eq, PartialEq, Clone)]
-pub struct Board {
+pub struct BoardOLD {
     pub mine: bool,
     pub ships: Vec<Ship>,
     pub state: [[CellState; H]; W],
 }
 
-impl Board {
+impl BoardOLD {
 
     pub fn new(ships: Vec<Ship>, mine: bool) -> Board {
         Board {
@@ -146,3 +147,4 @@ impl Board {
         return (dest.0, dest.1);
     }
 }
+*/

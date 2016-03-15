@@ -7,11 +7,11 @@ use std::cmp;
 
 use rustc_serialize::Encodable;
 
-use client_::board::{Board};
 use client_::lobby::ClientLobby;
 
 use rusty_battleships::message::{serialize_message, deserialize_message, Message, ShipPlacement, Direction, Reason};
 use rusty_battleships::ship::{Ship};
+use rusty_battleships::board::{Board, DumbBoard};
 use rusty_battleships::timer::timer_periodic;
 
 
@@ -64,13 +64,13 @@ pub struct State {
     hits: u8,
     destroyed: u8,
     my_board : Option<Board>,
-    their_board : Option<Board>,
+    their_board : Option<DumbBoard>,
     pub buff_reader : BufReader<TcpStream>,
     buff_writer : BufWriter<TcpStream>,
     ui_update_receiver : Receiver<Message>,
     ui_update_sender : Sender<(Status, Message)>,
     lobby_update_sender : Sender<LobbyList>,
-    board_update_sender : Sender<(Board, Board, u8, u8)>,
+    board_update_sender : Sender<(Board, DumbBoard, u8, u8)>,
     disconnect_update_sender : Sender<bool>
 }
 
@@ -99,7 +99,7 @@ impl State {
     pub fn new(rec_ui_update: Receiver<Message>,
                 tx_ui_update: Sender<(Status, Message)>,
                 tx_lobby_update: Sender<LobbyList>,
-                tx_board_update: Sender<(Board, Board, u8, u8)>,
+                tx_board_update: Sender<(Board, DumbBoard, u8, u8)>,
                 tx_disconnect_update: Sender<bool>,
                 buff_reader: BufReader<TcpStream>,
                 buff_writer: BufWriter<TcpStream>) -> State {
@@ -195,9 +195,13 @@ impl State {
             };
             ship_vec.push(s);
         }
-        self.my_board = Some(Board::new(ship_vec, true));
+        let my_board = Board::try_create(ship_vec, false);
+        if my_board.is_none() {
+            return false;
+        }
+        self.my_board = my_board;
         self.my_board.as_mut().unwrap().compute_state();
-        self.their_board = Some(Board::new(Vec::<Ship>::new(), false));
+        self.their_board = Some(DumbBoard::new());
 
         send_message(Message::PlaceShipsRequest{ placement: ships }, &mut self.buff_writer);
 
@@ -217,7 +221,7 @@ impl State {
             panic!("I cannot move and shoot when I'm not in Planning state! STATUS = {:?}", self.status);
         }
 
-        self.my_board.as_mut().unwrap().move_ship(id as usize, direction);
+        self.my_board.as_mut().unwrap().move_ship(id, direction);
         send_message(Message::MoveAndShootRequest { id: id, direction: direction, x: x, y: y }, &mut self.buff_writer);
     }
 
@@ -324,7 +328,7 @@ impl State {
     pub fn handle_hit_response(&mut self, x: u8, y: u8) {
         if self.status == Status::Planning {
             if let Some(ref mut board) = self.their_board {
-                board.hit(x as usize, y as usize);
+                board.set_ship(x, y);
             }
             self.my_turn = false;
             self.hits += 1;
@@ -351,7 +355,7 @@ impl State {
     pub fn handle_miss_response(&mut self, x: u8, y: u8) {
         if self.status == Status::Planning {
             if let Some(ref mut board) = self.their_board {
-                board.miss(x as usize, y as usize);
+                board.set_water(x, y);
             }
             self.my_turn = false;
             self.status = Status::OpponentPlanning;
@@ -364,7 +368,7 @@ impl State {
     pub fn handle_enemy_miss_update(&mut self, x: u8, y: u8) {
         if self.status == Status::OpponentPlanning {
             if let Some(ref mut board) = self.my_board {
-                board.miss(x as usize, y as usize);
+                board.set_visible_at(x as usize, y as usize);
             }
             self.my_turn = true;
             self.status = Status::Planning;
@@ -377,7 +381,7 @@ impl State {
     pub fn handle_destroyed_response(&mut self, x: u8, y: u8) {
         if self.status == Status::Planning {
             if let Some(ref mut board) = self.their_board {
-                board.destroyed(x as usize, y as usize);
+                board.set_water(x, y);
             }
             self.my_turn = false;
             self.hits += 1;
@@ -411,13 +415,13 @@ impl State {
 
     pub fn handle_enemy_visible_update(&mut self, x: u8, y: u8) {
         if let Some(ref mut board) = self.their_board {
-            board.visible(x as usize, y as usize);
+            board.set_ship(x, y);
         }
     }
 
     pub fn handle_enemy_invisible_update(&mut self, x: u8, y: u8) {
         if let Some(ref mut board) = self.their_board {
-            board.invisible(x as usize, y as usize);
+            board.set_water(x, y);
         }
     }
 

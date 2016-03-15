@@ -66,19 +66,63 @@ impl CellState {
     }
 }
 
+type BoardArray = [[bool; H]; W];
+
+#[derive(Copy, Clone)]
+pub struct DumbBoard {
+    ship_at: BoardArray,
+    visible: BoardArray,
+}
+
+impl DumbBoard {
+    pub fn new() -> DumbBoard {
+        DumbBoard {
+            ship_at: [[false; H]; W],
+            visible: [[false; H]; W],
+        }
+    }
+
+    fn handle(&mut self, x: usize, y: usize, ship_at_coords: bool) {
+        self.visible[x][y] = true;
+        self.ship_at[x][y] = ship_at_coords;
+    }
+
+    // former hit(), visible()
+    pub fn set_ship(&mut self, x: u8, y: u8) {
+        self.handle(x as usize, y as usize, true);
+    }
+
+    // former miss(), invisible(), destroyed()
+    pub fn set_water(&mut self, x: u8, y: u8) {
+        self.handle(x as usize, y as usize, false);
+    }
+
+    pub fn is_visible_at(&self, x: usize, y: usize) -> bool {
+        self.visible[x][y]
+    }
+
+    pub fn has_ship_at(&self, x: usize, y: usize) -> bool {
+        self.ship_at[x][y]
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct Board {
     ships: Vec<Ship>,
     state: BoardState,
     old_states: Vec<BoardState>,
+
+    handle_visibility_updates: bool,
     visibility_updates: Vec<Message>,
 }
 
 impl Board {
-    pub fn try_create(ships: Vec<Ship>) -> Option<Board> {
+    pub fn try_create(ships: Vec<Ship>, handle_visibility_updates: bool) -> Option<Board> {
         let mut board = Board {
             state: [[CellState::new(); H]; W],
             old_states: vec![],
             ships: ships,
+            handle_visibility_updates: handle_visibility_updates,
             visibility_updates: vec![],
         };
         if let Some(state) = board.compute_state() {
@@ -87,6 +131,18 @@ impl Board {
         } else {
             return None;
         }
+    }
+
+    pub fn is_visible_at(&self, x: usize, y: usize) -> bool {
+        self.state[x][y].visible
+    }
+
+    pub fn get_ship_index_at(&self, x: usize, y: usize) -> Option<u8> {
+        self.state[x][y].ship_index
+    }
+
+    pub fn get_ships(&self) -> &Vec<Ship> {
+        &self.ships
     }
 
     pub fn has_ships(&self) -> bool {
@@ -101,7 +157,7 @@ impl Board {
         if x >= W || y >= H {
             return HitResult::Miss;
         }
-        self.state[x][y].visible = true;
+        self.set_visible_at(x, y);
         let hit_result = match self.state[x][y].ship_index {
             // no ship
             None => HitResult::Miss,
@@ -119,6 +175,10 @@ impl Board {
         self.print_me(Some((x, y)));
         self.old_states.clear();
         return hit_result;
+    }
+
+    pub fn set_visible_at(&mut self, x: usize, y: usize) {
+        self.state[x][y].visible = true;
     }
 
     /**
@@ -150,6 +210,9 @@ impl Board {
     }
 
     pub fn pop_updates(&mut self) -> Vec<Message> {
+        if !self.handle_visibility_updates {
+            panic!("This board does not compute visibility updates");
+        }
         let foo = self.visibility_updates.clone();
         self.visibility_updates = vec![];
         return foo;
@@ -167,6 +230,9 @@ impl Board {
     }
 
     fn compute_visibility_updates(&mut self) {
+        if !self.handle_visibility_updates {
+            return;
+        }
         // Find all cells that had ships in old state (self.state) but no longer in new_state and
         // vice versa -> some ship moved out of some cell
         for x in 0..W {

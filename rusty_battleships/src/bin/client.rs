@@ -9,7 +9,6 @@ use byteorder::{ByteOrder, BigEndian, ReadBytesExt};
 
 mod client_;
 use client_::state::{LobbyList, State, Status};
-use client_::board::{Board};
 
 #[macro_use]
 extern crate qmlrs;
@@ -21,7 +20,7 @@ use rustc_serialize::json::{Json};
 
 extern crate rusty_battleships;
 use rusty_battleships::message::{Message, Direction, ShipPlacement};
-use rusty_battleships::board::{CellState, W, H};
+use rusty_battleships::board::{Board, DumbBoard, W, H};
 use rusty_battleships::timer::timer_periodic;
 
 extern crate time;
@@ -96,11 +95,11 @@ struct Bridge {
     disconnect_sender : mpsc::Sender<bool>, //For the State object!
     disconnect_receiver : mpsc::Receiver<bool>,
 
-    board_sender: mpsc::Sender<(Board, Board, u8, u8)>, //For the State object!
-    board_receiver: mpsc::Receiver<(Board, Board, u8, u8)>,
+    board_sender: mpsc::Sender<(Board, DumbBoard, u8, u8)>, //For the State object!
+    board_receiver: mpsc::Receiver<(Board, DumbBoard, u8, u8)>,
 
     my_board: Option<Board>,
-    their_board: Option<Board>,
+    their_board: Option<DumbBoard>,
     hits: u8,
     destroyed: u8,
 
@@ -300,8 +299,8 @@ impl Bridge {
     fn can_move_in_direction(&mut self, ship_index: i64, direction_index: i64) -> bool {
         self.update_boards();
         let mut cloned_board = self.my_board.as_ref().unwrap().clone();
-        cloned_board.move_ship(ship_index as usize, Bridge::index_to_direction(direction_index));
-        return cloned_board.compute_state();
+        cloned_board.move_ship(ship_index as u8, Bridge::index_to_direction(direction_index));
+        return cloned_board.compute_state().is_some();
     }
 
     fn set_ready_state(&mut self, ready: i64) {
@@ -353,12 +352,18 @@ impl Bridge {
         for y in 0..H {
             for x in 0..W {
                 if let Some(ref board) = self.their_board {
-                    let character = match board.state[x][y] {
-                        CellState { visible: false, ship_index: _ } => '"',
-                        CellState { visible: true, ship_index: Some(_) } => 'X',
-                        CellState { visible: true, ship_index: None } => '-',
-                    };
-                    result.push(character);
+                    // if !board.is_visible_at(x, y) {
+                    //     result.push('"');
+                    // } else {
+                    //     if board.has_ship_at(x, y) {
+                    //         result.push('X');
+                    //     } else {
+                    //         result.push('-');
+                    //     }
+                    // }
+                    result.push( if !board.is_visible_at(x, y) { '"' } else {
+                        if board.has_ship_at(x, y) { 'X' } else { '-' }
+                    });
                 } else {
                     result.push('?');
                 }
@@ -375,8 +380,8 @@ impl Bridge {
         assert!(x > -1 && x < W as i64 && y > -1 && y < H as i64);
         self.update_boards();
         let ref my_board = self.my_board.as_ref().unwrap();
-        if let Some(ship_index) = my_board.state[x as usize][y as usize].ship_index {
-            if !my_board.ships.get(ship_index as usize).unwrap().is_dead() {
+        if let Some(ship_index) = my_board.get_ship_index_at(x as usize, y as usize) {
+            if !my_board.get_ships().get(ship_index as usize).unwrap().is_dead() {
                 return ship_index as i64;
             }
         }
@@ -394,7 +399,7 @@ impl Bridge {
             for x in 0..W {
 	            let mut character = '0';
 	            if let Some(ref board) = self.my_board {
-		            character = if board.state[x][y].visible { '1' } else { '0' }
+		            character = if board.is_visible_at(x, y) { '1' } else { '0' }
 	            }
 
                 result.push(character);
@@ -411,7 +416,7 @@ impl Bridge {
         self.update_boards();
         let hps;
         if let Some(ref board) = self.my_board {
-            hps = board.ships.iter().map(|&ship| ship.health_points).collect::<Vec<usize>>();
+            hps = board.get_ships().iter().map(|&ship| ship.health_points).collect::<Vec<usize>>();
         } else {
             hps = vec![5, 4, 3, 2, 2];
         }
@@ -455,7 +460,7 @@ Q_OBJECT! { Bridge:
 
 fn tcp_loop(hostname: String, port: i64, rcv_ui_update: mpsc::Receiver<Message>,
     tx_message_update: mpsc::Sender<(Status, Message)>, tx_lobby_update: mpsc::Sender<LobbyList>,
-    tx_board_update: mpsc::Sender<(Board, Board, u8, u8)>, tx_disconnect_update: mpsc::Sender<bool>)
+    tx_board_update: mpsc::Sender<(Board, DumbBoard, u8, u8)>, tx_disconnect_update: mpsc::Sender<bool>)
         -> bool {
 
     //Connect to the specified address and port.
@@ -490,7 +495,7 @@ fn main() {
 
     let (tx_lobby_update, rcv_lobby_update) = mpsc::channel();
     let (tx_udp_discovery, rcv_udp_discovery) = mpsc::channel();
-    let (tx_board_update, rcv_board_update) : (mpsc::Sender<(Board, Board, u8, u8)>, mpsc::Receiver<(Board, Board, u8, u8)>) = mpsc::channel();
+    let (tx_board_update, rcv_board_update) : (mpsc::Sender<(Board, DumbBoard, u8, u8)>, mpsc::Receiver<(Board, DumbBoard, u8, u8)>) = mpsc::channel();
 
     let socket = UdpSocket::bind("0.0.0.0:0").unwrap();
 	let socket_send = socket.try_clone().unwrap();
