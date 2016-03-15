@@ -56,16 +56,14 @@ impl Board {
         if x >= W && y >= H {
             panic!("Destroyed out of bounds! X={}, Y={}", x, y);
         }
-        let ship_index: Option<u8>;
+
         if self.mine { //Which of our precious ships has been destroyed?
             match self.state[x][y].ship_index {
                 None => {
-                    ship_index = None;
                     panic!("Server says DESTROYED, but there is no ship! X={}, Y={}", x, y);
                 },
                 Some(x) => {
-                    ship_index = Some(x);
-                    let ref mut ship = self.ships[ship_index.unwrap() as usize];
+                    let ref mut ship = self.ships[x as usize];
                     if ship.health_points != 1 {
                         panic!("Server says DESTROYED, but the ship had {} hp before the hit!", ship.health_points);
                     }
@@ -150,7 +148,7 @@ impl Board {
     }
 
     fn coords_valid(&self, x: usize, y: usize) -> bool {
-        return !(x < 0 || y < 0 || x >= (W as usize) - 1 || y >= (H as usize) - 1);
+        return !(x >= (W as usize) - 1 || y >= (H as usize) - 1);
     }
 
     fn get_ship_dest_coords(ship: &Ship, i: usize) -> (usize, usize) {

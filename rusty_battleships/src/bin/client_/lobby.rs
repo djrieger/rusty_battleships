@@ -21,10 +21,6 @@ impl ClientLobby {
         self.player_name = String::from(name);
     }
 
-    pub fn set_player_list(&mut self, players: HashMap<String, bool>) {
-        self.player_list = players;
-    }
-
     pub fn add_player(&mut self, player: &str) {
         self.player_list.insert(String::from(player), false);
     }
@@ -50,8 +46,8 @@ impl ClientLobby {
     pub fn get_ready_players(&self) -> Vec<String> {
         self.player_list
             .iter()
-            .filter(|&(name, is_ready)| *is_ready == true)
-            .map(|(ref name, &is_ready)| (**name).clone())
+            .filter(|&(_, is_ready)| *is_ready == true)
+            .map(|(ref name, _)| (**name).clone())
             .collect()
     }
 

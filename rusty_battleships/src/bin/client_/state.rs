@@ -1,8 +1,7 @@
-use std::io::{BufReader, BufWriter, Write, stdin, BufRead};
+use std::io::{BufReader, BufWriter, Write};
 use std::net::{TcpStream};
 use std::sync::mpsc::{self, Sender, Receiver};
 use std::thread;
-use std::time::Duration;
 use std::sync::mpsc::TryRecvError;
 use std::cmp;
 
@@ -36,16 +35,9 @@ impl LobbyList {
 
 fn send_message(msg: Message, stream: &mut BufWriter<TcpStream>) {
     let serialized_msg = serialize_message(msg);
+    // TODO: don't crash when TCP stream closes
     stream.write(&serialized_msg[..]).unwrap();
-    stream.flush();
-}
-
-/* For quick user prompts. */
-pub fn ask(question: String) -> String {
-    println!("{}", question);
-    let stdin = stdin();
-    let answer = stdin.lock().lines().next().unwrap().unwrap();
-    return answer;
+    stream.flush().unwrap();
 }
 
 /*Tries to read from the TCP stream. If there's no message, it waits patiently.*/
@@ -154,7 +146,6 @@ impl State {
     pub fn ready(&mut self) -> bool {
         if self.status != Status::Available {
             return false;
-            println!("Möp");
         }
         self.status = Status::AwaitReady;
         send_message(Message::ReadyRequest, &mut self.buff_writer);
@@ -166,7 +157,6 @@ impl State {
     pub fn unready(&mut self) -> bool {
         if self.status != Status::Waiting {
             return false;
-            println!("Müp");
         }
         self.status = Status::AwaitNotReady;
         send_message(Message::NotReadyRequest, &mut self.buff_writer);
@@ -253,6 +243,7 @@ impl State {
     pub fn handle_game_start_update(&mut self, nickname: &str) -> Result<(), String> {
         if self.status == Status::Waiting {
             self.status = Status::PlacingShips;
+            self.opponent = nickname.to_owned();
             return Ok(());
         } else {
             return Err(format!("ERROR: I did not expect a GameStartUpdate! STATUS={:?}", self.status));
@@ -295,7 +286,7 @@ impl State {
         }
     }
 
-    pub fn handle_name_taken_response(&mut self, nickname: &str) {
+    pub fn handle_name_taken_response(&mut self, _: &str) {
         if self.status == Status::Register {
             self.status = Status::Unregistered;
         } else {
@@ -303,7 +294,7 @@ impl State {
         }
     }
 
-    pub fn handle_no_such_player_response(&mut self, nickname: &str) {
+    pub fn handle_no_such_player_response(&mut self, _: &str) {
         if self.status == Status::AwaitGameStart {
             self.status = Status::Available;
         } else {
@@ -311,7 +302,7 @@ impl State {
         }
     }
 
-    pub fn handle_not_waiting_response(&mut self, nickname: &str) {
+    pub fn handle_not_waiting_response(&mut self, _: &str) {
         if self.status == Status::AwaitGameStart {
             self.status = Status::Available;
         } else {
@@ -498,7 +489,7 @@ impl State {
             panic!("I was told there would be boards! But there's no board for them...");
         }
         let boards = (mb, tb, self.hits, self.destroyed);
-        self.board_update_sender.send(boards);
+        self.board_update_sender.send(boards).unwrap();
     }
 
     pub fn update_listen_loop(&mut self, rx: Receiver<Message>) {
@@ -513,7 +504,7 @@ impl State {
             if let Ok(server_response) = received {
                 println!(">>>Oh, a message for me! MSG={:?}", server_response.clone());
 
-                let outcome: Result<(), String>;
+                //let outcome: Result<(), String>;
 
                 /* Handle messages from the server. */
                 match server_response.clone() {
@@ -540,7 +531,7 @@ impl State {
                     },
                     Message::GameStartUpdate {nickname: nn} => {
                         println!("Received a challenge by captain {:?}", nn);
-                        self.handle_game_start_update(&nn.clone());
+                        self.handle_game_start_update(&nn.clone()).unwrap();
                     },
                     Message::GameOverUpdate {victorious, reason} => {
                         self.handle_game_over_update(victorious, reason);
@@ -592,13 +583,13 @@ impl State {
                         self.handle_enemy_afk_update(strikes);
                     },
                     // RESPONSES
-                    Message::OkResponse => outcome = self.handle_ok_response(server_response.clone()),
+                    Message::OkResponse => self.handle_ok_response(server_response.clone()).unwrap(),
                     Message::InvalidRequestResponse => {
                         println!("Received an INVALID_REQUEST_RESPONSE in state {:?}.", self.status);
                     },
                     Message::FeaturesResponse {features: fts} => {
                         println!("Received features list!");
-                        self.handle_get_features_response(fts);
+                        self.handle_get_features_response(fts).unwrap();
                     },
                     Message::NameTakenResponse {nickname: nn} => {
                         println!("There is already a captain {:?} registered. Choose a different name.", nn);
@@ -633,7 +624,7 @@ impl State {
                     _ => println!(">>>RECEIVED: {:?}", server_response),
                 }
 
-                self.ui_update_sender.send( (self.status.clone(), server_response.clone()) );
+                self.ui_update_sender.send((self.status.clone(), server_response.clone())).unwrap();
 
             } else if received == Err(TryRecvError::Empty) {
                 //println!("Nothing there =(");
@@ -682,6 +673,6 @@ impl State {
             tick.recv().expect("Timer thread died unexpectedly."); // wait for next tick
         }
 
-        self.disconnect_update_sender.send(true);
+        self.disconnect_update_sender.send(true).unwrap();
     }
 }

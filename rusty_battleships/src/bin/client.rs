@@ -2,7 +2,6 @@ use std::collections::HashMap;
 use std::io::{BufReader, BufWriter};
 use std::net::{Ipv4Addr, TcpStream, UdpSocket, SocketAddr};
 use std::sync::mpsc;
-use std::sync::mpsc::{TryRecvError};
 use std::thread;
 
 extern crate byteorder;
@@ -23,7 +22,6 @@ use rustc_serialize::json::{Json};
 extern crate rusty_battleships;
 use rusty_battleships::message::{Message, Direction, ShipPlacement};
 use rusty_battleships::board::{CellState, W, H};
-use rusty_battleships::ship::{Ship};
 use rusty_battleships::timer::timer_periodic;
 
 extern crate time;
@@ -118,7 +116,7 @@ struct Bridge {
 impl Bridge {
     fn send_login_request(&mut self, username: String) -> bool{
         println!(">>> UI: Sending login request for {} ...", username);
-        self.ui_sender.as_mut().unwrap().send(Message::LoginRequest { username: username });
+        self.ui_sender.as_mut().unwrap().send(Message::LoginRequest { username: username }).unwrap();
         // Wait for a OkResponse from the server, discard player state updates.
         let mut response_received = false;
         let mut success = false;
@@ -188,7 +186,9 @@ impl Bridge {
 
     fn send_challenge(&mut self, username: String) {
         println!(">>> UI: Sending challenge request for {} ...", username);
-        self.ui_sender.as_mut().unwrap().send(Message::ChallengePlayerRequest { username: username });
+        self.ui_sender.as_mut().unwrap()
+            .send(Message::ChallengePlayerRequest { username: username })
+            .unwrap();
         if let Ok(tuple) = self.msg_update_receiver.try_recv() {
             self.state = tuple.0;
             self.last_rcvd_msg = Some(tuple.1);
@@ -266,15 +266,6 @@ impl Bridge {
         return json::encode(&current_servers).unwrap();
     }
 
-    fn get_coords_from_button_index(button_index: i64) -> (u8, u8) {
-        ((button_index % 10) as u8, (button_index / 10) as u8)
-    }
-
-    // fn on_clicked_my_board(&mut self, button_index: i64) {
-    //     let (x, y) = Bridge::get_coords_from_button_index(button_index);
-    //     println!("Button clicked at {}, {}", x, y);
-    // }
-
     fn index_to_direction(index: i64) -> Direction {
         match index {
             0 => Direction::North,
@@ -290,14 +281,16 @@ impl Bridge {
      */
     fn move_and_shoot(&mut self, x: i64, y: i64, ship_index: i64, direction_index: i64) {
         if ship_index == -1 {
-            self.ui_sender.as_mut().unwrap().send(Message::ShootRequest { x: x as u8, y: y as u8 });
+            self.ui_sender.as_mut().unwrap()
+                .send(Message::ShootRequest { x: x as u8, y: y as u8 })
+                .unwrap();
         } else {
             self.ui_sender.as_mut().unwrap().send(Message::MoveAndShootRequest {
                 x: x as u8,
                 y: y as u8,
                 id: ship_index as u8,
                 direction: Bridge::index_to_direction(direction_index)
-            });
+            }).unwrap();
         }
     }
 
@@ -312,7 +305,9 @@ impl Bridge {
     }
 
     fn set_ready_state(&mut self, ready: i64) {
-        self.ui_sender.as_mut().unwrap().send(if ready == 1 { Message::ReadyRequest } else { Message::NotReadyRequest });
+        self.ui_sender.as_mut().unwrap()
+                .send(if ready == 1 { Message::ReadyRequest } else { Message::NotReadyRequest })
+                .unwrap();
     }
 
     fn handle_placement(&mut self, placement_json: String) {
@@ -348,7 +343,7 @@ impl Bridge {
             placements[2],
             placements[3],
             placements[4]
-        ] });
+        ] }).unwrap();
         println!("{:?}", placements);
     }
 
@@ -464,7 +459,7 @@ fn tcp_loop(hostname: String, port: i64, rcv_ui_update: mpsc::Receiver<Message>,
         -> bool {
 
     //Connect to the specified address and port.
-    let mut sender;
+    let sender;
     match TcpStream::connect((&hostname[..], port as u16)) {
         Ok(foo) => sender = foo,
         Err(why) => {
@@ -472,7 +467,7 @@ fn tcp_loop(hostname: String, port: i64, rcv_ui_update: mpsc::Receiver<Message>,
             return false;
         }
     };
-    sender.set_write_timeout(None);
+    sender.set_write_timeout(None).unwrap();
 
     let receiver = sender.try_clone().unwrap();
     let buff_writer = BufWriter::new(sender);
@@ -490,8 +485,6 @@ fn tcp_loop(hostname: String, port: i64, rcv_ui_update: mpsc::Receiver<Message>,
 }
 
 fn main() {
-    // Channel pair for connecting the Bridge and ???
-    let (tx_main, rcv_tcp) : (mpsc::Sender<Message>, mpsc::Receiver<Message>) = mpsc::channel();
     let (tx_message_update, rcv_main) = mpsc::channel();
     let (tx_disconnect_update, rcv_disconnect) = mpsc::channel();
 
@@ -506,7 +499,8 @@ fn main() {
 		let tick = timer_periodic(UDP_DISCOVERY_TICK_DURATION_MS);
 
 		loop {
-			socket_send.send_to(&response[..], &(Ipv4Addr::new(224, 0, 0, 250), 49001 as u16));
+			socket_send.send_to(&response[..], &(Ipv4Addr::new(224, 0, 0, 250), 49001 as u16))
+                    .expect("Could not send message to multicast group.");
 
 			tick.recv().expect("Timer thread died unexpectedly."); // wait for next tick
 		}
@@ -522,9 +516,9 @@ fn main() {
 				    }
 				    let port = BigEndian::read_u16(&buf[0..2]);
 				    let server_name = std::str::from_utf8(&buf[2..]).unwrap_or("");
-				    tx_udp_discovery.send((*src.ip(), port, String::from(server_name)));
+				    tx_udp_discovery.send((*src.ip(), port, String::from(server_name))).unwrap();
 			    },
-			    Ok((num_bytes, SocketAddr::V6(_))) => panic!("Currently not supporting Ipv6"),
+			    Ok((_, SocketAddr::V6(_))) => panic!("Currently not supporting Ipv6"),
 			    Err(e) => {
 			        println!("Couldn't receive a datagram: {}", e);
 			    }
