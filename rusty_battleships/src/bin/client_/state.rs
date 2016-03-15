@@ -69,6 +69,8 @@ pub struct State {
     my_turn : bool,
     my_afks : u8,
     their_afks : u8,
+    hits: u8,
+    destroyed: u8,
     my_board : Option<Board>,
     their_board : Option<Board>,
     pub buff_reader : BufReader<TcpStream>,
@@ -76,7 +78,7 @@ pub struct State {
     ui_update_receiver : Receiver<Message>,
     ui_update_sender : Sender<(Status, Message)>,
     lobby_update_sender : Sender<LobbyList>,
-    board_update_sender : Sender<(Board, Board)>,
+    board_update_sender : Sender<(Board, Board, u8, u8)>,
     disconnect_update_sender : Sender<bool>
 }
 
@@ -105,7 +107,7 @@ impl State {
     pub fn new(rec_ui_update: Receiver<Message>,
                 tx_ui_update: Sender<(Status, Message)>,
                 tx_lobby_update: Sender<LobbyList>,
-                tx_board_update: Sender<(Board, Board)>,
+                tx_board_update: Sender<(Board, Board, u8, u8)>,
                 tx_disconnect_update: Sender<bool>,
                 buff_reader: BufReader<TcpStream>,
                 buff_writer: BufWriter<TcpStream>) -> State {
@@ -116,6 +118,8 @@ impl State {
             my_turn : false,
             my_afks : 0,
             their_afks : 0,
+            hits : 0,
+            destroyed: 0,
             my_board : None,
             their_board : None,
             buff_reader : buff_reader,
@@ -321,6 +325,7 @@ impl State {
                 board.hit(x as usize, y as usize);
             }
             self.my_turn = false;
+            self.hits += 1;
             self.status = Status::OpponentPlanning;
         } else {
             panic!("Received a HIT_RESPONSE while not in PLANNING state! STATUS={:?}", self.status);
@@ -369,6 +374,8 @@ impl State {
                 board.destroyed(x as usize, y as usize);
             }
             self.my_turn = false;
+            self.hits += 1;
+            self.destroyed += 1;
             self.status = Status::OpponentPlanning;
         } else {
             panic!("Received a DESTROYED_RESPONSE while not in PLANNING state! STATUS={:?}", self.status);
@@ -450,6 +457,10 @@ impl State {
             self.my_afks = 0;
             self.their_board = None;
             self.their_afks = 0;
+            self.hits = 0;
+            self.destroyed = 0;
+
+            self.lobby = ClientLobby::new();
         } else {
             panic!("Received a GAME_OVER_UPDATE while not in an ingame state! STATUS={:?}", self.status);
         }
@@ -486,7 +497,7 @@ impl State {
         } else {
             panic!("I was told there would be boards! But there's no board for them...");
         }
-        let boards = (mb, tb);
+        let boards = (mb, tb, self.hits, self.destroyed);
         self.board_update_sender.send(boards);
     }
 

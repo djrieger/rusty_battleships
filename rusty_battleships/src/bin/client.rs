@@ -91,12 +91,16 @@ struct Bridge {
     lobby_sender : mpsc::Sender<LobbyList>, //For the State object!
     lobby_receiver: mpsc::Receiver<LobbyList>,
 
-    disconnect_sender : mpsc::Sender<bool>, // For state object
+    disconnect_sender : mpsc::Sender<bool>, //For the State object!
     disconnect_receiver : mpsc::Receiver<bool>,
 
-    board_receiver: Option<mpsc::Receiver<(Board, Board)>>,
+    board_sender: mpsc::Sender<(Board, Board, u8, u8)>, //For the State object!
+    board_receiver: mpsc::Receiver<(Board, Board, u8, u8)>,
+
     my_board: Option<Board>,
     their_board: Option<Board>,
+    hits: u8,
+    destroyed: u8,
 
     state: Status,
     features_list: Vec<String>,
@@ -165,11 +169,12 @@ impl Bridge {
     }
 
     fn update_boards(&mut self) {
-        if let Some(ref recv) = self.board_receiver {
-            while let Ok((ref my_board, ref their_board)) = recv.try_recv() {
-                self.my_board = Some(my_board.clone());
-                self.their_board = Some(their_board.clone());
-            }
+        while let Ok((ref my_board, ref their_board, hits, destroyed)) =
+                self.board_receiver.try_recv() {
+            self.my_board = Some(my_board.clone());
+            self.their_board = Some(their_board.clone());
+            self.hits = hits;
+            self.destroyed = destroyed;
         }
     }
 
@@ -219,12 +224,10 @@ impl Bridge {
         /* From UI-Thread (this one) to Status-Update-Thread.
            Since every UI input corresponds to a Request, we can recycle message.rs for encoding user input. */
         let (tx_ui_update, rcv_ui_update) : (mpsc::Sender<Message>, mpsc::Receiver<Message>) = mpsc::channel();
-        /* From Statuis-Update-Thread to UI-Thread (this one). Transmits the current board situation. */
-        let (tx_board_update, rcv_board_update) : (mpsc::Sender<(Board, Board)>, mpsc::Receiver<(Board, Board)>) = mpsc::channel();
         self.ui_sender = Some(tx_ui_update);
-        self.board_receiver = Some(rcv_board_update);
         return tcp_loop(hostname, port, rcv_ui_update, self.msg_update_sender.clone(),
-        self.lobby_sender.clone(), tx_board_update, self.disconnect_sender.clone());
+                self.lobby_sender.clone(), self.board_sender.clone(),
+                self.disconnect_sender.clone());
     }
 
     fn discover_servers(&mut self) -> String {
@@ -392,6 +395,16 @@ impl Bridge {
         }
         return json::encode(&hps).unwrap();
     }
+
+    fn get_hits(&mut self) -> i64 {
+        self.update_boards();
+        self.hits as i64
+    }
+
+    fn get_destroyed(&mut self) -> i64 {
+        self.update_boards();
+        self.destroyed as i64
+    }
 }
 
 Q_OBJECT! { Bridge:
@@ -414,12 +427,14 @@ Q_OBJECT! { Bridge:
     slot fn get_ship_at(i64, i64);
     slot fn get_my_board_visibility();
     slot fn get_ships_hps();
+    slot fn get_hits();
+    slot fn get_destroyed();
 }
 
 fn tcp_loop(hostname: String, port: i64, rcv_ui_update: mpsc::Receiver<Message>,
     tx_message_update: mpsc::Sender<(Status, Message)>, tx_lobby_update: mpsc::Sender<LobbyList>,
-    tx_board_update: mpsc::Sender<(Board, Board)>, tx_disconnect_update: mpsc::Sender<bool>)
-    -> bool {
+    tx_board_update: mpsc::Sender<(Board, Board, u8, u8)>, tx_disconnect_update: mpsc::Sender<bool>)
+        -> bool {
 
     //Connect to the specified address and port.
     let mut sender;
@@ -455,6 +470,7 @@ fn main() {
 
     let (tx_lobby_update, rcv_lobby_update) = mpsc::channel();
     let (tx_udp_discovery, rcv_udp_discovery) = mpsc::channel();
+    let (tx_board_update, rcv_board_update) : (mpsc::Sender<(Board, Board, u8, u8)>, mpsc::Receiver<(Board, Board, u8, u8)>) = mpsc::channel();
 
     let socket = UdpSocket::bind("0.0.0.0:0").unwrap();
     let response = vec![];
@@ -490,14 +506,17 @@ fn main() {
         state: Status::Unregistered,
         my_board: None,
         their_board: None,
+        hits: 0,
+        destroyed: 0,
         ui_sender: None,
         msg_update_sender: tx_message_update, //For the State object!
         msg_update_receiver: rcv_main,
         lobby_sender : tx_lobby_update, //For the State object!
         lobby_receiver: rcv_lobby_update,
-        disconnect_sender : tx_disconnect_update,
+        disconnect_sender : tx_disconnect_update, //For the State object!
         disconnect_receiver : rcv_disconnect,
-        board_receiver : None,
+        board_sender : tx_board_update, //For the State object!
+        board_receiver : rcv_board_update,
         last_rcvd_msg: None,
         udp_discovery_receiver: rcv_udp_discovery,
         discovered_servers: Vec::<Server>::new(),

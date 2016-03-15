@@ -206,6 +206,19 @@ Item {
                 }
                 model: shipModel
             }
+
+            ColumnLayout {
+                Text {
+                    id: hitCounter
+                    property int count: 0
+                    text: "Hits: " + count + "/16"
+                }
+                Text {
+                    id: destroyedCounter
+                    property int count: 0
+                    text: "Destroyed: " + count + "/5"
+                }
+            }
         }
 	}
 
@@ -418,6 +431,9 @@ Item {
 		for (var i = 0; i < 5; i++) {
             shipModel.get(i).hp = hitPoints[i];
         }
+
+        hitCounter.count = bridge.get_hits();
+        destroyedCounter.count = bridge.get_destroyed();
     }
 
     function updateState() {
@@ -458,6 +474,10 @@ Item {
     }
 
     function deactivate() {
+        timer.triggered.disconnect(updateBoards);
+        timer.triggered.disconnect(updateHitPoints);
+        timer.triggered.disconnect(updateState);
+
         // reset board
         board.active = true;
         board.moveAllowed = false;
@@ -466,15 +486,18 @@ Item {
         board.placement_phase = true;
 
         clearBoard(true);
+        for (var i = 0; i < 100; i++) {
+            opponentBoardButtons.itemAt(i).text = "?";
+        }
         for (var i = 0; i < 5; i++) {
             var ship = shipModel.get(i);
             ship.x = -1;
             ship.hp = ship.length;
         }
 
-        timer.triggered.disconnect(updateBoards);
-        timer.triggered.disconnect(updateHitPoints);
-        timer.triggered.disconnect(updateState);
+        hitCounter.count = 0;
+        destroyedCounter.count = 0;
+
         visible = false;
     }
 }
