@@ -301,7 +301,7 @@ impl Bridge {
         self.update_boards();
         let mut cloned_board = self.my_board.as_ref().unwrap().clone();
         cloned_board.move_ship(ship_index as usize, Bridge::index_to_direction(direction_index));
-        return cloned_board.compute_state().0;
+        return cloned_board.compute_state();
     }
 
     fn set_ready_state(&mut self, ready: i64) {
