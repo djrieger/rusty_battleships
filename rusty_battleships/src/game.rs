@@ -90,15 +90,11 @@ impl Game {
         self.state == GameState::Running
     }
 
-    pub fn is_player1_active(&self) -> bool {
-        self.player1_active
-    }
-
     pub fn get_active_player_afk_count(&self) -> u8 {
         if self.player1_active { self.player1_afk_count } else { self.player2_afk_count }
     }
 
-    pub fn dec_active_player_afk_count(&mut self) -> () {
+    pub fn dec_active_player_afk_count(&mut self) {
         if self.player1_active {
             self.player1_afk_count -= 1;
         } else {
