@@ -40,7 +40,6 @@ macro_rules! version_string {
     () => ( concat!(description!(), " v", version!()) )
 }
 
-const TICK_DURATION_MS: u64 = 100;
 const UDP_DISCOVERY_TICK_DURATION_MS: u64 = 5000; // we don't need to discover servers all the time
 
 
@@ -238,6 +237,7 @@ impl Bridge {
     fn discover_servers(&mut self) -> String {
         while let Ok((ip, port, server_name)) = self.udp_discovery_receiver.try_recv() {
 	        let server = Server { ip: ip.octets(), port: port, name: server_name };
+
             if let Some(time) = self.discovered_servers.get_mut(&server) {
 	            *time = PreciseTime::now();
 	            continue;
@@ -246,17 +246,24 @@ impl Bridge {
 			self.discovered_servers.insert(server, PreciseTime::now());
         }
 
-	    let servers = self.discovered_servers.iter()
-	            .fold(Vec::<Server>::new(), |mut v, (server, time)| {
-				    if time.to(time::PreciseTime::now()) <
-				            Duration::milliseconds(UDP_DISCOVERY_TICK_DURATION_MS as i64 * 2) {
-						v.push(server.clone());
-				    }
 
-				    v
-		        });
+        let mut current_servers = vec![];
+        let mut old_servers = vec![];
 
-        return json::encode(&servers).unwrap();
+        for (server, time) in &self.discovered_servers {
+            if time.to(time::PreciseTime::now()) <
+                    Duration::milliseconds(UDP_DISCOVERY_TICK_DURATION_MS as i64 * 2) {
+                current_servers.push(server.clone());
+            } else {
+                old_servers.push(server.clone());
+            }
+        }
+
+	    for server in &old_servers {
+            self.discovered_servers.remove(server);
+        }
+
+        return json::encode(&current_servers).unwrap();
     }
 
     fn get_coords_from_button_index(button_index: i64) -> (u8, u8) {
@@ -504,9 +511,9 @@ fn main() {
 			tick.recv().expect("Timer thread died unexpectedly."); // wait for next tick
 		}
 	});
+    socket.set_read_timeout(None).unwrap(); // blocking reads
     thread::spawn(move || {
 	    let mut buf = [0; 2048];
-	    let tick = timer_periodic(TICK_DURATION_MS);
 	    loop {
 		    match socket.recv_from(&mut buf) {
 			    Ok((num_bytes, SocketAddr::V4(src))) => {
@@ -522,8 +529,6 @@ fn main() {
 			        println!("Couldn't receive a datagram: {}", e);
 			    }
 		    }
-
-		    tick.recv().expect("Timer thread died unexpectedly."); // wait for next tick
 	    }
     });
 

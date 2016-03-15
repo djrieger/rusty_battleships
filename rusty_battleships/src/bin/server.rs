@@ -48,17 +48,24 @@ const TICK_DURATION_MS: u64 = 100;
 fn start_udp_discovery(tcp_port: u16) {
     let socket = match UdpSocket::bind("0.0.0.0:49001") {
         Ok(s) => s,
-        Err(e) => panic!("couldn't bind socket: {}", e)
+        Err(e) => {
+            println!("Couldn't bind socket: {}", e);
+            return;
+        }
     };
     match socket.join_multicast_v4(&Ipv4Addr::new(224, 0, 0, 250), &Ipv4Addr::new(0, 0, 0, 0)) {
-        Err(why) => println!("{:?}", why),
-        Ok(_) => {},
+        Err(why) => {
+            println!("Couldn't join multicast group: {:?}", why);
+            return;
+        },
+        Ok(_) => {
+            println!("Joined UDP multicast group 224.0.0.250, listening on port 49001 for UDP discovery");
+        },
     };
-    println!("Joined UDP multicast group 224.0.0.250, listening on port 49001 for UDP discovery");
+    socket.set_read_timeout(None).unwrap(); // blocking reads
+    
     let udp_discovery_loop = move || {
         let mut buf = [0; 2048];
-
-        let tick = timer_periodic(TICK_DURATION_MS);
 
         loop {
             match socket.recv_from(&mut buf) {
@@ -79,8 +86,6 @@ fn start_udp_discovery(tcp_port: u16) {
                     println!("Couldn't receive a datagram: {}", e);
                 }
             }
-
-            tick.recv().expect("Timer thread died unexpectedly."); // wait for next tick
         }
     };
     thread::spawn(udp_discovery_loop);
