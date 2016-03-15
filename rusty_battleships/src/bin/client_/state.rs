@@ -580,7 +580,7 @@ impl State {
                     Message::NotYourTurnResponse => {
                         //println!("I'm sorry dave, I'm afraid I can't do that.");
                         // FIXME: handle properly, race condition occurred!
-                        panic!("It's not your turn! Protocol demands termination.");
+                        println!("It's not your turn!");
                     },
                     Message::AfkWarningUpdate {strikes} => {
                         self.handle_afk_warning_update(strikes);
