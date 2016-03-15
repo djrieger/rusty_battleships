@@ -258,8 +258,7 @@ impl State {
      * the usual message loop. If everythin goes the way it's meant to go, all's fine. If not, then
      * we'll panic anyway. */
     pub fn handle_ok_response(&mut self, msg: Message) -> Result<(), String> {
-        let mut fail = false;
-        match self.status {
+        match self.status.clone() {
             Status::Register => {
                 self.status = Status::Available;
                 return Ok(());
@@ -288,16 +287,11 @@ impl State {
                 return Ok(());
             },
             _ => {
-                fail = true;
+                let error_message: String = format!("ERROR: I did not expect a {:?}! CUR_STATE={:?}", msg, self.status.clone());
+                send_message(Message::ReportErrorRequest { errormessage: error_message.clone() }, &mut self.buff_writer);
+                return Err(error_message);
             }
         };
-        if fail {
-            let error_message: String = format!("ERROR: I did not expect a {:?}! CUR_STATE={:?}", msg, self.status.clone());
-            send_message(Message::ReportErrorRequest { errormessage: error_message.clone() }, &mut self.buff_writer);
-            return Err(error_message);
-        } else {
-            return Ok(());
-        }
     }
 
     pub fn handle_name_taken_response(&mut self, _: &str) {
