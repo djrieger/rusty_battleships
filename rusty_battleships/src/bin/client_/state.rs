@@ -228,7 +228,9 @@ impl State {
             self.status = Status::Unregistered;
             return Ok(());
         } else {
-            return Err(format!("ERROR: I did not expect a feature response! STATUS={:?}", self.status));
+            let error_message: String = format!("ERROR: I did not expect a feature response! CUR_STATE={:?}", self.status);
+            send_message(Message::ReportErrorRequest { errormessage: error_message.clone() }, &mut self.buff_writer);
+            return Err(error_message.clone());
         }
     }
 
@@ -246,7 +248,9 @@ impl State {
             self.opponent = nickname.to_owned();
             return Ok(());
         } else {
-            return Err(format!("ERROR: I did not expect a GameStartUpdate! STATUS={:?}", self.status));
+            let error_message: String = format!("ERROR: I did not expect a GameStartUpdate! CUR_STATE={:?}", self.status);
+            send_message(Message::ReportErrorRequest { errormessage: error_message.clone() }, &mut self.buff_writer);
+            return Err(error_message.clone());
         }
     }
 
@@ -254,6 +258,7 @@ impl State {
      * the usual message loop. If everythin goes the way it's meant to go, all's fine. If not, then
      * we'll panic anyway. */
     pub fn handle_ok_response(&mut self, msg: Message) -> Result<(), String> {
+        let mut fail = false;
         match self.status {
             Status::Register => {
                 self.status = Status::Available;
@@ -282,7 +287,16 @@ impl State {
                 self.status = Status::Available;
                 return Ok(());
             },
-            _ => return Err(format!("Wrong message! STATUS={:?}, MESSAGE={:?}", self.status, msg)),
+            _ => {
+                fail = true;
+            }
+        };
+        if fail {
+            let error_message: String = format!("ERROR: I did not expect a {:?}! CUR_STATE={:?}", msg, self.status.clone());
+            send_message(Message::ReportErrorRequest { errormessage: error_message.clone() }, &mut self.buff_writer);
+            return Err(error_message);
+        } else {
+            return Ok(());
         }
     }
 
@@ -290,7 +304,8 @@ impl State {
         if self.status == Status::Register {
             self.status = Status::Unregistered;
         } else {
-            panic!("Received a NAME_TAKEN_RESPONSE while not in Register State! STATUS={:?}", self.status);
+            let error_message: String = format!("ERROR: I did not expect a NAME_TAKEN_RESPONSE! CUR_STATE={:?}", self.status);
+            send_message(Message::ReportErrorRequest { errormessage: error_message }, &mut self.buff_writer);
         }
     }
 
@@ -298,7 +313,8 @@ impl State {
         if self.status == Status::AwaitGameStart {
             self.status = Status::Available;
         } else {
-            panic!("Received a NAME_TAKEN_RESPONSE while not in AwaitGameStart State! STATUS={:?}", self.status);
+            let error_message: String = format!("ERROR: I did not expect a NO_SUCH_PLAYER_RESPONSE! CUR_STATE={:?}", self.status);
+            send_message(Message::ReportErrorRequest { errormessage: error_message }, &mut self.buff_writer);
         }
     }
 
@@ -306,7 +322,8 @@ impl State {
         if self.status == Status::AwaitGameStart {
             self.status = Status::Available;
         } else {
-            panic!("Received a NOT_WAITING_RESPONSE while not in AwaitGameStart State! STATUS={:?}", self.status);
+            let error_message: String = format!("ERROR: I did not expect a NOT_WAITING_RESPONSE! CUR_STATE={:?}", self.status);
+            send_message(Message::ReportErrorRequest { errormessage: error_message }, &mut self.buff_writer);
         }
     }
 
@@ -319,7 +336,8 @@ impl State {
             self.hits += 1;
             self.status = Status::OpponentPlanning;
         } else {
-            panic!("Received a HIT_RESPONSE while not in PLANNING state! STATUS={:?}", self.status);
+            let error_message: String = format!("ERROR: I did not expect a HIT_RESPONSE! CUR_STATE={:?}", self.status);
+            send_message(Message::ReportErrorRequest { errormessage: error_message }, &mut self.buff_writer);
         }
     }
 
@@ -331,7 +349,8 @@ impl State {
             self.my_turn = true;
             self.status = Status::Planning;
         } else {
-            panic!("Received a ENEMY_HIT_UPDATE while not in OPPONENT_PLANNING state! STATUS={:?}", self.status);
+            let error_message: String = format!("ERROR: I did not expect a ENEMY_HIT_UPDATE! CUR_STATE={:?}", self.status);
+            send_message(Message::ReportErrorRequest { errormessage: error_message }, &mut self.buff_writer);
         }
     }
 
@@ -343,7 +362,8 @@ impl State {
             self.my_turn = false;
             self.status = Status::OpponentPlanning;
         } else {
-            panic!("Received a MISS_RESPONSE while not in PLANNING state! STATUS={:?}", self.status);
+            let error_message: String = format!("ERROR: I did not expect a MISS_RESPONSE! CUR_STATE={:?}", self.status);
+            send_message(Message::ReportErrorRequest { errormessage: error_message }, &mut self.buff_writer);
         }
     }
 
@@ -355,7 +375,8 @@ impl State {
             self.my_turn = true;
             self.status = Status::Planning;
         } else {
-            panic!("Received a MISS_RESPONSE while not in PLANNING state! STATUS={:?}", self.status);
+            let error_message: String = format!("ERROR: I did not expect an ENEMY_MISS_UPDATE! CUR_STATE={:?}", self.status);
+            send_message(Message::ReportErrorRequest { errormessage: error_message }, &mut self.buff_writer);
         }
     }
 
@@ -369,7 +390,8 @@ impl State {
             self.destroyed += 1;
             self.status = Status::OpponentPlanning;
         } else {
-            panic!("Received a DESTROYED_RESPONSE while not in PLANNING state! STATUS={:?}", self.status);
+            let error_message: String = format!("ERROR: I did not expect a DESTROYED_RESPONSE! CUR_STATE={:?}", self.status);
+            send_message(Message::ReportErrorRequest { errormessage: error_message }, &mut self.buff_writer);
         }
     }
 
@@ -378,7 +400,8 @@ impl State {
             self.my_turn = true;
             self.status = Status::Planning;
         } else {
-            panic!("Received a YOUR_TURN_UPDATE while not in OPPONENT_PLACING state! STATUS={:?}", self.status);
+            let error_message: String = format!("ERROR: I did not expect a YOUR_TURN_UPDATE! CUR_STATE={:?}", self.status);
+            send_message(Message::ReportErrorRequest { errormessage: error_message }, &mut self.buff_writer);
         }
     }
 
@@ -387,7 +410,8 @@ impl State {
             self.my_turn = false;
             self.status = Status::OpponentPlanning;
         } else {
-            panic!("Received a ENEMY_TURN_UPDATE while not in OPPONENT_PLACING state! STATUS={:?}", self.status);
+            let error_message: String = format!("ERROR: I did not expect an ENEMY_TURN_UPDATE! CUR_STATE={:?}", self.status);
+            send_message(Message::ReportErrorRequest { errormessage: error_message }, &mut self.buff_writer);
         }
     }
 
@@ -412,7 +436,8 @@ impl State {
             }
             self.status = Status::OpponentPlanning;
         } else {
-            panic!("Received a AFK_WARNING_UPDATE while not in PLANNING state! STATUS={:?}", self.status);
+            let error_message: String = format!("ERROR: I did not expect an AFK_WARNING_UPDATE! CUR_STATE={:?}", self.status);
+            send_message(Message::ReportErrorRequest { errormessage: error_message }, &mut self.buff_writer);
         }
     }
 
@@ -425,7 +450,8 @@ impl State {
             }
             self.status = Status::Planning;
         } else {
-            panic!("Received a ENEMY_AFK_UPDATE while not in OPPONENT_PLANNING state! STATUS={:?}", self.status);
+            let error_message: String = format!("ERROR: I did not expect an ENEMY_AFK_UPDATE! CUR_STATE={:?}", self.status);
+            send_message(Message::ReportErrorRequest { errormessage: error_message }, &mut self.buff_writer);
         }
     }
 
@@ -453,7 +479,8 @@ impl State {
 
             self.lobby = ClientLobby::new();
         } else {
-            panic!("Received a GAME_OVER_UPDATE while not in an ingame state! STATUS={:?}", self.status);
+            let error_message: String = format!("ERROR: I did not expect a GAME_OVER_UPDATE! CUR_STATE={:?}", self.status);
+            send_message(Message::ReportErrorRequest { errormessage: error_message }, &mut self.buff_writer);
         }
     }
 
