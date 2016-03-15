@@ -43,7 +43,7 @@ macro_rules! version_string {
     () => ( concat!(description!(), " v", version!()) )
 }
 
-const TICK_DURATION_MS: u64 = 5;
+const TICK_DURATION_MS: u64 = 100;
 
 fn start_udp_discovery(tcp_port: u16) {
     let socket = match UdpSocket::bind("0.0.0.0:49001") {
@@ -57,6 +57,9 @@ fn start_udp_discovery(tcp_port: u16) {
     println!("Joined UDP multicast group 224.0.0.250, listening on port 49001 for UDP discovery");
     let udp_discovery_loop = move || {
         let mut buf = [0; 2048];
+
+        let tick = timer_periodic(TICK_DURATION_MS);
+
         loop {
             match socket.recv_from(&mut buf) {
                 Ok((num_bytes, src)) => {
@@ -65,7 +68,7 @@ fn start_udp_discovery(tcp_port: u16) {
                     println!("{}", std::str::from_utf8(&buf).unwrap_or(""));
                     let mut response = vec![];
                     response.write_u16::<BigEndian>(tcp_port).unwrap();
-                    write!(&mut response, "Some host name");
+                    write!(&mut response, version_string!());
                     if socket.send_to(&response[..], &src).is_err() {
                         println!("Unable to respond");
                     } else {
@@ -76,6 +79,8 @@ fn start_udp_discovery(tcp_port: u16) {
                     println!("Couldn't receive a datagram: {}", e);
                 }
             }
+
+            tick.recv().expect("Timer thread died unexpectedly."); // wait for next tick
         }
     };
     thread::spawn(udp_discovery_loop);

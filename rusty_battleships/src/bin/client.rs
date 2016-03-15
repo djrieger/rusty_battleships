@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::io::{BufReader, BufWriter};
 use std::net::{Ipv4Addr, TcpStream, UdpSocket, SocketAddr};
 use std::sync::mpsc;
@@ -25,6 +26,9 @@ use rusty_battleships::board::{CellState, W, H};
 use rusty_battleships::ship::{Ship};
 use rusty_battleships::timer::timer_periodic;
 
+extern crate time;
+use time::{Duration, PreciseTime};
+
 // http://stackoverflow.com/questions/35157399/how-to-concatenate-static-strings-in-rust/35159310
 macro_rules! description {
     () => ( "rusty battleships: game client" )
@@ -36,7 +40,8 @@ macro_rules! version_string {
     () => ( concat!(description!(), " v", version!()) )
 }
 
-const TICK_DURATION_MS: u64 = 50;
+const TICK_DURATION_MS: u64 = 100;
+const UDP_DISCOVERY_TICK_DURATION_MS: u64 = 5000; // we don't need to discover servers all the time
 
 
 static CONNECT_SCREEN: &'static str = include_str!("assets/connect_screen.qml");
@@ -74,7 +79,7 @@ Q_OBJECT! { Assets:
 }
 
 
-#[derive(RustcEncodable)]
+#[derive(Clone, Eq, Hash, PartialEq, RustcEncodable)]
 struct Server {
     ip: [u8; 4],
     port: u16,
@@ -108,7 +113,7 @@ struct Bridge {
     lobby_list: LobbyList,
 
     udp_discovery_receiver: mpsc::Receiver<(Ipv4Addr, u16, String)>,
-    discovered_servers: Vec<Server>,
+    discovered_servers: HashMap<Server, PreciseTime>,
 }
 
 impl Bridge {
@@ -231,12 +236,27 @@ impl Bridge {
     }
 
     fn discover_servers(&mut self) -> String {
-        // FIXME: handle removed servers somehow
         while let Ok((ip, port, server_name)) = self.udp_discovery_receiver.try_recv() {
-            self.discovered_servers.push(Server { ip: ip.octets(), port: port, name: server_name });
+	        let server = Server { ip: ip.octets(), port: port, name: server_name };
+            if let Some(time) = self.discovered_servers.get_mut(&server) {
+	            *time = PreciseTime::now();
+	            continue;
+            }
+
+			self.discovered_servers.insert(server, PreciseTime::now());
         }
 
-        return json::encode(&self.discovered_servers).unwrap();
+	    let servers = self.discovered_servers.iter()
+	            .fold(Vec::<Server>::new(), |mut v, (server, time)| {
+				    if time.to(time::PreciseTime::now()) <
+				            Duration::milliseconds(UDP_DISCOVERY_TICK_DURATION_MS as i64 * 2) {
+						v.push(server.clone());
+				    }
+
+				    v
+		        });
+
+        return json::encode(&servers).unwrap();
     }
 
     fn get_coords_from_button_index(button_index: i64) -> (u8, u8) {
@@ -473,31 +493,39 @@ fn main() {
     let (tx_board_update, rcv_board_update) : (mpsc::Sender<(Board, Board, u8, u8)>, mpsc::Receiver<(Board, Board, u8, u8)>) = mpsc::channel();
 
     let socket = UdpSocket::bind("0.0.0.0:0").unwrap();
-    let response = vec![];
-    socket.send_to(&response[..], &(Ipv4Addr::new(224, 0, 0, 250), 49001 as u16));
-    let udp_discovery_loop = move || {
-        let mut buf = [0; 2048];
-        let tick = timer_periodic(TICK_DURATION_MS);
-        loop {
-            match socket.recv_from(&mut buf) {
-                Ok((num_bytes, SocketAddr::V4(src))) => {
-                    if num_bytes < 2 {
-                        panic!("Received invalid response from {} to UDP discovery request", src);
-                    }
-                    let port = BigEndian::read_u16(&buf[0..2]);
-                    let server_name = std::str::from_utf8(&buf[2..]).unwrap_or("");
-                    tx_udp_discovery.send((*src.ip(), port, String::from(server_name)));
-                },
-                Ok((num_bytes, SocketAddr::V6(_))) => panic!("Currently not supporting Ipv6"),
-                Err(e) => {
-                    println!("Couldn't receive a datagram: {}", e);
-                }
-            }
+	let socket_send = socket.try_clone().unwrap();
+	thread::spawn(move || {
+		let response = vec![];
+		let tick = timer_periodic(UDP_DISCOVERY_TICK_DURATION_MS);
 
-            tick.recv().expect("Timer thread died unexpectedly."); // wait for next tick
-        }
-    };
-    thread::spawn(udp_discovery_loop);
+		loop {
+			socket_send.send_to(&response[..], &(Ipv4Addr::new(224, 0, 0, 250), 49001 as u16));
+
+			tick.recv().expect("Timer thread died unexpectedly."); // wait for next tick
+		}
+	});
+    thread::spawn(move || {
+	    let mut buf = [0; 2048];
+	    let tick = timer_periodic(TICK_DURATION_MS);
+	    loop {
+		    match socket.recv_from(&mut buf) {
+			    Ok((num_bytes, SocketAddr::V4(src))) => {
+				    if num_bytes < 2 {
+				        panic!("Received invalid response from {} to UDP discovery request", src);
+				    }
+				    let port = BigEndian::read_u16(&buf[0..2]);
+				    let server_name = std::str::from_utf8(&buf[2..]).unwrap_or("");
+				    tx_udp_discovery.send((*src.ip(), port, String::from(server_name)));
+			    },
+			    Ok((num_bytes, SocketAddr::V6(_))) => panic!("Currently not supporting Ipv6"),
+			    Err(e) => {
+			        println!("Couldn't receive a datagram: {}", e);
+			    }
+		    }
+
+		    tick.recv().expect("Timer thread died unexpectedly."); // wait for next tick
+	    }
+    });
 
     let mut engine = qmlrs::Engine::new();
     let assets = Assets;
@@ -519,7 +547,7 @@ fn main() {
         board_receiver : rcv_board_update,
         last_rcvd_msg: None,
         udp_discovery_receiver: rcv_udp_discovery,
-        discovered_servers: Vec::<Server>::new(),
+        discovered_servers: HashMap::new(),
         lobby_list: LobbyList::new(),
         features_list : Vec::<String>::new(),
     };

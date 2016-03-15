@@ -16,7 +16,7 @@ use rusty_battleships::ship::{Ship};
 use rusty_battleships::timer::timer_periodic;
 
 
-const TICK_DURATION_MS: u64 = 5;
+const TICK_DURATION_MS: u64 = 100;
 
 
 #[derive(Clone, Debug, PartialEq, RustcEncodable)]

@@ -48,17 +48,6 @@ impl Result {
             terminate_connection: terminate_connection,
         }
     }
-
-    pub fn update(updates: HashMap<String, Vec<Message>>) -> Result {
-        return Result {
-            response: None,
-            updates: updates,
-            terminate_connection: false,
-        }
-    }
-    pub fn empty() -> Result {
-        return Result { response: None, updates: hashmap![], terminate_connection: false };
-    }
 }
 
 /// Send update to all players who are not currently playing a game.
