@@ -230,9 +230,6 @@ impl Board {
     }
 
     fn compute_visibility_updates(&mut self) {
-        if !self.handle_visibility_updates {
-            return;
-        }
         // Find all cells that had ships in old state (self.state) but no longer in new_state and
         // vice versa -> some ship moved out of some cell
         for x in 0..W {
@@ -241,7 +238,7 @@ impl Board {
                 let ref mut new_cell = self.state[x][y];
                 // copy visibility information to new state
                 new_cell.visible = new_cell.visible || old_cell.visible;
-                if new_cell.visible {
+                if self.handle_visibility_updates && new_cell.visible {
                     let ship_entered_cell = !old_cell.has_ship() && new_cell.has_ship();
                     let ship_left_cell = old_cell.has_ship() && !new_cell.has_ship();
                     if ship_left_cell {
