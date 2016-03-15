@@ -5,7 +5,7 @@ use std::rc::Rc;
 use rusty_battleships::message::{ShipPlacement, Direction, Message, Reason};
 use rusty_battleships::board::{Board, PlayerState, Player, PlayerHandle, HitResult};
 use rusty_battleships::ship::Ship;
-use rusty_battleships::game::{Game, GameState};
+use rusty_battleships::game::Game;
 
 // From http://stackoverflow.com/a/28392068
 macro_rules! hashmap {
@@ -331,7 +331,7 @@ pub fn handle_place_ships_request(placement: [ShipPlacement; 5], player_name: &S
     let player = lobby.get_mut(player_name).unwrap();
 
     if let Some(ref game) = player.game {
-        if let GameState::Running = (*game).borrow().state {
+        if (*game).borrow().is_running() {
             return Result::respond(Message::InvalidRequestResponse, false);
         }
 
@@ -344,17 +344,8 @@ pub fn handle_place_ships_request(placement: [ShipPlacement; 5], player_name: &S
         {
             println!("Computing initial placement for {}:", player_name);
             let mut game_ref = (*game).borrow_mut();
-            if game_ref.player1 == *player_name {
-                // game_ref.board1.ships = ships;
-                game_ref.board1 = Board::try_create(ships, true).unwrap();
-                // new_board_valid = game_ref.board1.compute_state();
-                opponent_ready = game_ref.board2.has_ships();
-            } else {
-                // game_ref.board2.ships = ships;
-                // new_board_valid = game_ref.board2.compute_state();
-                game_ref.board2 = Board::try_create(ships, true).unwrap();
-                opponent_ready = game_ref.board1.has_ships();
-            };
+            *game_ref.get_board(player_name) = Board::try_create(ships, true).unwrap();
+            opponent_ready = game_ref.get_opponent_board(player_name).has_ships();
         }
 
         // Check if new state is valid
@@ -365,7 +356,7 @@ pub fn handle_place_ships_request(placement: [ShipPlacement; 5], player_name: &S
         let mut game_ref = (*game).borrow_mut();
         // opponent also done placing ships?
         if opponent_ready {
-            game_ref.state = GameState::Running;
+            game_ref.start();
             let mut result = Result::respond(Message::OkResponse, false);
             result.updates.insert(game_ref.get_active_player(), vec![Message::YourTurnUpdate]);
             result.updates.insert(game_ref.get_waiting_player(), vec![Message::EnemyTurnUpdate]);
@@ -391,7 +382,7 @@ fn handle_move(game: &mut Game, player_name: &String, movement: (usize, Directio
         return false;
     }
 
-    let ref mut my_board = if *game.player1 == *player_name { &mut game.board1 } else { &mut game.board2 };
+    let ref mut my_board = game.get_board(player_name);
     return my_board.move_ship(ship_index as u8, direction);
 }
 
@@ -411,11 +402,7 @@ fn handle_shoot(games: &mut Vec<Rc<RefCell<Game>>>, game: Rc<RefCell<Game>>,
 
         // enemy visibility updates
         {
-            let ref mut opponent_board = if game_ref.player1 == *player_name {
-                &mut game_ref.board2
-            } else {
-                &mut game_ref.board1
-            };
+            let ref mut opponent_board = game_ref.get_opponent_board(player_name);
             println!("Shooting on {}'s board at {}:{}:", opponent_name, target_x, target_y);
             hit_result = opponent_board.hit(target_x as usize, target_y as usize);
             let opponent_updates = hashmap![player_name.clone() => opponent_board.pop_updates()];
@@ -425,11 +412,7 @@ fn handle_shoot(games: &mut Vec<Rc<RefCell<Game>>>, game: Rc<RefCell<Game>>,
 
         // my visibility updates
         {
-            let ref mut my_board = if game_ref.player1 == *player_name {
-                &mut game_ref.board1
-            } else {
-                &mut game_ref.board2
-            };
+            let ref mut my_board = game_ref.get_board(player_name);
             let my_updates = hashmap![opponent_name.clone() => my_board.pop_updates()];
             merge_updates(&mut updates, my_updates);
         }
@@ -483,7 +466,7 @@ pub fn handle_move_shoot_request(target_coords: (u8, u8),
         // check if in valid state and handle move, if requested
         let mut game_ref = (*game).borrow_mut();
 
-        if game_ref.state != GameState::Running {
+        if !game_ref.is_running() {
             return Result::respond(Message::InvalidRequestResponse, false);
         }
 

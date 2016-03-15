@@ -13,15 +13,15 @@ pub enum GameState {
 static LIMIT_SECONDS: i64 = 60;
 
 pub struct Game {
-    pub board1: Board,
-    pub board2: Board,
-    pub player1: String,
-    pub player2: String,
+    board1: Board,
+    board2: Board,
+    player1: String,
+    player2: String,
     last_turn_started_at: Option<time::PreciseTime>,
     player1_active: bool,
     player1_afk_count: u8,
     player2_afk_count: u8,
-    pub state: GameState,
+    state: GameState,
 }
 
 impl PartialEq for Game {
@@ -50,6 +50,10 @@ impl Game {
     }
 
     pub fn get_board(&mut self, player_name: &String) -> &mut Board {
+        return if *self.player1 == *player_name { &mut self.board1 } else { &mut self.board2 };
+    }
+
+    pub fn get_opponent_board(&mut self, player_name: &String) -> &mut Board {
         return if *self.player1 == *player_name { &mut self.board2 } else { &mut self.board1 };
     }
 
@@ -65,7 +69,12 @@ impl Game {
         return if self.player1_active { self.player2.clone() } else { self.player1.clone() };
     }
 
-    pub fn switch_turns(&mut self) -> () {
+    pub fn start(&mut self) {
+        self.state = GameState::Running;
+        self.last_turn_started_at = Some(time::PreciseTime::now());
+    }
+
+    pub fn switch_turns(&mut self) {
         self.player1_active = !self.player1_active;
         self.last_turn_started_at = Some(time::PreciseTime::now());
     }

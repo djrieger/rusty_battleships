@@ -160,7 +160,7 @@ Item {
                 text: "∧"
                 enabled: board.moveAllowed && board.moveShip !== -1
                 onClicked: {
-                    move(0);
+                    try_move(0);
                 }
             }
             Button {
@@ -169,7 +169,7 @@ Item {
                 text: ">"
                 enabled: board.moveAllowed && board.moveShip !== -1
                 onClicked: {
-                    move(1);
+                    try_move(1);
                 }
             }
             Button {
@@ -178,7 +178,7 @@ Item {
                 text: "∨"
                 enabled: board.moveAllowed && board.moveShip !== -1
                 onClicked: {
-                    move(2);
+                    try_move(2);
                 }
             }
             Button {
@@ -187,7 +187,7 @@ Item {
                 text: "<"
                 enabled: board.moveAllowed && board.moveShip !== -1
                 onClicked: {
-                    move(3);
+                    try_move(3);
                 }
             }
         }
@@ -385,32 +385,36 @@ Item {
         }
     }
 
-    function move(direction) {
+    function try_move(direction) {
         console.assert(direction > -1 && direction < 4);
         if (bridge.can_move_in_direction(board.moveShip, direction)) {
-	        board.moveAllowed = false;
-			board.moveDirection = direction;
-
-			if (direction === 0) {
-				shipModel.get(board.moveShip).y--;
-			} else if (direction === 1) {
-				shipModel.get(board.moveShip).x++;
-			} else if (direction === 2) {
-                shipModel.get(board.moveShip).y++;
-            } else if (direction === 3) {
-                shipModel.get(board.moveShip).x--;
-            }
-
-			clearBoard();
-			draw_ship(0);
-			draw_ship(1);
-			draw_ship(2);
-			draw_ship(3);
-			draw_ship(4);
+	        move(direction);
         } else {
             // TODO: show error message
             console.log("Invalid move");
         }
+    }
+
+    function move(direction) {
+        board.moveAllowed = false;
+		board.moveDirection = direction;
+
+		if (direction === 0) {
+			shipModel.get(board.moveShip).y--;
+		} else if (direction === 1) {
+			shipModel.get(board.moveShip).x++;
+		} else if (direction === 2) {
+            shipModel.get(board.moveShip).y++;
+        } else if (direction === 3) {
+            shipModel.get(board.moveShip).x--;
+        }
+
+		clearBoard();
+		draw_ship(0);
+		draw_ship(1);
+		draw_ship(2);
+		draw_ship(3);
+		draw_ship(4);
     }
 
     function updateBoards() {
@@ -459,6 +463,11 @@ Item {
             if (board.active) {
                 // AFK received
                 board.active = false;
+
+                // reset last move, if ship was moved
+                if (!board.moveAllowed) {
+                    move((board.moveDirection + 2) % 4);
+                }
             }
         } else if (state === "Available") {
             screen.gameEnded();
