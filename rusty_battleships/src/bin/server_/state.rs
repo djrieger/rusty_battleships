@@ -285,8 +285,9 @@ pub fn handle_surrender_request(username: &String, lobby: &mut HashMap<String, P
     }
 
     if let Some(ref game) = game {
-        terminate_game(games, game.clone(), lobby, username, false, Reason::Surrendered);
-        return Result::respond(Message::OkResponse, false);
+        let updates = terminate_game(games, game.clone(), lobby, username, false,
+                                     Reason::Surrendered);
+        return Result::respond_and_update_single(Message::OkResponse, updates, false);
     } else {
         return Result::respond(Message::NotYourTurnResponse, false);
     }
