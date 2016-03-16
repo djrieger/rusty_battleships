@@ -285,8 +285,9 @@ pub fn handle_surrender_request(username: &String, lobby: &mut HashMap<String, P
     }
 
     if let Some(ref game) = game {
-        terminate_game(games, game.clone(), lobby, username, false, Reason::Surrendered);
-        return Result::respond(Message::OkResponse, false);
+        let updates = terminate_game(games, game.clone(), lobby, username, false,
+                                     Reason::Surrendered);
+        return Result::respond_and_update_single(Message::OkResponse, updates, false);
     } else {
         return Result::respond(Message::NotYourTurnResponse, false);
     }
@@ -339,7 +340,6 @@ pub fn handle_place_ships_request(placement: [ShipPlacement; 5], player_name: &S
         if Board::try_create(ships.clone(), false).is_none() {
             return Result::respond(Message::InvalidRequestResponse, false);
         }
-        // let new_board_valid;
         let opponent_ready;
         {
             println!("Computing initial placement for {}:", player_name);
@@ -347,11 +347,6 @@ pub fn handle_place_ships_request(placement: [ShipPlacement; 5], player_name: &S
             *game_ref.get_board(player_name) = Board::try_create(ships, true).unwrap();
             opponent_ready = game_ref.get_opponent_board(player_name).has_ships();
         }
-
-        // Check if new state is valid
-        // if !new_board_valid {
-        //     return Result::respond(Message::InvalidRequestResponse, false);
-        // }
 
         let mut game_ref = (*game).borrow_mut();
         // opponent also done placing ships?
@@ -377,7 +372,6 @@ pub fn handle_place_ships_request(placement: [ShipPlacement; 5], player_name: &S
 fn handle_move(game: &mut Game, player_name: &String, movement: (usize, Direction)) -> bool {
     let (ship_index, direction) = movement;
     if ship_index > 4 {
-        // ship index is out of bounds
         println!("ship index out of bounds");
         return false;
     }
@@ -496,13 +490,13 @@ pub fn handle_afk(game: Rc<RefCell<Game>>, lobby: &mut HashMap<String, Player>,
         active_player = game_ref.get_active_player();
         let strike_count = game_ref.get_active_player_afk_count();
 
-        if strike_count < 2 {
+        if strike_count > 1 {
             let opponent_name = game_ref.get_opponent_name(&game_ref.get_active_player()).clone();
-            game_ref.inc_active_player_afk_count();
+            game_ref.dec_active_player_afk_count();
             game_ref.switch_turns();
             return hashmap![
-                active_player => vec![Message::AfkWarningUpdate { strikes: strike_count + 1 }],
-                opponent_name => vec![Message::EnemyAfkUpdate { strikes: strike_count + 1 }]
+                active_player => vec![Message::AfkWarningUpdate { strikes: strike_count - 1 }],
+                opponent_name => vec![Message::EnemyAfkUpdate { strikes: strike_count - 1 }]
             ];
         }
     }
