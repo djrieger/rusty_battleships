@@ -3,7 +3,7 @@ use std::collections::HashMap;
 #[derive(Clone, Debug)]
 pub struct ClientLobby {
     pub player_name: String,
-    // player name -> is ready 
+    // player name -> is ready
     player_list: HashMap<String, bool>,
     pub feature_list: Vec<String>,
 }
@@ -26,14 +26,13 @@ impl ClientLobby {
     }
 
     pub fn remove_player(&mut self, player: &str) {
-        self.player_list.remove(player).expect(&format!("Tried removing non-existing player {}", player));
+        self.player_list.remove(player);
     }
 
     fn change_ready_state(&mut self, player: &str, ready: bool) {
         let entry = self.player_list
-            .get_mut(&String::from(player))
-            .expect(&format!("Tried setting ready state to {} for non-existing player {}", ready, player));
-        *entry = ready; 
+            .entry(String::from(player)).or_insert(ready);
+        *entry = ready;
     }
 
     pub fn get_available_players(&self) -> Vec<String> {
