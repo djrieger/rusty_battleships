@@ -39,8 +39,8 @@ impl Game {
             player2: player2,
             last_turn_started_at: None,
             player1_active: thread_rng().gen(),
-            player1_afk_count: 0,
-            player2_afk_count: 0,
+            player1_afk_count: 3,
+            player2_afk_count: 3,
             state: GameState::Placing,
         }
     }
@@ -98,11 +98,11 @@ impl Game {
         if self.player1_active { self.player1_afk_count } else { self.player2_afk_count }
     }
 
-    pub fn inc_active_player_afk_count(&mut self) -> () {
+    pub fn dec_active_player_afk_count(&mut self) -> () {
         if self.player1_active {
-            self.player1_afk_count += 1;
+            self.player1_afk_count -= 1;
         } else {
-            self.player2_afk_count += 1;
+            self.player2_afk_count -= 1;
         }
     }
 }

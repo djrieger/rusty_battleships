@@ -108,8 +108,8 @@ impl State {
             opponent : String::from("None"),
             status : Status::Unregistered,
             my_turn : false,
-            my_afks : 0,
-            their_afks : 0,
+            my_afks : 3,
+            their_afks : 3,
             hits : 0,
             destroyed: 0,
             my_board : None,
@@ -424,7 +424,7 @@ impl State {
     pub fn handle_afk_warning_update(&mut self, strikes: u8) {
         if self.status == Status::Planning {
             self.my_turn = false;
-            self.my_afks += 1;
+            self.my_afks -= 1;
             if self.my_afks != strikes {
                 panic!("Inconsistent strike count for **me**! MINE={}, SERVER={}", self.my_afks, strikes);
             }
@@ -438,7 +438,7 @@ impl State {
     pub fn handle_enemy_afk_update(&mut self, strikes: u8) {
         if self.status == Status::OpponentPlanning {
             self.my_turn = true;
-            self.their_afks += 1;
+            self.their_afks -= 1;
             if self.their_afks != strikes {
                 panic!("Inconsistent strike count for **the enemy**! MINE={}, SERVER={}", self.their_afks, strikes);
             }
@@ -465,9 +465,9 @@ impl State {
             // reset game state
             self.my_turn = false;
             self.my_board = None;
-            self.my_afks = 0;
+            self.my_afks = 3;
             self.their_board = None;
-            self.their_afks = 0;
+            self.their_afks = 3;
             self.hits = 0;
             self.destroyed = 0;
 
