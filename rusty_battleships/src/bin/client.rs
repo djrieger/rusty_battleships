@@ -138,6 +138,10 @@ impl Bridge {
                         self.state = tuple.0;
                         self.last_rcvd_msg = Some(tuple.1.clone());
                     },
+                    Message::PlayerJoinedUpdate { .. } | Message::PlayerLeftUpdate { .. } |
+                    Message::PlayerReadyUpdate { .. } | Message::PlayerNotReadyUpdate { .. } => {
+                        // ignore
+                    },
                     x => {
                         println!("Received illegal response: {:?}", x);
                         break;

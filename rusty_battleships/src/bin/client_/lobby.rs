@@ -22,7 +22,9 @@ impl ClientLobby {
     }
 
     pub fn add_player(&mut self, player: &str) {
-        self.player_list.insert(String::from(player), false);
+        if !self.player_list.contains_key(player) {
+            self.player_list.insert(String::from(player), false);
+        }
     }
 
     pub fn remove_player(&mut self, player: &str) {

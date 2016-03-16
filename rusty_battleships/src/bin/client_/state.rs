@@ -76,10 +76,11 @@ pub struct State {
 
 #[derive(Debug, Hash, Eq, PartialEq, Clone)]
 pub enum Status {
-    //LOBBY
+    //NOT REGISTERED
     Unregistered,
     AwaitFeatures,
     Register,
+    //LOBBY
     Available,
     AwaitReady,
     AwaitGameStart,
