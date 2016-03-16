@@ -477,6 +477,7 @@ impl State {
             self.destroyed = 0;
 
             self.lobby = ClientLobby::new();
+            self.send_updated_boards(); // send new, empty board to UI thread
         } else {
             let error_message: String = format!("ERROR: I did not expect a GAME_OVER_UPDATE! CUR_STATE={:?}", self.status);
             send_message(Message::ReportErrorRequest { errormessage: error_message }, &mut self.buff_writer);
@@ -507,12 +508,12 @@ impl State {
         if let Some(ref b) = self.my_board {
             mb = b.clone();
         } else {
-            panic!("I was told there would be boards! But there's no board for me...");
+            mb = Board::try_create(vec![], false).unwrap();
         }
         if let Some(ref c) = self.their_board {
             tb = c.clone();
         } else {
-            panic!("I was told there would be boards! But there's no board for them...");
+            tb = DumbBoard::new();
         }
         let boards = (mb, tb, self.hits, self.destroyed);
         self.board_update_sender.send(boards).unwrap();
