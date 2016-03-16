@@ -520,9 +520,10 @@ fn main() {
 				        panic!("Received invalid response from {} to UDP discovery request", src);
 				    }
 				    let port = BigEndian::read_u16(&buf[0..2]);
-                    // string length at byte 3
-				    let server_name = std::str::from_utf8(&buf[3..]).unwrap_or("");
-				    tx_udp_discovery.send((*src.ip(), port, String::from(server_name))).unwrap();
+                    let server_name_length = buf[2];
+				    let mut server_name = String::from(std::str::from_utf8(&buf[3..]).unwrap());
+                    server_name.truncate(server_name_length as usize);
+				    tx_udp_discovery.send((*src.ip(), port, server_name)).unwrap();
 			    },
 			    Ok((_, SocketAddr::V6(_))) => panic!("Currently not supporting Ipv6"),
 			    Err(e) => {
