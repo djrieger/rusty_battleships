@@ -92,13 +92,6 @@ fn start_udp_discovery(tcp_port: u16) {
     thread::spawn(udp_discovery_loop);
 }
 
-// Tell server to perform proper shutdown, like removing player from their game, informing
-// opponent etc.
-fn shutdown_player(tx: &mpsc::SyncSender<ToMainThreadCommand>, rx: &mpsc::Receiver<ToChildCommand>) {
-    tx.send(ToMainThreadCommand::TerminatePlayer).expect("Main thread died, exiting.");
-    rx.recv().expect("Main thread died before answering, exiting.");
-}
-
 fn respond(response_msg: Message, buff_writer: &mut BufWriter<TcpStream>) -> Result<(), std::io::Error> {
     let serialized_msg = serialize_message(response_msg);
     try!(buff_writer.write(&serialized_msg[..])); //.expect("Could not write to TCP steam, exiting.");
@@ -111,64 +104,34 @@ fn handle_client(stream: TcpStream, tx: mpsc::SyncSender<ToMainThreadCommand>, r
 
     let response_stream = stream.try_clone().unwrap();
     let mut buff_reader = BufReader::new(stream);
-    let mut buff_writer = BufWriter::new(response_stream);
     let tick = timer_periodic(TICK_DURATION_MS);
-    let (tx_client_msg, rx_client_msg) = mpsc::channel();
 
     // launch thread receiving messages from child TCP endpoint
     thread::spawn(move || {
         loop {
             let request = deserialize_message(&mut buff_reader);
-            let is_error = request.is_err();
-            tx_client_msg.send(request).unwrap();
-            if is_error {
-                return;
+            match request {
+                Ok(msg) => tx.send(ToMainThreadCommand::Message(msg)).unwrap(),
+                Err(e) => {
+                    tx.send(ToMainThreadCommand::Error(e)).unwrap();
+                    return;
+                },
             }
+            tick.recv().expect("Timer thread died unexpectedly."); // wait for next tick
         }
     });
 
+    let mut buff_writer = BufWriter::new(response_stream);
     loop {
-        // Do we have any deserialized message from this child?
-        if let Ok(request) = rx_client_msg.try_recv() {
-            match request {
-                Ok(request_msg) => {
-                    // Send parsed Message to main thread
-                    tx.send(ToMainThreadCommand::Message(request_msg)).expect("Main thread died, exiting.");
-                },
-                Err(ref e) => {
-                    shutdown_player(&tx, &rx);
-                    if e.kind() == std::io::ErrorKind::UnexpectedEof {
-                        println!("Client terminated connection");
-                    } else {
-                        println!("Got error: {:?}", e);
-                        // Ignoring return value of respond() since we are exiting anyway
-                        let _ = respond(Message::InvalidRequestResponse, &mut buff_writer);
-                    }
-                    return;
-                },
-            }
+        let response = rx.recv().unwrap();
+        match response {
+            ToChildCommand::TerminateConnection => return,
+            ToChildCommand::Message(Message::InvalidRequestResponse) => {
+                respond(Message::InvalidRequestResponse, &mut buff_writer).is_err();
+                return;
+            },
+            ToChildCommand::Message(response_msg) => if respond(response_msg, &mut buff_writer).is_err() { return },
         }
-
-        // Check for response from main thread
-        if let Ok(response) = rx.try_recv() {
-            match response {
-                ToChildCommand::TerminateConnection => return,
-                ToChildCommand::Message(Message::InvalidRequestResponse) => {
-                    shutdown_player(&tx, &rx);
-                    // Ignoring return value of respond() since we are exiting anyway
-                    let _ = respond(Message::InvalidRequestResponse, &mut buff_writer);
-                    return;
-                },
-                ToChildCommand::Message(response_msg) => {
-                    if respond(response_msg, &mut buff_writer).is_err() {
-                        shutdown_player(&tx, &rx);
-                        return;
-                    }
-                },
-            }
-        }
-
-        tick.recv().expect("Timer thread died unexpectedly."); // wait for next tick
     }
 }
 
@@ -284,20 +247,27 @@ fn main() {
                         if result.terminate_connection {
                             println!("-- Closing connection to child {}", i);
                             player_handle.to_child_endpoint.send(ToChildCommand::TerminateConnection).unwrap();
-	                        valid[i] = false;
+                            valid[i] = false;
                         }
                         if !result.updates.is_empty() {
                             message_store = result.updates;
                             break;
                         }
                     },
-                    ToMainThreadCommand::TerminatePlayer => {
+                    ToMainThreadCommand::Error(ref e) => {
                         if let Some(ref name) = player_handle.nickname {
                             message_store = state::terminate_player(name, &mut lobby, &mut games);
                         }
-                        player_handle.to_child_endpoint.send(ToChildCommand::TerminateConnection).unwrap();
-	                    valid[i] = false;
-                    }
+                        valid[i] = false;
+                        if e.kind() == std::io::ErrorKind::UnexpectedEof {
+                            println!("Client terminated connection");
+                            player_handle.to_child_endpoint.send(ToChildCommand::TerminateConnection).unwrap();
+                        } else {
+                            println!("Got error: {:?}", e);
+                            // Ignoring return value of respond() since we are exiting anyway
+                            player_handle.to_child_endpoint.send(ToChildCommand::Message(Message::InvalidRequestResponse)).unwrap();
+                        }
+                    },
                 }
             }
         }

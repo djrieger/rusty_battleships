@@ -19,7 +19,7 @@ pub enum ToChildCommand {
 
 pub enum ToMainThreadCommand {
     Message(Message),
-    TerminatePlayer,
+    Error(::std::io::Error),
 }
 
 pub struct PlayerHandle {
