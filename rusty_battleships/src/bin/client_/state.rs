@@ -151,6 +151,19 @@ impl State {
             true
         }
 
+    fn handle_response<F>(&mut self, expected_status: Status, new_status: Status, mut handler: F, response_label: &str) -> Result<(), String>
+        where F: FnMut(&mut State) {
+        if self.status == expected_status {
+            handler(self);
+            self.status = new_status;
+            Ok(())
+        } else {
+            let error_message: String = format!("ERROR: I did not expect a {}! CUR_STATE={:?}", response_label, self.status);
+            send_message(Message::ReportErrorRequest { errormessage: error_message.clone() }, &mut self.buff_writer);
+            Err(error_message.clone())
+        }
+    }
+
     //FIXME: Change return value to Result<(),String)>
     pub fn login(&mut self, nickname: &str) -> bool {
         self.change_status(
@@ -267,15 +280,12 @@ impl State {
     }
 
     pub fn handle_game_start_update(&mut self, nickname: &str) -> Result<(), String> {
-        if self.status == Status::Waiting {
-            self.status = Status::PlacingShips;
-            self.opponent = nickname.to_owned();
-            return Ok(());
-        } else {
-            let error_message: String = format!("ERROR: I did not expect a GameStartUpdate! CUR_STATE={:?}", self.status);
-            send_message(Message::ReportErrorRequest { errormessage: error_message.clone() }, &mut self.buff_writer);
-            return Err(error_message.clone());
-        }
+        self.handle_response(
+            Status::Waiting,
+            Status::PlacingShips,
+            |state| { state.opponent = nickname.to_owned(); },
+            "GameStartUpdate"
+        )
     }
 
     /* Program flow guideline: Set your values when you're sending the Requests and hand over to
@@ -294,17 +304,6 @@ impl State {
             }
         };
         Ok(())
-    }
-
-    fn handle_response<F>(&mut self, expected_status: Status, new_status: Status, mut handler: F, response_label: &str)
-        where F: FnMut(&mut State) {
-        if self.status == expected_status {
-            handler(self);
-            self.status = new_status;
-        } else {
-            let error_message: String = format!("ERROR: I did not expect a {}! CUR_STATE={:?}", response_label, self.status);
-            send_message(Message::ReportErrorRequest { errormessage: error_message }, &mut self.buff_writer);
-        }
     }
 
     pub fn handle_name_taken_response(&mut self, _: &str) {
@@ -529,30 +528,24 @@ impl State {
             if let Ok(server_response) = received {
                 println!(">>>Oh, a message for me! MSG={:?}", server_response.clone());
 
-                //let outcome: Result<(), String>;
-
                 /* Handle messages from the server. */
                 match server_response.clone() {
                     // UPDATES
                     Message::PlayerJoinedUpdate {nickname: nn} => {
                         println!("Welcome our new captain {:?}", nn);
                         self.lobby.add_player(&nn.clone());
-                        self.send_updated_lobby();
                     },
                     Message::PlayerLeftUpdate {nickname: nn} => {
                         println!("Say goodbye to captain {:?}", nn);
                         self.lobby.remove_player(&nn.clone());
-                        self.send_updated_lobby();
                     }
                     Message::PlayerReadyUpdate {nickname: nn} => {
                         println!("Captain {:?} is now ready to be challenged.", nn);
                         self.lobby.ready_player(&nn.clone());
-                        self.send_updated_lobby();
                     },
                     Message::PlayerNotReadyUpdate {nickname : nn} => {
                         println!("Captain {:?} is not ready.", nn);
                         self.lobby.unready_player(&nn.clone());
-                        self.send_updated_lobby();
                     },
                     Message::GameStartUpdate {nickname: nn} => {
                         println!("Received a challenge by captain {:?}", nn);
@@ -568,12 +561,10 @@ impl State {
                     Message::YourTurnUpdate => {
                         println!("It's yout turn!");
                         self.handle_your_turn_update();
-                        self.send_updated_boards();
                     },
                     Message::EnemyTurnUpdate => {
                         println!("It's the enemy's turn!");
                         self.handle_enemy_turn_update();
-                        self.send_updated_boards();
                     },
                     Message::NotYourTurnResponse => {
                         //println!("I'm sorry dave, I'm afraid I can't do that.");
@@ -586,22 +577,18 @@ impl State {
                     Message::EnemyHitUpdate {x, y} => {
                         println!("We're hit! ({}, {})", x, y);
                         self.handle_enemy_hit_update(x, y);
-                        self.send_updated_boards();
                     },
                     Message::EnemyMissUpdate {x, y} => {
                         println!("They missed! ({}, {})", x, y);
                         self.handle_enemy_miss_update(x, y);
-                        self.send_updated_boards();
                     },
                     Message::EnemyVisibleUpdate {x, y} => {
                         println!("The enemy has been sighted! ({}, {})", x, y);
                         self.handle_enemy_visible_update(x, y);
-                        self.send_updated_boards();
                     },
                     Message::EnemyInvisibleUpdate {x, y} => {
                         println!("We lost track of the enemy! ({}, {})", x, y);
                         self.handle_enemy_invisible_update(x, y);
-                        self.send_updated_boards();
                     },
                     Message::EnemyAfkUpdate {strikes} => {
                         println!("The enemy is sleeping! ({})", strikes);
@@ -634,19 +621,33 @@ impl State {
                     Message::HitResponse {x, y} => {
                         println!("You have hit a ship! ({}, {})", x, y);
                         self.handle_hit_response(x, y);
-                        self.send_updated_boards();
                     },
                     Message::MissResponse {x, y} => {
                         println!("You have missed.({}, {})", x, y);
                         self.handle_miss_response(x, y);
-                        self.send_updated_boards();
                     },
                     Message::DestroyedResponse {x, y} => {
                         println!("Congratulations! You destroyed an enemy ship!");
                         self.handle_destroyed_response(x, y);
-                        self.send_updated_boards();
                     },
                     _ => println!(">>>RECEIVED: {:?}", server_response),
+                }
+
+                match server_response.clone() {
+                    Message::PlayerJoinedUpdate {..} |
+                        Message::PlayerLeftUpdate {..}  |
+                        Message::PlayerReadyUpdate {..}  |
+                        Message::PlayerNotReadyUpdate {..} => self.send_updated_lobby(),
+                    Message::YourTurnUpdate | 
+                        Message::EnemyTurnUpdate |
+                        Message::EnemyHitUpdate {..} |
+                        Message::EnemyMissUpdate {..} |
+                        Message::EnemyVisibleUpdate {..} | 
+                        Message::EnemyInvisibleUpdate {..} |
+                        Message::HitResponse {..} |
+                        Message::MissResponse {..} |
+                        Message::DestroyedResponse {..} => self.send_updated_boards(),
+                    _ => {}
                 }
 
                 self.ui_update_sender.send((self.status.clone(), server_response.clone())).unwrap();
@@ -661,33 +662,15 @@ impl State {
 
             if let Ok(received) = input {
                 match received {
-                    Message::GetFeaturesRequest => {
-                        self.get_features();
-                    },
-                    Message::LoginRequest { username } => {
-                        self.login(&username);
-                    },
-                    Message::ReadyRequest => {
-                        self.ready();
-                    },
-                    Message::NotReadyRequest => {
-                        self.unready();
-                    },
-                    Message::ChallengePlayerRequest { username } => {
-                        self.challenge(&username);
-                    },
-                    Message::PlaceShipsRequest { placement } => {
-                        self.place_ships( placement );
-                    },
-                    Message::ShootRequest { x, y } => {
-                        self.shoot( x, y );
-                    },
-                    Message::MoveAndShootRequest { id, direction, x, y } => {
-                        self.move_and_shoot( x, y, id, direction );
-                    },
-                    Message::SurrenderRequest => {
-                        self.surrender();
-                    },
+                    Message::GetFeaturesRequest => { self.get_features(); },
+                    Message::LoginRequest { username } => { self.login(&username); },
+                    Message::ReadyRequest => { self.ready(); },
+                    Message::NotReadyRequest => { self.unready(); },
+                    Message::ChallengePlayerRequest { username } => { self.challenge(&username); },
+                    Message::PlaceShipsRequest { placement } => { self.place_ships( placement ); },
+                    Message::ShootRequest { x, y } => { self.shoot( x, y ); },
+                    Message::MoveAndShootRequest { id, direction, x, y } => { self.move_and_shoot( x, y, id, direction ); },
+                    Message::SurrenderRequest => { self.surrender(); },
                     m => panic!("Received illegal request from client: {:?}", m),
                 }
             } 
