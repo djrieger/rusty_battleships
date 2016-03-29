@@ -131,35 +131,46 @@ impl State {
         return true;
     }
 
-    fn change_status(&mut self, from: Status, to: Status, msg: Message) -> bool {
-        if self.status != from {
-            println!("Transitioning to {:?} not possible in state {:?}, expected to be in state {:?}", to, self.status, from);
-            return false;
+    fn change_status<F>(&mut self, from: Status, to: Option<Status>, msg: Message, mut custom_logic: F) -> bool
+        where F: FnMut(&mut State) -> bool {
+            if self.status != from {
+                println!("Expected to be in state {:?}", from);
+                if to.is_some() {
+                    println!("Transitioning to {:?} not possible in state {:?}", to, self.status);
+                }
+                return false;
+            }
+            println!("Sending {:?}", msg);
+            send_message(msg.clone(), &mut self.buff_writer);
+            if !custom_logic(self) {
+                return false;
+            }
+            if let Some(new_state) = to {
+                self.status = new_state;
+            }
+            true
         }
-        self.status = to;
-        send_message(msg.clone(), &mut self.buff_writer);
-        println!("Sending {:?}", msg);
-        true
-    }
 
     //FIXME: Change return value to Result<(),String)>
     pub fn login(&mut self, nickname: &str) -> bool {
-        if self.status != Status::Unregistered {
-            println!("You're already logged in! STATUS = {:?}", self.status);
-            return false;
-        }
-        send_message(Message::LoginRequest { username: String::from(nickname) }, &mut self.buff_writer);
-        self.lobby.set_player_name(nickname);
-        self.status = Status::Register;
-        return true;
+        self.change_status(
+            Status::Unregistered,
+            Some(Status::Register),
+            Message::LoginRequest { username: String::from(nickname) },
+            |state| {
+                state.lobby.set_player_name(nickname);
+                true
+            }
+        )
     }
 
     //FIXME: Change return value to Result<(),String)>
     pub fn ready(&mut self) -> bool {
         self.change_status(
             Status::Available, 
-            Status::AwaitReady,
-            Message::ReadyRequest
+            Some(Status::AwaitReady),
+            Message::ReadyRequest,
+            |_| {true}
         )
     }
 
@@ -167,8 +178,9 @@ impl State {
     pub fn unready(&mut self) -> bool {
         self.change_status(
             Status::Waiting, 
-            Status::AwaitNotReady, 
-            Message::NotReadyRequest
+            Some(Status::AwaitNotReady), 
+            Message::NotReadyRequest,
+            |_| {true}
         )
     }
 
@@ -177,58 +189,62 @@ impl State {
     pub fn challenge(&mut self, opponent: &str) -> bool {
         self.change_status(
             Status::Available,
-            Status::AwaitGameStart,
-            Message::ChallengePlayerRequest { username: String::from(opponent) }
+            Some(Status::AwaitGameStart),
+            Message::ChallengePlayerRequest { username: String::from(opponent) },
+            |_| {true}
         )
     }
 
     //FIXME: Change return value to Result<(),String)>
     pub fn place_ships(&mut self, ships: [ShipPlacement; 5]) -> bool {
-        if self.status != Status::PlacingShips {
-            return false;
-        }
-
-        let mut ship_vec = Vec::<Ship>::new();
-        for i in 0..5 {
-            let s = Ship {
-                x: ships[i].x as isize,
-                y: ships[i].y as isize,
-                length: cmp::max(5-i, 2),
-                direction: ships[i].direction,
-                health_points: cmp::max(5-i, 2),
-            };
-            ship_vec.push(s);
-        }
-        let my_board = Board::try_create(ship_vec, false);
-        if my_board.is_none() {
-            return false;
-        }
-        self.my_board = my_board;
-        self.my_board.as_mut().unwrap().compute_state();
-        self.their_board = Some(DumbBoard::new());
-
-        send_message(Message::PlaceShipsRequest{ placement: ships }, &mut self.buff_writer);
-
-        return true;
+        self.change_status(
+            Status::PlacingShips,
+            None,
+            Message::PlaceShipsRequest { placement: ships },
+            |state| {
+                let mut ship_vec = Vec::<Ship>::new();
+                for i in 0..5 {
+                    let s = Ship {
+                        x: ships[i].x as isize,
+                        y: ships[i].y as isize,
+                        length: cmp::max(5-i, 2),
+                        direction: ships[i].direction,
+                        health_points: cmp::max(5-i, 2),
+                    };
+                    ship_vec.push(s);
+                }
+                let my_board = Board::try_create(ship_vec, false);
+                if my_board.is_none() {
+                    return false;
+                }
+                state.my_board = my_board;
+                state.my_board.as_mut().unwrap().compute_state();
+                state.their_board = Some(DumbBoard::new());
+                true
+            }
+        )
     }
 
     fn shoot(&mut self, x: u8, y: u8) {
-        if self.status != Status::Planning {
-            panic!("I cannot shoot when I'm not in Planning state! STATUS = {:?}", self.status);
-        }
-
-        send_message(Message::ShootRequest { x: x, y: y }, &mut self.buff_writer);
+        self.change_status(
+            Status::Planning,
+            None,
+            Message::ShootRequest { x: x, y: y },
+            |_| {true}
+        );
     }
 
     fn move_and_shoot(&mut self, x: u8, y: u8, id: u8, direction: Direction) {
-        if self.status != Status::Planning {
-            panic!("I cannot move and shoot when I'm not in Planning state! STATUS = {:?}", self.status);
-        }
-
-        self.my_board.as_mut().unwrap().move_ship(id, direction);
-        send_message(Message::MoveAndShootRequest { id: id, direction: direction, x: x, y: y }, &mut self.buff_writer);
+        self.change_status(
+            Status::Planning,
+            None,
+            Message::MoveAndShootRequest { id: id, direction: direction, x: x, y: y },
+            |state| { 
+                state.my_board.as_mut().unwrap().move_ship(id, direction);
+                true
+            }
+        );
     }
-
 
     pub fn handle_get_features_response(&mut self, features: Vec<String>) -> Result<(), String> {
         if self.status == Status::AwaitFeatures {
