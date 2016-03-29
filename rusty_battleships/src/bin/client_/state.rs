@@ -128,7 +128,7 @@ impl State {
     pub fn get_features(&mut self) -> bool {
         send_message(Message::GetFeaturesRequest, &mut self.buff_writer);
         self.status = Status::AwaitFeatures;
-        return true;
+        true
     }
 
     fn change_status<F>(&mut self, from: Status, to: Option<Status>, msg: Message, mut custom_logic: F) -> bool
@@ -283,39 +283,17 @@ impl State {
      * we'll panic anyway. */
     pub fn handle_ok_response(&mut self, msg: Message) -> Result<(), String> {
         match self.status.clone() {
-            Status::Register => {
-                self.status = Status::Available;
-                return Ok(());
-            },
-            Status::AwaitGameStart => {
-                self.status = Status::PlacingShips;
-                return Ok(());
-            },
-            Status::AwaitReady => {
-                println!("Waiting to be challenged.");
-                self.status = Status::Waiting;
-                return Ok(());
-            },
-            Status::AwaitNotReady => {
-                self.status = Status::Available;
-                return Ok(());
-            },
-            Status::PlacingShips => {
-                println!("Ships ok.");
-                self.status = Status::OpponentPlacing;
-                return Ok(());
-            },
-            Status::Surrendered => {
-                println!("Surrender request was received.");
-                self.status = Status::Available;
-                return Ok(());
-            },
+            Status::Register | Status::AwaitNotReady | Status::Surrendered => self.status = Status::Available,
+            Status::AwaitGameStart => self.status = Status::PlacingShips,
+            Status::AwaitReady => self.status = Status::Waiting,
+            Status::PlacingShips => self.status = Status::OpponentPlacing,
             _ => {
                 let error_message: String = format!("ERROR: I did not expect a {:?}! CUR_STATE={:?}", msg, self.status.clone());
                 send_message(Message::ReportErrorRequest { errormessage: error_message.clone() }, &mut self.buff_writer);
                 return Err(error_message);
             }
         };
+        Ok(())
     }
 
     pub fn handle_name_taken_response(&mut self, _: &str) {
