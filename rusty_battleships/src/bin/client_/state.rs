@@ -151,16 +151,14 @@ impl State {
             true
         }
 
-    fn handle_response<F>(&mut self, expected_status: Status, new_status: Status, mut handler: F, response_label: &str) -> Result<(), String>
+    fn handle_response<F>(&mut self, expected_status: Status, new_status: Status, mut handler: F, response_label: &str) 
         where F: FnMut(&mut State) {
         if self.status == expected_status {
             handler(self);
             self.status = new_status;
-            Ok(())
         } else {
             let error_message: String = format!("ERROR: I did not expect a {}! CUR_STATE={:?}", response_label, self.status);
             send_message(Message::ReportErrorRequest { errormessage: error_message.clone() }, &mut self.buff_writer);
-            Err(error_message.clone())
         }
     }
 
@@ -279,7 +277,7 @@ impl State {
         }
     }
 
-    pub fn handle_game_start_update(&mut self, nickname: &str) -> Result<(), String> {
+    pub fn handle_game_start_update(&mut self, nickname: &str) {
         self.handle_response(
             Status::Waiting,
             Status::PlacingShips,
@@ -549,7 +547,7 @@ impl State {
                     },
                     Message::GameStartUpdate {nickname: nn} => {
                         println!("Received a challenge by captain {:?}", nn);
-                        self.handle_game_start_update(&nn.clone()).unwrap();
+                        self.handle_game_start_update(&nn.clone());
                     },
                     Message::GameOverUpdate {victorious, reason} => {
                         self.handle_game_over_update(victorious, reason);
