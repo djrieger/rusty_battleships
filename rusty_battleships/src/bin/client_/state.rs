@@ -296,119 +296,118 @@ impl State {
         Ok(())
     }
 
-    pub fn handle_name_taken_response(&mut self, _: &str) {
-        if self.status == Status::Register {
-            self.status = Status::Unregistered;
+    fn handle_response<F>(&mut self, expected_status: Status, new_status: Status, mut handler: F, response_label: &str)
+        where F: FnMut(&mut State) {
+        if self.status == expected_status {
+            handler(self);
+            self.status = new_status;
         } else {
-            let error_message: String = format!("ERROR: I did not expect a NAME_TAKEN_RESPONSE! CUR_STATE={:?}", self.status);
+            let error_message: String = format!("ERROR: I did not expect a {}! CUR_STATE={:?}", response_label, self.status);
             send_message(Message::ReportErrorRequest { errormessage: error_message }, &mut self.buff_writer);
         }
+    }
+
+    pub fn handle_name_taken_response(&mut self, _: &str) {
+        self.handle_response(Status::Register, Status::Unregistered, |_| {}, "NameTakenResponse");
     }
 
     pub fn handle_no_such_player_response(&mut self, _: &str) {
-        if self.status == Status::AwaitGameStart {
-            self.status = Status::Available;
-        } else {
-            let error_message: String = format!("ERROR: I did not expect a NO_SUCH_PLAYER_RESPONSE! CUR_STATE={:?}", self.status);
-            send_message(Message::ReportErrorRequest { errormessage: error_message }, &mut self.buff_writer);
-        }
+        self.handle_response(Status::AwaitGameStart, Status::Available, |_| {}, "NoSuchPlayerResponse"); 
     }
 
     pub fn handle_not_waiting_response(&mut self, _: &str) {
-        if self.status == Status::AwaitGameStart {
-            self.status = Status::Available;
-        } else {
-            let error_message: String = format!("ERROR: I did not expect a NOT_WAITING_RESPONSE! CUR_STATE={:?}", self.status);
-            send_message(Message::ReportErrorRequest { errormessage: error_message }, &mut self.buff_writer);
-        }
+        self.handle_response(Status::AwaitGameStart, Status::Available, |_| {}, "NotWaitingResponse");
     }
 
     pub fn handle_hit_response(&mut self, x: u8, y: u8) {
-        if self.status == Status::Planning {
-            if let Some(ref mut board) = self.their_board {
-                board.set_ship(x, y);
-            }
-            self.my_turn = false;
-            self.hits += 1;
-            self.status = Status::OpponentPlanning;
-        } else {
-            let error_message: String = format!("ERROR: I did not expect a HIT_RESPONSE! CUR_STATE={:?}", self.status);
-            send_message(Message::ReportErrorRequest { errormessage: error_message }, &mut self.buff_writer);
-        }
+        self.handle_response(
+            Status::Planning,
+            Status::OpponentPlacing,
+            |state| {
+                if let Some(ref mut board) = state.their_board {
+                    board.set_ship(x, y);
+                }
+                state.my_turn = false;
+                state.hits += 1;
+            },
+            "HitResponse"
+        );
     }
 
     pub fn handle_enemy_hit_update(&mut self, x: u8, y: u8) {
-        if self.status == Status::OpponentPlanning {
-            if let Some(ref mut board) = self.my_board {
-                board.hit(x as usize, y as usize);
-            }
-            self.my_turn = true;
-            self.status = Status::Planning;
-        } else {
-            let error_message: String = format!("ERROR: I did not expect a ENEMY_HIT_UPDATE! CUR_STATE={:?}", self.status);
-            send_message(Message::ReportErrorRequest { errormessage: error_message }, &mut self.buff_writer);
-        }
+        self.handle_response(
+            Status::OpponentPlanning,
+            Status::Planning,
+            |state| {
+                if let Some(ref mut board) = state.my_board {
+                    board.hit(x as usize, y as usize);
+                }
+                state.my_turn = true;
+            },
+            "EnemyHitUpdate"
+        );
     }
 
     pub fn handle_miss_response(&mut self, x: u8, y: u8) {
-        if self.status == Status::Planning {
-            if let Some(ref mut board) = self.their_board {
-                board.set_water(x, y);
-            }
-            self.my_turn = false;
-            self.status = Status::OpponentPlanning;
-        } else {
-            let error_message: String = format!("ERROR: I did not expect a MISS_RESPONSE! CUR_STATE={:?}", self.status);
-            send_message(Message::ReportErrorRequest { errormessage: error_message }, &mut self.buff_writer);
-        }
+        self.handle_response(
+            Status::Planning,
+            Status::OpponentPlacing,
+            |state| {
+                if let Some(ref mut board) = state.their_board {
+                    board.set_water(x, y);
+                }
+                state.my_turn = false;
+            },
+            "MissResponse"
+        );
     }
 
     pub fn handle_enemy_miss_update(&mut self, x: u8, y: u8) {
-        if self.status == Status::OpponentPlanning {
-            if let Some(ref mut board) = self.my_board {
-                board.set_visible_at(x as usize, y as usize);
-            }
-            self.my_turn = true;
-            self.status = Status::Planning;
-        } else {
-            let error_message: String = format!("ERROR: I did not expect an ENEMY_MISS_UPDATE! CUR_STATE={:?}", self.status);
-            send_message(Message::ReportErrorRequest { errormessage: error_message }, &mut self.buff_writer);
-        }
+        self.handle_response(
+            Status::OpponentPlanning,
+            Status::Planning,
+            |state| {
+                if let Some(ref mut board) = state.my_board {
+                    board.set_visible_at(x as usize, y as usize);
+                }
+                state.my_turn = true;
+            },
+            "EnemyMissUpdate"
+        );
     }
 
     pub fn handle_destroyed_response(&mut self, x: u8, y: u8) {
-        if self.status == Status::Planning {
-            if let Some(ref mut board) = self.their_board {
-                board.set_water(x, y);
-            }
-            self.my_turn = false;
-            self.hits += 1;
-            self.destroyed += 1;
-            self.status = Status::OpponentPlanning;
-        } else {
-            let error_message: String = format!("ERROR: I did not expect a DESTROYED_RESPONSE! CUR_STATE={:?}", self.status);
-            send_message(Message::ReportErrorRequest { errormessage: error_message }, &mut self.buff_writer);
-        }
+        self.handle_response(
+            Status::Planning,
+            Status::OpponentPlacing,
+            |state| {
+                if let Some(ref mut board) = state.their_board {
+                    board.set_water(x, y);
+                }
+                state.my_turn = false;
+                state.hits += 1;
+                state.destroyed += 1;
+            },
+            "DestroyedResponse"
+        );
     }
 
     pub fn handle_your_turn_update(&mut self) {
-        if self.status == Status::OpponentPlacing {
-            self.my_turn = true;
-            self.status = Status::Planning;
-        } else {
-            let error_message: String = format!("ERROR: I did not expect a YOUR_TURN_UPDATE! CUR_STATE={:?}", self.status);
-            send_message(Message::ReportErrorRequest { errormessage: error_message }, &mut self.buff_writer);
-        }
+        self.handle_response(
+            Status::OpponentPlacing,
+            Status::Planning,
+            |state| { state.my_turn = true; },
+            "YourTurnUpdate"
+        );
     }
 
     pub fn handle_enemy_turn_update(&mut self) {
-        if self.status == Status::OpponentPlacing {
-            self.my_turn = false;
-            self.status = Status::OpponentPlanning;
-        } else {
-            let error_message: String = format!("ERROR: I did not expect an ENEMY_TURN_UPDATE! CUR_STATE={:?}", self.status);
-            send_message(Message::ReportErrorRequest { errormessage: error_message }, &mut self.buff_writer);
-        }
+        self.handle_response(
+            Status::OpponentPlacing,
+            Status::OpponentPlanning,
+            |state| { state.my_turn = false; },
+            "EnemyTurnUpdate"
+        );
     }
 
     pub fn handle_enemy_visible_update(&mut self, x: u8, y: u8) {
@@ -424,31 +423,33 @@ impl State {
     }
 
     pub fn handle_afk_warning_update(&mut self, strikes: u8) {
-        if self.status == Status::Planning {
-            self.my_turn = false;
-            self.my_afks -= 1;
-            if self.my_afks != strikes {
-                panic!("Inconsistent strike count for **me**! MINE={}, SERVER={}", self.my_afks, strikes);
-            }
-            self.status = Status::OpponentPlanning;
-        } else {
-            let error_message: String = format!("ERROR: I did not expect an AFK_WARNING_UPDATE! CUR_STATE={:?}", self.status);
-            send_message(Message::ReportErrorRequest { errormessage: error_message }, &mut self.buff_writer);
-        }
+        self.handle_response(
+            Status::Planning,
+            Status::OpponentPlanning,
+            |state| {
+                state.my_turn = false;
+                state.my_afks -= 1;
+                if state.my_afks != strikes {
+                    panic!("Inconsistent strike count for **me**! MINE={}, SERVER={}", state.my_afks, strikes);
+                }
+            },
+            "AfkWarningUpdate"
+        );
     }
 
     pub fn handle_enemy_afk_update(&mut self, strikes: u8) {
-        if self.status == Status::OpponentPlanning {
-            self.my_turn = true;
-            self.their_afks -= 1;
-            if self.their_afks != strikes {
-                panic!("Inconsistent strike count for **the enemy**! MINE={}, SERVER={}", self.their_afks, strikes);
-            }
-            self.status = Status::Planning;
-        } else {
-            let error_message: String = format!("ERROR: I did not expect an ENEMY_AFK_UPDATE! CUR_STATE={:?}", self.status);
-            send_message(Message::ReportErrorRequest { errormessage: error_message }, &mut self.buff_writer);
-        }
+        self.handle_response(
+            Status::OpponentPlanning,
+            Status::Planning,
+            |state| {
+                state.my_turn = true;
+                state.their_afks -= 1;
+                if state.their_afks != strikes {
+                    panic!("Inconsistent strike count for **the enemy**! MINE={}, SERVER={}", state.their_afks, strikes);
+                }
+            },
+            "EnemyAfkUpdate"
+        );
     }
 
     pub fn handle_game_over_update(&mut self, victory: bool, reason: Reason) {
@@ -659,7 +660,6 @@ impl State {
             let input = self.ui_update_receiver.try_recv();
 
             if let Ok(received) = input {
-//                    println!(">>>UI input!");
                 match received {
                     Message::GetFeaturesRequest => {
                         self.get_features();
@@ -690,9 +690,7 @@ impl State {
                     },
                     m => panic!("Received illegal request from client: {:?}", m),
                 }
-            } else {
-//                    println!(">>>No UI input: {:?}", input);
-            }
+            } 
 
             tick.recv().expect("Timer thread died unexpectedly."); // wait for next tick
         }
