@@ -131,6 +131,17 @@ impl State {
         return true;
     }
 
+    fn change_status(&mut self, from: Status, to: Status, msg: Message) -> bool {
+        if self.status != from {
+            println!("Transitioning to {:?} not possible in state {:?}, expected to be in state {:?}", to, self.status, from);
+            return false;
+        }
+        self.status = to;
+        send_message(msg.clone(), &mut self.buff_writer);
+        println!("Sending {:?}", msg);
+        true
+    }
+
     //FIXME: Change return value to Result<(),String)>
     pub fn login(&mut self, nickname: &str) -> bool {
         if self.status != Status::Unregistered {
@@ -145,38 +156,30 @@ impl State {
 
     //FIXME: Change return value to Result<(),String)>
     pub fn ready(&mut self) -> bool {
-        if self.status != Status::Available {
-            return false;
-        }
-        self.status = Status::AwaitReady;
-        send_message(Message::ReadyRequest, &mut self.buff_writer);
-        println!("Sending READY_REQUEST");
-        return true;
+        self.change_status(
+            Status::Available, 
+            Status::AwaitReady,
+            Message::ReadyRequest
+        )
     }
 
     //FIXME: Change return value to Result<(),String)>
     pub fn unready(&mut self) -> bool {
-        if self.status != Status::Waiting {
-            return false;
-        }
-        self.status = Status::AwaitNotReady;
-        send_message(Message::NotReadyRequest, &mut self.buff_writer);
-        println!("Sending NOT_READY_REQUEST");
-        return true;
+        self.change_status(
+            Status::Waiting, 
+            Status::AwaitNotReady, 
+            Message::NotReadyRequest
+        )
     }
 
     /* Sends a challenge to the server, if and only if the opponent is in the ready-and-waiting-list */
     //FIXME: Change return value to Result<(),String)>
     pub fn challenge(&mut self, opponent: &str) -> bool {
-        if self.status != Status::Available {
-            println!("You can't challenge anyone unless you're in state AVAILABLE! STATE={:?}", self.status.clone());
-            return false;
-        }
-
-        println!("Challenging captain {:?}", opponent);
-        send_message(Message::ChallengePlayerRequest { username: String::from(opponent) }, &mut self.buff_writer);
-        self.status = Status::AwaitGameStart;
-        return true;
+        self.change_status(
+            Status::Available,
+            Status::AwaitGameStart,
+            Message::ChallengePlayerRequest { username: String::from(opponent) }
+        )
     }
 
     //FIXME: Change return value to Result<(),String)>
