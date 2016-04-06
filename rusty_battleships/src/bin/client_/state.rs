@@ -77,20 +77,11 @@ pub struct State {
 #[derive(Debug, Hash, Eq, PartialEq, Clone)]
 pub enum Status {
     //NOT REGISTERED
-    Unregistered,
-    AwaitFeatures,
-    Register,
+    Unregistered, AwaitFeatures, Register,
     //LOBBY
-    Available,
-    AwaitReady,
-    AwaitGameStart,
-    Waiting,
-    AwaitNotReady,
+    Available, AwaitReady, AwaitGameStart, Waiting, AwaitNotReady,
     //GAME
-    PlacingShips,
-    OpponentPlacing,
-    Planning,
-    OpponentPlanning,
+    PlacingShips, OpponentPlacing, Planning, OpponentPlanning,
     //INTERMEDIATE
     Surrendered,
 }
@@ -257,16 +248,15 @@ impl State {
         );
     }
 
-    pub fn handle_get_features_response(&mut self, features: Vec<String>) -> Result<(), String> {
-        if self.status == Status::AwaitFeatures {
-            self.lobby.set_feature_list(features);
-            self.status = Status::Unregistered;
-            return Ok(());
-        } else {
-            let error_message: String = format!("ERROR: I did not expect a feature response! CUR_STATE={:?}", self.status);
-            send_message(Message::ReportErrorRequest { errormessage: error_message.clone() }, &mut self.buff_writer);
-            return Err(error_message.clone());
-        }
+    pub fn handle_get_features_response(&mut self, features: Vec<String>) {
+        self.handle_response(
+            Status::AwaitFeatures,
+            Status::Unregistered,
+            |state| {
+                state.lobby.set_feature_list(features.clone());
+            },
+            "feature response"
+        );
     }
 
     pub fn surrender(&mut self) {
@@ -599,7 +589,7 @@ impl State {
                     },
                     Message::FeaturesResponse {features: fts} => {
                         println!("Received features list!");
-                        self.handle_get_features_response(fts).unwrap();
+                        self.handle_get_features_response(fts);
                     },
                     Message::NameTakenResponse {nickname: nn} => {
                         println!("There is already a captain {:?} registered. Choose a different name.", nn);

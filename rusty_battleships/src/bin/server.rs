@@ -169,6 +169,34 @@ fn handle_main(msg: Message, player: &mut board::PlayerHandle, lobby: &mut HashM
     return state::Result::respond(Message::InvalidRequestResponse, false);
 }
 
+fn log_msg(index: usize, player_handle: &board::PlayerHandle, color: ansi_term::Colour, msg: &Message) {
+    println!(
+        "#{} ({}): {}", 
+        index, 
+        player_handle.nickname.clone().unwrap_or("".to_owned()), 
+        color.paint(format!("{:?}", msg)));
+}
+
+/**
+ * @return.0 Whether the player was terminated
+ */
+fn handle_msg(i: usize, player_handle: &mut board::PlayerHandle, msg: Message, mut lobby: &mut HashMap<String, board::Player>, mut games: &mut Vec<Rc<RefCell<Game>>>) -> (bool, state::Result) {
+    log_msg(i, &player_handle, Green, &msg);
+    // Handle Message received from child
+    let result = handle_main(msg, player_handle, &mut lobby, &mut games);
+    if let Some(ref response) = result.response {
+        // handle_main generated a response -> send response Message back to child
+        log_msg(i, &player_handle, Cyan, &response);
+        player_handle.to_child_endpoint.send(ToChildCommand::Message((*response).clone())).unwrap();
+    }
+    if result.terminate_connection {
+        println!("-- Closing connection to child {}", i);
+        player_handle.to_child_endpoint.send(ToChildCommand::TerminateConnection).unwrap();
+        return (false, result);
+    }
+    (true, result)
+}
+
 fn main() {
     let mut port:u16 = 5000;
     let mut ip = Ipv4Addr::new(0,0,0,0);
@@ -233,42 +261,35 @@ fn main() {
         // Receive Messages from child threads
 	    let mut valid = vec![true; player_handles.len()];
         for (i, player_handle) in player_handles.iter_mut().enumerate() {
-            if let Ok(maybe_msg) = player_handle.from_child_endpoint.try_recv() {
-                match maybe_msg {
-                    ToMainThreadCommand::Message(msg) => {
-                        println!("#{} ({}): {}", i, player_handle.nickname.clone().unwrap_or("".to_owned()), Green.paint(format!("{:?}", msg)));
-                        // Handle Message received from child
-                        let result = handle_main(msg, player_handle, &mut &mut lobby, &mut games);
-                        if let Some(response) = result.response {
-                            // handle_main generated a response -> send response Message back to child
-                            println!("#{} ({}): {}", i, player_handle.nickname.clone().unwrap_or("".to_owned()), Cyan.paint(format!("{:?}", response)));
-                            player_handle.to_child_endpoint.send(ToChildCommand::Message(response)).unwrap();
-                        }
-                        if result.terminate_connection {
-                            println!("-- Closing connection to child {}", i);
-                            player_handle.to_child_endpoint.send(ToChildCommand::TerminateConnection).unwrap();
-                            valid[i] = false;
-                        }
-                        if !result.updates.is_empty() {
-                            message_store = result.updates;
-                            break;
-                        }
-                    },
-                    ToMainThreadCommand::Error(ref e) => {
-                        if let Some(ref name) = player_handle.nickname {
-                            message_store = state::terminate_player(name, &mut lobby, &mut games);
-                        }
+            match player_handle.from_child_endpoint.try_recv() {
+                Ok(ToMainThreadCommand::Message(msg)) => {
+                    let (player_terminated, result) = handle_msg(i, player_handle, msg, &mut lobby, &mut games);
+                    if player_terminated {
                         valid[i] = false;
-                        if e.kind() == std::io::ErrorKind::UnexpectedEof {
+                    }
+                    if !result.updates.is_empty() {
+                        message_store = result.updates;
+                        break;
+                    }
+                },
+                Ok(ToMainThreadCommand::Error(ref e)) => {
+                    if let Some(ref name) = player_handle.nickname {
+                        message_store = state::terminate_player(name, &mut lobby, &mut games);
+                    }
+                    valid[i] = false;
+                    match e.kind() {
+                        std::io::ErrorKind::UnexpectedEof => {
                             println!("Client terminated connection");
                             player_handle.to_child_endpoint.send(ToChildCommand::TerminateConnection).unwrap();
-                        } else {
+                        },
+                        _ => {
                             println!("Got error: {:?}", e);
                             // Ignoring return value of respond() since we are exiting anyway
                             player_handle.to_child_endpoint.send(ToChildCommand::Message(Message::InvalidRequestResponse)).unwrap();
                         }
-                    },
-                }
+                    }
+                },
+                _ => {},
             }
         }
 
