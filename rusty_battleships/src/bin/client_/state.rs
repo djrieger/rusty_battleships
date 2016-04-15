@@ -500,6 +500,69 @@ impl State {
         self.board_update_sender.send(boards).unwrap();
     }
 
+    fn print_server_response(&self, msg: Message) {
+        match msg {
+            Message::PlayerJoinedUpdate {nickname: nn} => println!("Welcome our new captain {:?}", nn),
+            Message::PlayerLeftUpdate {nickname: nn} => println!("Say goodbye to captain {:?}", nn), 
+            Message::PlayerReadyUpdate {nickname: nn} => println!("Captain {:?} is now ready to be challenged.", nn),
+            Message::PlayerNotReadyUpdate {nickname : nn} => println!("Captain {:?} is not ready.", nn),
+            Message::GameStartUpdate {nickname: nn} => println!("Received a challenge by captain {:?}", nn),
+            Message::ServerGoingDownUpdate {errormessage: err}=> {
+                println!("The server is going down!");
+                println!("REASON:{:?}",err);
+            },
+            Message::YourTurnUpdate => println!("It's your turn!"),
+            Message::EnemyTurnUpdate => println!("It's the enemy's turn!"),
+            Message::NotYourTurnResponse => println!("It's not your turn!"),
+            Message::EnemyHitUpdate {x, y} => println!("We're hit! ({}, {})", x, y),
+            Message::EnemyMissUpdate {x, y} => println!("They missed! ({}, {})", x, y),
+            Message::EnemyVisibleUpdate {x, y} => println!("The enemy has been sighted! ({}, {})", x, y),
+            Message::EnemyInvisibleUpdate {x, y} => println!("We lost track of the enemy! ({}, {})", x, y),
+            Message::EnemyAfkUpdate {strikes} => println!("The enemy is sleeping! ({})", strikes),
+            // RESPONSES
+            Message::InvalidRequestResponse => println!("Received an INVALID_REQUEST_RESPONSE in state {:?}.", self.status),
+            Message::FeaturesResponse {..} => println!("Received features list!"),
+            Message::NameTakenResponse {nickname: nn} => println!("There is already a captain {:?} registered. Choose a different name.", nn),
+            Message::NoSuchPlayerResponse {nickname: nn} => println!("There is no captain {:?} registered.", nn),
+            Message::NotWaitingResponse {nickname: nn} => println!("Captain {:?} is not waiting to be challenged.", nn),
+            Message::GameAlreadyStartedResponse => println!("The game has already started."),
+            Message::HitResponse {x, y} => println!("You have hit a ship! ({}, {})", x, y),
+            Message::MissResponse {x, y} => println!("You have missed.({}, {})", x, y),
+            Message::DestroyedResponse {..} => println!("Congratulations! You destroyed an enemy ship!"),
+            _ => println!(">>>RECEIVED: {:?}", msg),
+        }
+    }
+
+    fn handle_server_response(&mut self, msg: Message) {
+        match msg.clone() {
+            // UPDATES
+            Message::PlayerJoinedUpdate {nickname: nn} => self.lobby.add_player(&nn.clone()),
+            Message::PlayerLeftUpdate {nickname: nn} => self.lobby.remove_player(&nn.clone()),
+            Message::PlayerReadyUpdate {nickname: nn} => self.lobby.ready_player(&nn.clone()),
+            Message::PlayerNotReadyUpdate {nickname : nn} => self.lobby.unready_player(&nn.clone()),
+            Message::GameStartUpdate {nickname: nn} => self.handle_game_start_update(&nn.clone()),
+            Message::GameOverUpdate {victorious, reason} => self.handle_game_over_update(victorious, reason),
+            Message::YourTurnUpdate => self.handle_your_turn_update(),
+            Message::EnemyTurnUpdate => self.handle_enemy_turn_update(),
+            Message::AfkWarningUpdate {strikes} => self.handle_afk_warning_update(strikes),
+            Message::EnemyHitUpdate {x, y} => self.handle_enemy_hit_update(x, y),
+            Message::EnemyMissUpdate {x, y} => self.handle_enemy_miss_update(x, y),
+            Message::EnemyVisibleUpdate {x, y} => self.handle_enemy_visible_update(x, y),
+            Message::EnemyInvisibleUpdate {x, y} => self.handle_enemy_invisible_update(x, y),
+            Message::EnemyAfkUpdate {strikes} => self.handle_enemy_afk_update(strikes),
+            // RESPONSES
+            Message::OkResponse => self.handle_ok_response(msg.clone()).unwrap(),
+            Message::FeaturesResponse {features: fts} => self.handle_get_features_response(fts),
+            Message::NameTakenResponse {nickname: nn} => self.handle_name_taken_response(&nn),
+            Message::NoSuchPlayerResponse {nickname: nn} => self.handle_no_such_player_response(&nn),
+            Message::NotWaitingResponse {nickname: nn} => self.handle_not_waiting_response(&nn),
+            Message::HitResponse {x, y} => self.handle_hit_response(x, y),
+            Message::MissResponse {x, y} => self.handle_miss_response(x, y),
+            Message::DestroyedResponse {x, y} => self.handle_destroyed_response(x, y),
+            _ => {},
+        }
+    }
+
     pub fn update_listen_loop(&mut self, rx: Receiver<Message>) {
         println!(">>>Starting update_listen_loop.");
 
@@ -507,115 +570,12 @@ impl State {
 
         /*check-for-messages-loop*/
         loop {
-            //println!("Checking for messages.");
             let received = rx.try_recv();
             if let Ok(server_response) = received {
                 println!(">>>Oh, a message for me! MSG={:?}", server_response.clone());
 
-                /* Handle messages from the server. */
-                match server_response.clone() {
-                    // UPDATES
-                    Message::PlayerJoinedUpdate {nickname: nn} => {
-                        println!("Welcome our new captain {:?}", nn);
-                        self.lobby.add_player(&nn.clone());
-                    },
-                    Message::PlayerLeftUpdate {nickname: nn} => {
-                        println!("Say goodbye to captain {:?}", nn);
-                        self.lobby.remove_player(&nn.clone());
-                    }
-                    Message::PlayerReadyUpdate {nickname: nn} => {
-                        println!("Captain {:?} is now ready to be challenged.", nn);
-                        self.lobby.ready_player(&nn.clone());
-                    },
-                    Message::PlayerNotReadyUpdate {nickname : nn} => {
-                        println!("Captain {:?} is not ready.", nn);
-                        self.lobby.unready_player(&nn.clone());
-                    },
-                    Message::GameStartUpdate {nickname: nn} => {
-                        println!("Received a challenge by captain {:?}", nn);
-                        self.handle_game_start_update(&nn.clone());
-                    },
-                    Message::GameOverUpdate {victorious, reason} => {
-                        self.handle_game_over_update(victorious, reason);
-                    }
-                    Message::ServerGoingDownUpdate {errormessage: err}=> {
-                        println!("The server is going down!");
-                        println!("REASON:{:?}",err);
-                    },
-                    Message::YourTurnUpdate => {
-                        println!("It's yout turn!");
-                        self.handle_your_turn_update();
-                    },
-                    Message::EnemyTurnUpdate => {
-                        println!("It's the enemy's turn!");
-                        self.handle_enemy_turn_update();
-                    },
-                    Message::NotYourTurnResponse => {
-                        //println!("I'm sorry dave, I'm afraid I can't do that.");
-                        // FIXME: handle properly, race condition occurred!
-                        println!("It's not your turn!");
-                    },
-                    Message::AfkWarningUpdate {strikes} => {
-                        self.handle_afk_warning_update(strikes);
-                    }
-                    Message::EnemyHitUpdate {x, y} => {
-                        println!("We're hit! ({}, {})", x, y);
-                        self.handle_enemy_hit_update(x, y);
-                    },
-                    Message::EnemyMissUpdate {x, y} => {
-                        println!("They missed! ({}, {})", x, y);
-                        self.handle_enemy_miss_update(x, y);
-                    },
-                    Message::EnemyVisibleUpdate {x, y} => {
-                        println!("The enemy has been sighted! ({}, {})", x, y);
-                        self.handle_enemy_visible_update(x, y);
-                    },
-                    Message::EnemyInvisibleUpdate {x, y} => {
-                        println!("We lost track of the enemy! ({}, {})", x, y);
-                        self.handle_enemy_invisible_update(x, y);
-                    },
-                    Message::EnemyAfkUpdate {strikes} => {
-                        println!("The enemy is sleeping! ({})", strikes);
-                        self.handle_enemy_afk_update(strikes);
-                    },
-                    // RESPONSES
-                    Message::OkResponse => self.handle_ok_response(server_response.clone()).unwrap(),
-                    Message::InvalidRequestResponse => {
-                        println!("Received an INVALID_REQUEST_RESPONSE in state {:?}.", self.status);
-                    },
-                    Message::FeaturesResponse {features: fts} => {
-                        println!("Received features list!");
-                        self.handle_get_features_response(fts);
-                    },
-                    Message::NameTakenResponse {nickname: nn} => {
-                        println!("There is already a captain {:?} registered. Choose a different name.", nn);
-                        self.handle_name_taken_response(&nn);
-                    },
-                    Message::NoSuchPlayerResponse {nickname: nn} => {
-                        println!("There is no captain {:?} registered.", nn);
-                        self.handle_no_such_player_response(&nn);
-                    },
-                    Message::NotWaitingResponse {nickname: nn} => {
-                        println!("Captain {:?} is not waiting to be challenged.", nn);
-                        self.handle_not_waiting_response(&nn);
-                    },
-                    Message::GameAlreadyStartedResponse => {
-                        println!("The game has already started.");
-                    },
-                    Message::HitResponse {x, y} => {
-                        println!("You have hit a ship! ({}, {})", x, y);
-                        self.handle_hit_response(x, y);
-                    },
-                    Message::MissResponse {x, y} => {
-                        println!("You have missed.({}, {})", x, y);
-                        self.handle_miss_response(x, y);
-                    },
-                    Message::DestroyedResponse {x, y} => {
-                        println!("Congratulations! You destroyed an enemy ship!");
-                        self.handle_destroyed_response(x, y);
-                    },
-                    _ => println!(">>>RECEIVED: {:?}", server_response),
-                }
+                self.print_server_response(server_response.clone());
+                self.handle_server_response(server_response.clone());
 
                 match server_response.clone() {
                     Message::PlayerJoinedUpdate {..} |
