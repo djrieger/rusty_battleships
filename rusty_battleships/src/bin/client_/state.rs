@@ -488,19 +488,15 @@ impl State {
     }
 
     fn send_updated_boards(&mut self) {
-        let mb;
-        let tb;
-        if let Some(ref b) = self.my_board {
-            mb = b.clone();
-        } else {
-            mb = Board::try_create(vec![], false).unwrap();
-        }
-        if let Some(ref c) = self.their_board {
-            tb = c.clone();
-        } else {
-            tb = DumbBoard::new();
-        }
-        let boards = (mb, tb, self.hits, self.destroyed);
+        let myboard = match self.my_board {
+            Some(ref board) => board.clone(),
+            None => Board::try_create(vec![], false).unwrap(),
+        };
+        let theirboard = match self.their_board {
+            Some(ref board) => board.clone(),
+            None => DumbBoard::new(),
+        };
+        let boards = (myboard, theirboard, self.hits, self.destroyed);
         self.board_update_sender.send(boards).unwrap();
     }
 
