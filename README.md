@@ -65,4 +65,6 @@ export PKG_CONFIG_PATH=<QT-Path>/<QT-Version>/gcc_64/lib/pkgconfig/
 Please note, that exports only apply to the terminal in which the exports were executed. You can also add these four lines to your ~/.bashrc.
 
 You also need the OpenGL dev libraries:
-$ sudo apt-get install build-essential libgl1-mesa-dev
+```bash
+sudo apt-get install build-essential libgl1-mesa-dev
+```
