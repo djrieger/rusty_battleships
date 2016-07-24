@@ -14,7 +14,7 @@ Build requirements
    * OS X: XCode command line tools (include clang)
    * Windows: Visual Studio 2015, including C++ support
  * Qt 5.5 (Linux, OS X) / 5.6 beta, 64-bit, VS 2015 (Windows)
-   * When using the online installer only the following Qt modules have to be selected: 
+   * When using the online installer only the following Qt modules have to be selected:
      - Quick Controls
      - Quick
      - Script
@@ -55,17 +55,14 @@ The following Ubuntu packages must be installed to compile the project (Only Ubu
 
 For older versions, such as 14.04 LTS, use the online installer from http://www.qt.io/download-open-source/ to install the Qt modules for your platform (you don't need the source and android packages!). Then export the following, after replacing <QT-Path> and <QT-Version> with the path to your Qt installation and your Qt version (e.g. /Qt/5.5/...):
 
-$ export CMAKE_PREFIX_PATH=<QT-Path>/<QT-Version>/gcc_64/
-$ export QTDIR=<QT-Path>/<QT-Version>/gcc_64/
-$ export LD_LIBRARY_PATH=<QT-Path>/<QT-Version>/gcc_64/lib
-$ export PKG_CONFIG_PATH=<QT-Path>/<QT-Version>/gcc_64/lib/pkgconfig/
+```bash
+export CMAKE_PREFIX_PATH=<QT-Path>/<QT-Version>/gcc_64/
+export QTDIR=<QT-Path>/<QT-Version>/gcc_64/
+export LD_LIBRARY_PATH=<QT-Path>/<QT-Version>/gcc_64/lib
+export PKG_CONFIG_PATH=<QT-Path>/<QT-Version>/gcc_64/lib/pkgconfig/
+```
 
 Please note, that exports only apply to the terminal in which the exports were executed. You can also add these four lines to your ~/.bashrc.
 
 You also need the OpenGL dev libraries:
 $ sudo apt-get install build-essential libgl1-mesa-dev
-
-
-
-
-
